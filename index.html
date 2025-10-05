@@ -16,7 +16,7 @@
 <body>
   <div class="container">
     <h4><b>Laporan Index Shift</b></h4>
-    <p>Silakan input shift, Kemudian Upload file csv dari telegram, Lalu Generate</p>
+    <p>Silakan input shift, kemudian upload file CSV dari Telegram, lalu klik <b>Generate Tabel</b>.</p>
 
     <div class="mb-3 row">
       <div class="col-md-2">
@@ -38,7 +38,7 @@
     <div class="mb-3">
       <label for="csvFile" class="form-label">Upload file CSV (header: No | Personil | TotalCO | LastCO | Index)</label>
       <input type="file" id="csvFile" class="form-control" accept=".csv" />
-      <small class="text-muted">CSV harus memiliki header "header: No | Personil | TotalCO | LastCO | Index") sebagai acuan generate.</small>
+      <small class="text-muted">Gunakan file CSV dengan kolom Personil, TotalCO, LastCO, dan Index.</small>
     </div>
 
     <button id="generateBtn" class="btn btn-success mb-3">Generate Tabel</button>
@@ -71,9 +71,11 @@
     let sheetData = [];
     let csvData = [];
 
-    // === Tampilkan tanggal hari ini ===
+    // === Tanggal hari ini ===
     const today = new Date();
-    document.getElementById("tanggalCek").textContent = today.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+    document.getElementById("tanggalCek").textContent = today.toLocaleDateString("id-ID", {
+      day: "numeric", month: "long", year: "numeric"
+    });
 
     // === Ambil nama dari Google Sheet ===
     document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
@@ -84,20 +86,18 @@
 
       try {
         let shiftsToFetch = [shift];
-        if (shift === "P") shiftsToFetch.push("P1"); // tambahan penting agar P1 ikut diambil
-
+        if (shift === "P") shiftsToFetch.push("P1"); // agar P1 ikut
         let allData = [];
 
         for (let s of shiftsToFetch) {
-          const url = `${GAS_URL}?shift=${s}`;
-          const res = await fetch(url);
+          const res = await fetch(`${GAS_URL}?shift=${s}`);
           const data = await res.json();
           if (data.karyawan && Array.isArray(data.karyawan)) {
             allData = allData.concat(data.karyawan);
           }
         }
 
-        // Hilangkan duplikat nama
+        // Hilangkan duplikat
         const unique = [];
         const seen = new Set();
         for (const k of allData) {
@@ -108,13 +108,13 @@
         }
 
         sheetData = unique;
-        document.getElementById("statusText").textContent = `Data ditemukan: ${sheetData.length} orang. (Shift ${shiftsToFetch.join(" & ")})`;
+        document.getElementById("statusText").textContent = `Data ditemukan: ${sheetData.length} orang (Shift ${shiftsToFetch.join(" & ")})`;
       } catch (err) {
         document.getElementById("statusText").textContent = "Gagal memanggil API: " + err.message;
       }
     });
 
-    // === Upload & baca CSV ===
+    // === Upload CSV ===
     document.getElementById("csvFile").addEventListener("change", (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -137,7 +137,33 @@
       reader.readAsText(file);
     });
 
-    // === Generate tabel ===
+    // === Fuzzy matching helper (Levenshtein distance) ===
+    function levenshtein(a, b) {
+      const matrix = [];
+      const lenA = a.length, lenB = b.length;
+      for (let i = 0; i <= lenB; i++) matrix[i] = [i];
+      for (let j = 0; j <= lenA; j++) matrix[0][j] = j;
+      for (let i = 1; i <= lenB; i++) {
+        for (let j = 1; j <= lenA; j++) {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j - 1] + (b[i - 1] === a[j - 1] ? 0 : 1)
+          );
+        }
+      }
+      return matrix[lenB][lenA];
+    }
+
+    function similarity(a, b) {
+      a = a.toLowerCase().trim();
+      b = b.toLowerCase().trim();
+      if (!a || !b) return 0;
+      const dist = levenshtein(a, b);
+      return 1 - dist / Math.max(a.length, b.length);
+    }
+
+    // === Generate tabel dengan fuzzy matching ===
     document.getElementById("generateBtn").addEventListener("click", () => {
       if (!sheetData.length) return alert("Ambil nama dari Google Sheet dulu.");
       if (!csvData.length) return alert("Upload file CSV terlebih dahulu.");
@@ -147,10 +173,21 @@
       tbody.innerHTML = "";
 
       sheetData.forEach((k, i) => {
-        const dataCsv = csvData.find(c => c.nama.toLowerCase().includes(k.nama.toLowerCase()));
-        const total = dataCsv ? dataCsv.total : "";
-        const last = dataCsv ? dataCsv.last : "";
-        const idx = dataCsv ? dataCsv.index : "";
+        let bestMatch = null;
+        let bestScore = 0;
+
+        for (const c of csvData) {
+          const score = similarity(k.nama, c.nama);
+          if (score > bestScore) {
+            bestScore = score;
+            bestMatch = c;
+          }
+        }
+
+        // threshold 0.6 = toleran (bisa diganti jadi 0.7 kalau mau lebih ketat)
+        const total = bestMatch && bestScore > 0.6 ? bestMatch.total : "";
+        const last = bestMatch && bestScore > 0.6 ? bestMatch.last : "";
+        const idx = bestMatch && bestScore > 0.6 ? bestMatch.index : "";
 
         const tr = document.createElement("tr");
         tr.innerHTML = `
@@ -163,6 +200,8 @@
         `;
         tbody.appendChild(tr);
       });
+
+      document.getElementById("statusText").textContent = "Tabel berhasil digenerate dengan fuzzy matching toleran.";
     });
 
     // === Download JPG ===
@@ -177,4 +216,3 @@
   </script>
 </body>
 </html>
-
