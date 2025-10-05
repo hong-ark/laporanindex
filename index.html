@@ -103,6 +103,7 @@
     const previewBtn = document.getElementById("previewBtn");
     const tableBody = document.getElementById("tableBody");
 
+    // ======== Ambil data dari Google Sheet berdasarkan tanggal & shift ==========
     ambilDataBtn.addEventListener("click", async () => {
       const tanggal = tanggalInput.value;
       const shift = shiftInput.value;
@@ -112,7 +113,7 @@
       }
 
       try {
-        let tanggalParam = new Date(tanggal).toISOString().split('T')[0];
+        const tanggalParam = new Date(tanggal).toISOString().split('T')[0];
         let res = await fetch(`${GAS_URL}?shift=${shift}&tanggal=${tanggalParam}`);
         let data = await res.json();
 
@@ -125,54 +126,79 @@
         dataGabung = data.karyawan || [];
         renderTable(dataGabung);
       } catch (err) {
-        alert("Gagal ambil data dari Google Sheet");
+        alert("❌ Gagal ambil data dari Google Sheet");
         console.error(err);
       }
     });
 
+    // ======== Render tabel utama ==========
     function renderTable(data, withCsv = false) {
       if (!data.length) {
         tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Tidak ada data.</td></tr>`;
         return;
       }
+
       tableBody.innerHTML = data.map((row, i) => {
-        const csvMatch = withCsv ? csvData.find(c => c.nama.toLowerCase() === row.nama.toLowerCase()) : null;
+        const match = withCsv ? findCsvMatch(row.nama) : null;
         return `
           <tr>
             <td>${i + 1}</td>
             <td>${row.nama}</td>
             <td>${row.shift}</td>
-            <td>${csvMatch?.totalCO || "-"}</td>
-            <td>${csvMatch?.lastCO || "-"}</td>
-            <td>${csvMatch?.index || "-"}</td>
+            <td>${match?.totalCO || "-"}</td>
+            <td>${match?.lastCO || "-"}</td>
+            <td>${match?.index || "-"}</td>
           </tr>`;
       }).join("");
     }
 
+    // ======== Upload dan parsing CSV ==========
     csvInput.addEventListener("change", e => {
       const file = e.target.files[0];
       if (!file) return;
       const reader = new FileReader();
       reader.onload = ev => {
-        const lines = ev.target.result.split("\n").map(l => l.split(","));
-        csvData = lines.slice(1).map(l => ({
-          nama: l[1]?.trim(),
-          totalCO: l[2]?.trim(),
-          lastCO: l[3]?.trim(),
-          index: l[4]?.trim()
-        }));
+        const lines = ev.target.result.split(/\r?\n/).filter(l => l.trim() !== "");
+        const headers = lines[0].split(",").map(h => h.trim().toLowerCase());
+        const idxNama = headers.findIndex(h => h.includes("nama"));
+        const idxTotal = headers.findIndex(h => h.includes("total"));
+        const idxLast = headers.findIndex(h => h.includes("last"));
+        const idxIndex = headers.findIndex(h => h.includes("index"));
+
+        csvData = lines.slice(1).map(l => {
+          const cols = l.split(",");
+          return {
+            nama: cols[idxNama]?.trim() || "",
+            totalCO: cols[idxTotal]?.trim() || "",
+            lastCO: cols[idxLast]?.trim() || "",
+            index: cols[idxIndex]?.trim() || ""
+          };
+        });
+
         previewContainer.style.display = "block";
         alert("✅ File CSV berhasil diunggah!");
       };
       reader.readAsText(file);
     });
 
+    // ======== Pencocokan nama yang toleran (abaikan kapital, spasi, titik) ==========
+    function normalizeName(str) {
+      return str.toLowerCase().replace(/[\s.]/g, "");
+    }
+
+    function findCsvMatch(nama) {
+      const normNama = normalizeName(nama);
+      return csvData.find(c => normalizeName(c.nama) === normNama);
+    }
+
+    // ======== Preview Gabungan Data ==========
     previewBtn.addEventListener("click", () => {
       if (!dataGabung.length) return alert("Ambil data shift dulu!");
       if (!csvData.length) return alert("Upload file CSV dulu!");
       renderTable(dataGabung, true);
     });
 
+    // ======== Download Laporan ==========
     document.getElementById("downloadBtn").addEventListener("click", () => {
       html2canvas(document.querySelector(".card")).then(canvas => {
         const link = document.createElement("a");
