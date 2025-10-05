@@ -8,7 +8,7 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col items-center py-8">
 
-  <div class="bg-white shadow-2xl rounded-2xl p-6 w-full max-w-4xl">
+  <div class="bg-white shadow-2xl rounded-2xl p-6 w-full max-w-5xl">
     <h1 class="text-2xl font-bold text-center mb-4">📅 LAPORAN SHIFT HARIAN</h1>
 
     <!-- Pilihan tanggal -->
@@ -18,17 +18,12 @@
     </div>
 
     <!-- Tombol ambil data dari Sheet -->
-    <div class="flex justify-between items-center mb-6">
-      <button id="ambilSheet" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+    <div class="flex justify-between items-center mb-6 flex-col sm:flex-row gap-3">
+      <button id="ambilSheet" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 w-full sm:w-auto">
         Ambil Nama dari Google Sheet
       </button>
-      <input id="csvFile" type="file" accept=".csv" class="border p-2 rounded">
+      <input id="csvFile" type="file" accept=".csv" class="border p-2 rounded w-full sm:w-auto">
     </div>
-
-    <!-- Tombol generate -->
-    <button id="generateBtn" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 w-full mb-4">
-      Generate Laporan
-    </button>
 
     <!-- Area hasil -->
     <div id="resultArea" class="overflow-x-auto bg-gray-50 p-4 rounded-lg border border-gray-200">
@@ -36,10 +31,10 @@
         <thead class="bg-gray-200 text-gray-700 font-semibold">
           <tr>
             <th class="p-2">No</th>
-            <th class="p-2">Nama</th>
+            <th class="p-2">Nama Karyawan</th>
             <th class="p-2">Shift</th>
-            <th class="p-2">Total</th>
-            <th class="p-2">Last</th>
+            <th class="p-2">TotalCO</th>
+            <th class="p-2">LastCO</th>
             <th class="p-2">Index</th>
           </tr>
         </thead>
@@ -59,6 +54,25 @@
     let sheetData = [];
     let csvData = [];
 
+    const tableBody = document.querySelector("#resultTable tbody");
+
+    // === Render Tabel ===
+    function renderTable(data) {
+      tableBody.innerHTML = "";
+      data.forEach((row, i) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="border p-1">${i + 1}</td>
+          <td class="border p-1">${row.nama}</td>
+          <td class="border p-1">${row.shift || ""}</td>
+          <td class="border p-1">${row.total || ""}</td>
+          <td class="border p-1">${row.last || ""}</td>
+          <td class="border p-1">${row.index || ""}</td>
+        `;
+        tableBody.appendChild(tr);
+      });
+    }
+
     // === Ambil data nama dari Google Sheet ===
     document.getElementById("ambilSheet").addEventListener("click", async () => {
       const tanggal = document.getElementById("tanggalInput").value;
@@ -68,24 +82,27 @@
         const res = await fetch(`${GAS_URL}?tanggal=${encodeURIComponent(tanggal)}`);
         const data = await res.json();
 
-        // Normalisasi shift: P1 dianggap sama dengan P
+        // Normalisasi shift: misalnya P1 jadi P (tetap tampil aslinya di sheet)
         sheetData = data.map(d => ({
           nama: d.nama,
-          shift: (d.shift === "P1") ? "P" : d.shift
+          shift: d.shift
         }));
 
-        alert("✅ Data dari Google Sheet berhasil diambil!");
+        // tampilkan preview nama + shift
+        renderTable(sheetData);
+        alert("✅ Data dari Google Sheet berhasil diambil!\nPreview nama dan shift ditampilkan.");
       } catch (e) {
         console.error(e);
         alert("Gagal mengambil data dari Google Sheet.");
       }
     });
 
-    // === Upload CSV ===
+    // === Upload CSV dan otomatis isi data tabel ===
     document.getElementById("csvFile").addEventListener("change", e => {
       const file = e.target.files[0];
       if (!file) return;
       const reader = new FileReader();
+
       reader.onload = ev => {
         const lines = ev.target.result.split("\n").map(l => l.trim()).filter(l => l);
         const headers = lines[0].split(",").map(h => h.trim());
@@ -95,20 +112,24 @@
           headers.forEach((h, i) => obj[h.toLowerCase()] = vals[i] || "");
           return {
             nama: obj.nama || obj["name"] || "",
-            total: obj.total || "",
-            last: obj.last || "",
+            total: obj.total || obj["totalco"] || "",
+            last: obj.last || obj["lastco"] || "",
             index: obj.index || ""
           };
         });
-        alert("✅ File CSV berhasil dimuat!");
+        alert("✅ File CSV berhasil dimuat!\nData akan digabung ke tabel.");
+
+        updateTableWithCSV();
       };
       reader.readAsText(file);
     });
 
-    // === Generate tabel ===
-    document.getElementById("generateBtn").addEventListener("click", () => {
-      if (!sheetData.length) return alert("Ambil nama dari Google Sheet dulu.");
-      if (!csvData.length) return alert("Upload file CSV terlebih dahulu.");
+    // === Fungsi pencocokan CSV ke Sheet ===
+    function updateTableWithCSV() {
+      if (!sheetData.length) {
+        alert("Ambil nama dari Google Sheet terlebih dahulu.");
+        return;
+      }
 
       const normalize = str => str.toLowerCase().replace(/[^a-z0-9]/g, "").trim();
       const similarity = (a, b) => {
@@ -121,14 +142,10 @@
         return same / len;
       };
 
-      const tbody = document.querySelector("#resultTable tbody");
-      tbody.innerHTML = "";
-
-      sheetData.forEach((k, i) => {
+      const merged = sheetData.map(k => {
         const normNama = normalize(k.nama);
         let dataCsv = csvData.find(c => normalize(c.nama) === normNama);
 
-        // Jika tidak ketemu persis, cari yang paling mirip (≥ 0.85)
         if (!dataCsv) {
           let bestMatch = { score: 0, data: null };
           for (const c of csvData) {
@@ -138,18 +155,17 @@
           if (bestMatch.score >= 0.85) dataCsv = bestMatch.data;
         }
 
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td class="border p-1">${i + 1}</td>
-          <td class="border p-1">${k.nama}</td>
-          <td class="border p-1">${k.shift}</td>
-          <td class="border p-1">${dataCsv ? dataCsv.total : ""}</td>
-          <td class="border p-1">${dataCsv ? dataCsv.last : ""}</td>
-          <td class="border p-1">${dataCsv ? dataCsv.index : ""}</td>
-        `;
-        tbody.appendChild(tr);
+        return {
+          nama: k.nama,
+          shift: k.shift,
+          total: dataCsv ? dataCsv.total : "",
+          last: dataCsv ? dataCsv.last : "",
+          index: dataCsv ? dataCsv.index : ""
+        };
       });
-    });
+
+      renderTable(merged);
+    }
 
     // === Download JPG ===
     document.getElementById("downloadBtn").addEventListener("click", async () => {
