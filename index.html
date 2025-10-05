@@ -7,7 +7,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     body {
-      background: linear-gradient(135deg, #dfe9f3, #ffffff);
+      background: linear-gradient(135deg, #e3f2fd, #ffffff);
       min-height: 100vh;
       color: #333;
       display: flex;
@@ -24,37 +24,24 @@
       padding: 25px 35px;
       background: #ffffff;
     }
-    h3 {
-      color: #4b0082;
-    }
-    table th, table td {
-      text-align: center;
-      vertical-align: middle;
-    }
+    h3 { color: #4b0082; }
+    table th, table td { text-align: center; vertical-align: middle; }
     #downloadBtn {
-      background-color: #6a0dad;
-      color: #fff;
-      font-weight: 600;
-      border: none;
+      background-color: #6a0dad; color: #fff; font-weight: 600; border: none;
     }
-    #downloadBtn:hover {
-      background-color: #570b9e;
-    }
-    .form-label {
-      font-weight: 600;
-      color: #444;
-    }
+    #downloadBtn:hover { background-color: #570b9e; }
+    .form-label { font-weight: 600; color: #444; }
   </style>
 </head>
 <body>
   <div class="card">
     <h3 class="text-center mb-3 fw-bold">📋 LAPORAN INDEX KOMPLAIN ONLINE</h3>
 
-    <!-- Form input tanggal & shift -->
+    <!-- Input tanggal & shift -->
     <div class="row mb-3">
       <div class="col-md-6">
         <label for="tanggal" class="form-label">Pilih tanggal laporan:</label>
-        <input type="date" id="tanggal" class="form-control" required>
+        <input type="date" id="tanggal" class="form-control">
       </div>
       <div class="col-md-4">
         <label for="shift" class="form-label">Pilih Shift:</label>
@@ -70,7 +57,7 @@
       </div>
     </div>
 
-    <!-- Upload file CSV -->
+    <!-- Upload CSV -->
     <div class="mb-3">
       <label class="form-label">Upload File CSV:</label>
       <input type="file" id="csvFile" class="form-control" accept=".csv">
@@ -81,7 +68,7 @@
       <button class="btn btn-success" id="previewBtn">Preview Data Gabungan</button>
     </div>
 
-    <!-- Table hasil -->
+    <!-- Tabel -->
     <div class="table-responsive">
       <table class="table table-bordered table-striped mt-3" id="dataTable">
         <thead class="table-secondary">
@@ -103,61 +90,53 @@
     <button class="btn w-100 mt-3" id="downloadBtn">Download JPG</button>
   </div>
 
-  <!-- Script -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script>
     const GAS_URL = "https://script.google.com/macros/s/AKfycbyoPTlFn5NSBWlDLAT5tvfui9ZKe-l1-INlSmjZ9wWTD3bva3XiP1xp9R2i7K5eTPHqIg/exec";
+    let dataGabung = [], csvData = [];
 
-    const ambilDataBtn = document.getElementById("ambilDataBtn");
     const tanggalInput = document.getElementById("tanggal");
     const shiftInput = document.getElementById("shift");
+    const ambilDataBtn = document.getElementById("ambilDataBtn");
     const csvInput = document.getElementById("csvFile");
-    const tableBody = document.getElementById("tableBody");
     const previewContainer = document.getElementById("previewContainer");
     const previewBtn = document.getElementById("previewBtn");
-
-    let dataGabung = [];
-    let csvData = [];
+    const tableBody = document.getElementById("tableBody");
 
     ambilDataBtn.addEventListener("click", async () => {
       const tanggal = tanggalInput.value;
       const shift = shiftInput.value;
       if (!tanggal || !shift) {
-        alert("Silakan pilih tanggal dan shift terlebih dahulu!");
+        alert("Pilih tanggal dan shift terlebih dahulu!");
         return;
       }
 
       try {
-        dataGabung = [];
+        let tanggalParam = new Date(tanggal).toISOString().split('T')[0];
+        let res = await fetch(`${GAS_URL}?shift=${shift}&tanggal=${tanggalParam}`);
+        let data = await res.json();
 
-        // Ambil data shift utama
-        const resUtama = await fetch(`${GAS_URL}?shift=${shift}&tanggal=${tanggal}`);
-        const dataUtama = await resUtama.json();
-        if (dataUtama.karyawan) dataGabung = [...dataGabung, ...dataUtama.karyawan];
-
-        // Jika shift P, ambil juga P1
         if (shift === "P") {
-          const resP1 = await fetch(`${GAS_URL}?shift=P1&tanggal=${tanggal}`);
+          const resP1 = await fetch(`${GAS_URL}?shift=P1&tanggal=${tanggalParam}`);
           const dataP1 = await resP1.json();
-          if (dataP1.karyawan) dataGabung = [...dataGabung, ...dataP1.karyawan];
+          if (dataP1.karyawan) data.karyawan.push(...dataP1.karyawan);
         }
 
+        dataGabung = data.karyawan || [];
         renderTable(dataGabung);
       } catch (err) {
-        alert("Terjadi kesalahan mengambil data dari Google Sheet.");
+        alert("Gagal ambil data dari Google Sheet");
         console.error(err);
       }
     });
 
-    function renderTable(data, includeCsv = false) {
-      if (!data || data.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Tidak ada data shift untuk tanggal ini.</td></tr>`;
+    function renderTable(data, withCsv = false) {
+      if (!data.length) {
+        tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Tidak ada data.</td></tr>`;
         return;
       }
       tableBody.innerHTML = data.map((row, i) => {
-        const csvMatch = includeCsv
-          ? csvData.find(d => d.nama.toLowerCase() === row.nama.toLowerCase())
-          : null;
+        const csvMatch = withCsv ? csvData.find(c => c.nama.toLowerCase() === row.nama.toLowerCase()) : null;
         return `
           <tr>
             <td>${i + 1}</td>
@@ -167,41 +146,33 @@
             <td>${csvMatch?.lastCO || "-"}</td>
             <td>${csvMatch?.index || "-"}</td>
           </tr>`;
-      }).join('');
+      }).join("");
     }
 
-    // Upload CSV dan tampilkan tombol Preview
-    csvInput.addEventListener("change", function(event) {
-      const file = event.target.files[0];
+    csvInput.addEventListener("change", e => {
+      const file = e.target.files[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = function(e) {
-        const lines = e.target.result.split("\n").map(line => line.split(","));
+      reader.onload = ev => {
+        const lines = ev.target.result.split("\n").map(l => l.split(","));
         csvData = lines.slice(1).map(l => ({
-          nama: l[0]?.trim(),
-          totalCO: l[1]?.trim(),
-          lastCO: l[2]?.trim(),
-          index: l[3]?.trim()
+          nama: l[1]?.trim(),
+          totalCO: l[2]?.trim(),
+          lastCO: l[3]?.trim(),
+          index: l[4]?.trim()
         }));
         previewContainer.style.display = "block";
+        alert("✅ File CSV berhasil diunggah!");
       };
       reader.readAsText(file);
     });
 
-    // Preview gabungan data dengan CSV
     previewBtn.addEventListener("click", () => {
-      if (dataGabung.length === 0) {
-        alert("Silakan ambil data shift terlebih dahulu!");
-        return;
-      }
-      if (csvData.length === 0) {
-        alert("Silakan upload file CSV terlebih dahulu!");
-        return;
-      }
+      if (!dataGabung.length) return alert("Ambil data shift dulu!");
+      if (!csvData.length) return alert("Upload file CSV dulu!");
       renderTable(dataGabung, true);
     });
 
-    // Download JPG
     document.getElementById("downloadBtn").addEventListener("click", () => {
       html2canvas(document.querySelector(".card")).then(canvas => {
         const link = document.createElement("a");
