@@ -1,77 +1,52 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Laporan Index Komplain Online</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Laporan Index Shift</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <style>
-    body {
-      background: linear-gradient(135deg, #e3f2fd, #ffffff);
-      min-height: 100vh;
-      color: #333;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: "Segoe UI", sans-serif;
-    }
-    .card {
-      width: 95%;
-      max-width: 900px;
-      border: none;
-      border-radius: 20px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-      padding: 25px 35px;
-      background: #ffffff;
-    }
-    h3 { color: #4b0082; }
-    table th, table td { text-align: center; vertical-align: middle; }
-    #downloadBtn {
-      background-color: #6a0dad; color: #fff; font-weight: 600; border: none;
-    }
-    #downloadBtn:hover { background-color: #570b9e; }
-    .form-label { font-weight: 600; color: #444; }
+    body { background: #f6f7fb; padding: 20px; }
+    .container { max-width: 1100px; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    table { font-size: 15px; }
+    #resultTable th { background: #f2f2f2; text-align: center; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h3 class="text-center mb-3 fw-bold">📋 LAPORAN INDEX KOMPLAIN ONLINE</h3>
+  <div class="container">
+    <h4><b>Laporan Index Shift</b></h4>
+    <p>Pilih shift, ambil nama-nama dari Google Sheet, upload CSV, lalu generate JPG.</p>
 
-    <!-- Input tanggal & shift -->
-    <div class="row mb-3">
-      <div class="col-md-6">
-        <label for="tanggal" class="form-label">Pilih tanggal laporan:</label>
-        <input type="date" id="tanggal" class="form-control">
+    <div class="mb-3 row">
+      <div class="col-md-2">
+        <label class="form-label">Shift</label>
+        <input type="text" id="shiftInput" class="form-control" maxlength="2" placeholder="M / P / S" />
       </div>
       <div class="col-md-4">
-        <label for="shift" class="form-label">Pilih Shift:</label>
-        <select id="shift" class="form-select">
-          <option value="">-- Pilih Shift --</option>
-          <option value="M">Shift M</option>
-          <option value="S">Shift S</option>
-          <option value="P">Shift P (termasuk P1)</option>
-        </select>
+        <label class="form-label">&nbsp;</label><br />
+        <button id="ambilNamaBtn" class="btn btn-primary">Ambil Nama dari Google Sheet</button>
       </div>
-      <div class="col-md-2 d-flex align-items-end">
-        <button class="btn btn-primary w-100" id="ambilDataBtn">Ambil Data</button>
+      <div class="col-md-6 text-end">
+        <label class="form-label">Tanggal yang dicek:</label>
+        <p id="tanggalCek"></p>
       </div>
     </div>
 
-    <!-- Upload CSV -->
+    <hr />
+
     <div class="mb-3">
-      <label class="form-label">Upload File CSV:</label>
-      <input type="file" id="csvFile" class="form-control" accept=".csv">
+      <label for="csvFile" class="form-label">Upload file CSV (header: No | Personil | TotalCO | LastCO | Index)</label>
+      <input type="file" id="csvFile" class="form-control" accept=".csv" />
+      <small class="text-muted">CSV harus memiliki header "Personil" (atau "Person") sebagai kolom nama.</small>
     </div>
 
-    <!-- Tombol Preview -->
-    <div class="d-grid gap-2 mb-3" id="previewContainer" style="display:none;">
-      <button class="btn btn-success" id="previewBtn">Preview Data Gabungan</button>
-    </div>
+    <button id="generateBtn" class="btn btn-success mb-3">Generate Tabel</button>
+    <span id="statusText" class="ms-2 text-muted"></span>
 
-    <!-- Tabel -->
-    <div class="table-responsive">
-      <table class="table table-bordered table-striped mt-3" id="dataTable">
-        <thead class="table-secondary">
+    <div id="resultArea" class="mt-4">
+      <table id="resultTable" class="table table-bordered table-striped">
+        <thead>
           <tr>
             <th>No</th>
             <th>Nama Karyawan</th>
@@ -81,131 +56,123 @@
             <th>Index</th>
           </tr>
         </thead>
-        <tbody id="tableBody">
-          <tr><td colspan="6" class="text-center text-muted">Belum ada data</td></tr>
-        </tbody>
+        <tbody></tbody>
       </table>
     </div>
 
-    <button class="btn w-100 mt-3" id="downloadBtn">Download JPG</button>
+    <div class="text-end mt-3">
+      <button id="downloadBtn" class="btn btn-outline-primary">Download JPG</button>
+    </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script>
     const GAS_URL = "https://script.google.com/macros/s/AKfycbyoPTlFn5NSBWlDLAT5tvfui9ZKe-l1-INlSmjZ9wWTD3bva3XiP1xp9R2i7K5eTPHqIg/exec";
-    let dataGabung = [], csvData = [];
 
-    const tanggalInput = document.getElementById("tanggal");
-    const shiftInput = document.getElementById("shift");
-    const ambilDataBtn = document.getElementById("ambilDataBtn");
-    const csvInput = document.getElementById("csvFile");
-    const previewContainer = document.getElementById("previewContainer");
-    const previewBtn = document.getElementById("previewBtn");
-    const tableBody = document.getElementById("tableBody");
+    let sheetData = [];
+    let csvData = [];
 
-    // ======== Ambil data dari Google Sheet berdasarkan tanggal & shift ==========
-    ambilDataBtn.addEventListener("click", async () => {
-      const tanggal = tanggalInput.value;
-      const shift = shiftInput.value;
-      if (!tanggal || !shift) {
-        alert("Pilih tanggal dan shift terlebih dahulu!");
-        return;
-      }
+    // === Tampilkan tanggal hari ini ===
+    const today = new Date();
+    document.getElementById("tanggalCek").textContent = today.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+
+    // === Ambil nama dari Google Sheet ===
+    document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
+      const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
+      if (!shift) return alert("Masukkan shift (M, P, atau S)");
+
+      document.getElementById("statusText").textContent = "Mengambil data dari Google Sheet...";
 
       try {
-        const tanggalParam = new Date(tanggal).toISOString().split('T')[0];
-        let res = await fetch(`${GAS_URL}?shift=${shift}&tanggal=${tanggalParam}`);
-        let data = await res.json();
+        let shiftsToFetch = [shift];
+        if (shift === "P") shiftsToFetch.push("P1"); // tambahan penting agar P1 ikut diambil
 
-        if (shift === "P") {
-          const resP1 = await fetch(`${GAS_URL}?shift=P1&tanggal=${tanggalParam}`);
-          const dataP1 = await resP1.json();
-          if (dataP1.karyawan) data.karyawan.push(...dataP1.karyawan);
+        let allData = [];
+
+        for (let s of shiftsToFetch) {
+          const url = `${GAS_URL}?shift=${s}`;
+          const res = await fetch(url);
+          const data = await res.json();
+          if (data.karyawan && Array.isArray(data.karyawan)) {
+            allData = allData.concat(data.karyawan);
+          }
         }
 
-        dataGabung = data.karyawan || [];
-        renderTable(dataGabung);
+        // Hilangkan duplikat nama
+        const unique = [];
+        const seen = new Set();
+        for (const k of allData) {
+          if (!seen.has(k.nama)) {
+            seen.add(k.nama);
+            unique.push(k);
+          }
+        }
+
+        sheetData = unique;
+        document.getElementById("statusText").textContent = `Data ditemukan: ${sheetData.length} orang. (Shift ${shiftsToFetch.join(" & ")})`;
       } catch (err) {
-        alert("❌ Gagal ambil data dari Google Sheet");
-        console.error(err);
+        document.getElementById("statusText").textContent = "Gagal memanggil API: " + err.message;
       }
     });
 
-    // ======== Render tabel utama ==========
-    function renderTable(data, withCsv = false) {
-      if (!data.length) {
-        tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Tidak ada data.</td></tr>`;
-        return;
-      }
-
-      tableBody.innerHTML = data.map((row, i) => {
-        const match = withCsv ? findCsvMatch(row.nama) : null;
-        return `
-          <tr>
-            <td>${i + 1}</td>
-            <td>${row.nama}</td>
-            <td>${row.shift}</td>
-            <td>${match?.totalCO || "-"}</td>
-            <td>${match?.lastCO || "-"}</td>
-            <td>${match?.index || "-"}</td>
-          </tr>`;
-      }).join("");
-    }
-
-    // ======== Upload dan parsing CSV ==========
-    csvInput.addEventListener("change", e => {
+    // === Upload & baca CSV ===
+    document.getElementById("csvFile").addEventListener("change", (e) => {
       const file = e.target.files[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = ev => {
-        const lines = ev.target.result.split(/\r?\n/).filter(l => l.trim() !== "");
-        const headers = lines[0].split(",").map(h => h.trim().toLowerCase());
-        const idxNama = headers.findIndex(h => h.includes("nama"));
-        const idxTotal = headers.findIndex(h => h.includes("total"));
-        const idxLast = headers.findIndex(h => h.includes("last"));
-        const idxIndex = headers.findIndex(h => h.includes("index"));
-
-        csvData = lines.slice(1).map(l => {
-          const cols = l.split(",");
-          return {
-            nama: cols[idxNama]?.trim() || "",
-            totalCO: cols[idxTotal]?.trim() || "",
-            lastCO: cols[idxLast]?.trim() || "",
-            index: cols[idxIndex]?.trim() || ""
-          };
-        });
-
-        previewContainer.style.display = "block";
-        alert("✅ File CSV berhasil diunggah!");
+      reader.onload = (evt) => {
+        const rows = evt.target.result.split("\n").map(r => r.split("|").map(c => c.trim()));
+        const header = rows[0].map(h => h.toLowerCase());
+        const idxPerson = header.findIndex(h => h.includes("personil") || h.includes("person"));
+        const idxTotal = header.findIndex(h => h.includes("total"));
+        const idxLast = header.findIndex(h => h.includes("last"));
+        const idxIndex = header.findIndex(h => h.includes("index"));
+        csvData = rows.slice(1).map(r => ({
+          nama: (r[idxPerson] || "").trim(),
+          total: (r[idxTotal] || "").trim(),
+          last: (r[idxLast] || "").trim(),
+          index: (r[idxIndex] || "").trim(),
+        })).filter(x => x.nama);
+        document.getElementById("statusText").textContent = `File CSV terbaca: ${csvData.length} baris.`;
       };
       reader.readAsText(file);
     });
 
-    // ======== Pencocokan nama yang toleran (abaikan kapital, spasi, titik) ==========
-    function normalizeName(str) {
-      return str.toLowerCase().replace(/[\s.]/g, "");
-    }
+    // === Generate tabel ===
+    document.getElementById("generateBtn").addEventListener("click", () => {
+      if (!sheetData.length) return alert("Ambil nama dari Google Sheet dulu.");
+      if (!csvData.length) return alert("Upload file CSV terlebih dahulu.");
 
-    function findCsvMatch(nama) {
-      const normNama = normalizeName(nama);
-      return csvData.find(c => normalizeName(c.nama) === normNama);
-    }
+      const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
+      const tbody = document.querySelector("#resultTable tbody");
+      tbody.innerHTML = "";
 
-    // ======== Preview Gabungan Data ==========
-    previewBtn.addEventListener("click", () => {
-      if (!dataGabung.length) return alert("Ambil data shift dulu!");
-      if (!csvData.length) return alert("Upload file CSV dulu!");
-      renderTable(dataGabung, true);
+      sheetData.forEach((k, i) => {
+        const dataCsv = csvData.find(c => c.nama.toLowerCase().includes(k.nama.toLowerCase()));
+        const total = dataCsv ? dataCsv.total : "";
+        const last = dataCsv ? dataCsv.last : "";
+        const idx = dataCsv ? dataCsv.index : "";
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${i + 1}</td>
+          <td>${k.nama}</td>
+          <td>${shift}</td>
+          <td>${total}</td>
+          <td>${last}</td>
+          <td>${idx}</td>
+        `;
+        tbody.appendChild(tr);
+      });
     });
 
-    // ======== Download Laporan ==========
-    document.getElementById("downloadBtn").addEventListener("click", () => {
-      html2canvas(document.querySelector(".card")).then(canvas => {
-        const link = document.createElement("a");
-        link.download = "laporan-index-komplain.jpg";
-        link.href = canvas.toDataURL();
-        link.click();
-      });
+    // === Download JPG ===
+    document.getElementById("downloadBtn").addEventListener("click", async () => {
+      const area = document.querySelector("#resultArea");
+      const canvas = await html2canvas(area, { scale: 2 });
+      const link = document.createElement("a");
+      link.download = "Laporan_Index_Shift.jpg";
+      link.href = canvas.toDataURL("image/jpeg");
+      link.click();
     });
   </script>
 </body>
