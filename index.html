@@ -16,7 +16,7 @@
 <body>
   <div class="container">
     <h4><b>Laporan Index Shift</b></h4>
-    <p>Pilih shift, ambil nama-nama dari Google Sheet, upload CSV, lalu generate JPG.</p>
+    <p>Silakan input shift, Kemudian Upload file csv dari telegram, Lalu Generate</p>
 
     <div class="mb-3 row">
       <div class="col-md-2">
@@ -25,7 +25,7 @@
       </div>
       <div class="col-md-4">
         <label class="form-label">&nbsp;</label><br />
-        <button id="ambilNamaBtn" class="btn btn-primary">Ambil Nama dari Google Sheet</button>
+        <button id="ambilNamaBtn" class="btn btn-primary">Ambil Nama dari GSheet Jadwal</button>
       </div>
       <div class="col-md-6 text-end">
         <label class="form-label">Tanggal yang dicek:</label>
@@ -38,7 +38,7 @@
     <div class="mb-3">
       <label for="csvFile" class="form-label">Upload file CSV (header: No | Personil | TotalCO | LastCO | Index)</label>
       <input type="file" id="csvFile" class="form-control" accept=".csv" />
-      <small class="text-muted">CSV harus memiliki header "Personil" (atau "Person") sebagai kolom nama.</small>
+      <small class="text-muted">CSV harus memiliki header "header: No | Personil | TotalCO | LastCO | Index") sebagai acuan generate.</small>
     </div>
 
     <button id="generateBtn" class="btn btn-success mb-3">Generate Tabel</button>
@@ -177,3 +177,4 @@
   </script>
 </body>
 </html>
+
