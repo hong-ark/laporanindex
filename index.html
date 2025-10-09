@@ -1,119 +1,171 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hitung Index Komplain</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hitung Index Komplain (debug)</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
-    body { background: #f6f7fb; padding: 20px; }
-    .container { max-width: 1000px; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
-    table { font-size: 15px; }
-    th { background: #f2f2f2; text-align: center; }
+    body{background:#f6f7fb;padding:18px}
+    .container{max-width:1100px;background:#fff;padding:20px;border-radius:10px;box-shadow:0 2px 6px rgba(0,0,0,0.08)}
+    table{font-size:13px}
+    th{background:#f2f2f2}
+    pre{white-space:pre-wrap}
   </style>
 </head>
 <body>
   <div class="container">
-    <h4><b>Perhitungan Index Komplain</b></h4>
-    <p>Upload file CSV dari laporan komplain (pemisah semicolon <code>;</code>), lalu klik <b>Hitung Index</b>.</p>
+    <h4>Perhitungan Index Komplain — Debug & Fix</h4>
+    <p>Upload file CSV (pemisah <code>;</code>) — script akan menampilkan status unik & per-NIK totals agar tahu kenapa beberapa baris belum terhitung.</p>
 
-    <div class="mb-3">
-      <label for="csvFile" class="form-label">Upload file CSV</label>
-      <input type="file" id="csvFile" class="form-control" accept=".csv" />
-    </div>
-
-    <button id="processBtn" class="btn btn-success mb-3">Hitung Index</button>
+    <input id="csvFile" type="file" class="form-control mb-2" accept=".csv" />
+    <button id="processBtn" class="btn btn-success mb-2">Proses & Hitung</button>
     <span id="statusText" class="ms-2 text-muted"></span>
 
-    <div id="resultArea" class="mt-4">
-      <table id="resultTable" class="table table-bordered table-striped">
-        <thead>
-          <tr>
-            <th>No</th>
-            <th>NIK Pengambil</th>
-            <th>Jumlah Komplain</th>
-            <th>Rata-rata Index (C)</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
+    <h6 class="mt-3">Status unik (ditemukan)</h6>
+    <div id="statusList"></div>
+
+    <h6 class="mt-3">Hasil Per NIK</h6>
+    <table id="resultTable" class="table table-striped table-bordered">
+      <thead><tr><th>No</th><th>NIK</th><th>Total Baris</th><th>Baris (Resolved/In Progress/Closed)</th><th>Rata-rata C (filter)</th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <h6 class="mt-3">Contoh baris yang tidak ter-filter (preview 10)</h6>
+    <pre id="notMatchedPreview"></pre>
   </div>
 
-  <script>
-    let csvData = [];
+<script>
+  let csvData = [];
+  const normalizeStatus = s => {
+    if (!s && s !== 0) return "";
+    // replace NBSP, multiple spaces, underscores/hyphens; trim + lower
+    return String(s)
+      .replace(/\u00A0/g, ' ')
+      .replace(/[_\-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+  };
 
-    // === Upload CSV ===
-    document.getElementById("csvFile").addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
+  const isAcceptedStatus = sNorm => {
+    // terima: resolved, closed, in progress (varian)
+    if (!sNorm) return false;
+    return sNorm.includes("resolved")
+        || sNorm.includes("closed")
+        || sNorm.includes("in progress")
+        || sNorm.includes("inprogress")
+        || sNorm === "progress"
+        || sNorm.includes("progress"); // cadangan, toleran
+  };
 
-      Papa.parse(file, {
-        header: true,
-        delimiter: ";", // sesuai format asli
-        skipEmptyLines: true,
-        complete: (results) => {
-          csvData = results.data;
-          alert("Kolom terdeteksi:\n" + Object.keys(csvData[0]).join("\n"));
-          document.getElementById("statusText").textContent = `File terbaca: ${csvData.length} baris`;
-        },
-      });
+  // ambil hh:mm:ss terakhir jika ada prefix "0d 00:24:50"
+  const extractHms = v => {
+    if (!v) return "00:00:00";
+    const s = String(v).trim();
+    const m = s.match(/(\d{1,2}:\d{2}:\d{2})$/);
+    if (m) return m[1];
+    // kalau tidak cocok, kembalikan as-is (asumsi 'HH:MM:SS')
+    return s;
+  };
+
+  document.getElementById("csvFile").addEventListener("change", (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    Papa.parse(f, {
+      header: true,
+      delimiter: ";",
+      skipEmptyLines: true,
+      complete: (res) => {
+        csvData = res.data;
+        document.getElementById("statusText").textContent = `File terbaca: ${csvData.length} baris`;
+        // tampilkan header
+        const cols = Object.keys(csvData[0]||{});
+        alert("Kolom terdeteksi:\n" + cols.join("\n"));
+      }
+    });
+  });
+
+  document.getElementById("processBtn").addEventListener("click", () => {
+    if (!csvData.length) return alert("Upload file CSV terlebih dahulu!");
+
+    // kumpulkan status unik & hitung
+    const statusCounts = {};
+    csvData.forEach(r => {
+      const raw = r["Status Komplain"] || r["Status"] || r["status"] || "";
+      const norm = normalizeStatus(raw);
+      statusCounts[norm] = (statusCounts[norm]||0) + 1;
     });
 
-    // === Proses Perhitungan ===
-    document.getElementById("processBtn").addEventListener("click", () => {
-      if (!csvData.length) return alert("Upload file CSV terlebih dahulu!");
+    // tampilkan status unik (readable)
+    const sl = Object.entries(statusCounts).sort((a,b)=>b[1]-a[1])
+      .map(([k,v]) => `${k||"(kosong)"} : ${v}`);
+    document.getElementById("statusList").innerText = sl.join("\n");
 
-      // Filter status komplain yang valid
-      const filtered = csvData.filter(r => {
-        const status = (r["Status Komplain"] || "").toLowerCase();
-        return status.includes("resolved") || status.includes("in progress") || status.includes("closed");
-      });
-
-      // Hitung rasio C = B / A
-      const hasil = filtered.map(r => {
-        const waktuSLA = parseFloat(r["Waktu SLA"] || 0);
-        const durasi = r["Durasi Komplain"] || "00:00:00";
-        const [h, m, s] = durasi.split(":").map(Number);
-        const A = waktuSLA * 3600; // Waktu SLA dalam detik
-        const B = (h * 3600) + (m * 60) + s; // Durasi dalam detik
-        const C = A > 0 ? B / A : 0;
-        return { nik: r["NIK Pengambil"], nilai: C };
-      });
-
-      // Kelompokkan per NIK
-      const perNIK = {};
-      hasil.forEach(({ nik, nilai }) => {
-        if (!nik) return;
-        if (!perNIK[nik]) perNIK[nik] = [];
-        perNIK[nik].push(nilai);
-      });
-
-      // Hitung rata-rata per NIK
-      const avgResult = Object.entries(perNIK).map(([nik, arr]) => ({
-        nik,
-        count: arr.length,
-        avg: (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(4)
-      }));
-
-      // Tampilkan di tabel
-      const tbody = document.querySelector("#resultTable tbody");
-      tbody.innerHTML = "";
-      avgResult.forEach((r, i) => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${i + 1}</td>
-          <td>${r.nik}</td>
-          <td>${r.count}</td>
-          <td>${r.avg}</td>
-        `;
-        tbody.appendChild(tr);
-      });
-
-      document.getElementById("statusText").textContent =
-        `Selesai dihitung: ${avgResult.length} NIK ditemukan (${filtered.length} baris valid).`;
+    // filter sesuai ketentuan (resolved, in progress, closed)
+    const matchedRows = [];
+    const notMatchedRows = [];
+    csvData.forEach(r => {
+      const raw = r["Status Komplain"] || r["Status"] || r["status"] || "";
+      const sn = normalizeStatus(raw);
+      if (isAcceptedStatus(sn)) matchedRows.push(r);
+      else notMatchedRows.push({statusRaw: raw, statusNorm: sn, row: r});
     });
-  </script>
+
+    // untuk debugging: tampilkan contoh baris yang tidak ter-filter
+    document.getElementById("notMatchedPreview").textContent =
+      notMatchedRows.slice(0,10).map(x => `raw: ${x.statusRaw}  | norm: ${x.statusNorm}`).join("\n");
+
+    // hitung C per baris (gunakan field persis dari file)
+    const rowsWithC = matchedRows.map(r => {
+      const waktuSLA = parseFloat(r["Waktu SLA"] || r["Waktu_SLA"] || r["WaktuSLA"] || 0) || 0;
+      const durRaw = r["Durasi Komplain"] || r["Durasi_Komplain"] || r["Durasi"] || "";
+      const hms = extractHms(durRaw); // ambil hh:mm:ss terakhir
+      const parts = hms.split(":").map(x=>Number(x||0));
+      const h = parts[0]||0, m = parts[1]||0, s = parts[2]||0;
+      const A = waktuSLA * 3600;
+      const B = (h*3600) + (m*60) + s;
+      const C = A>0 ? (B / A) : 0;
+      return { nik: (r["NIK Pengambil"] || r["Nik Pengambil"] || r["nik"] || "").toString().trim(), C };
+    });
+
+    // kelompok per NIK: total semua baris & total matched
+    const perNikAllCounts = {}; // total baris per NIK (semua status)
+    csvData.forEach(r => {
+      const nik = (r["NIK Pengambil"] || r["Nik Pengambil"] || r["nik"] || "").toString().trim();
+      if (!nik) return;
+      perNikAllCounts[nik] = (perNikAllCounts[nik]||0) + 1;
+    });
+
+    const perNikMatched = {};
+    rowsWithC.forEach(r => {
+      if(!r.nik) return;
+      if(!perNikMatched[r.nik]) perNikMatched[r.nik] = { arr: [], sum:0 };
+      perNikMatched[r.nik].arr.push(r.C);
+      perNikMatched[r.nik].sum += r.C;
+    });
+
+    // assemble result array for display (include NIKs present in file)
+    const allNiks = new Set([...Object.keys(perNikAllCounts), ...Object.keys(perNikMatched)]);
+    const results = Array.from(allNiks).map(nik => {
+      const total = perNikAllCounts[nik] || 0;
+      const matchedCount = perNikMatched[nik] ? perNikMatched[nik].arr.length : 0;
+      const avg = matchedCount ? (perNikMatched[nik].sum / matchedCount) : 0;
+      return { nik, total, matchedCount, avg: avg.toFixed(4) };
+    }).sort((a,b)=>b.matchedCount - a.matchedCount);
+
+    // render results
+    const tbody = document.querySelector("#resultTable tbody");
+    tbody.innerHTML = "";
+    results.forEach((r,i) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${i+1}</td><td>${r.nik}</td><td>${r.total}</td><td>${r.matchedCount}</td><td>${r.avg}</td>`;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById("statusText").textContent = `Selesai: ${matchedRows.length} baris ter-filter (${csvData.length} total).`;
+  });
+</script>
 </body>
 </html>
