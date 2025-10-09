@@ -40,7 +40,7 @@
     <div class="mb-3">
       <label for="csvFile" class="form-label">Upload file CSV (dipisah dengan ;)</label>
       <input type="file" id="csvFile" class="form-control" accept=".csv" />
-      <small class="text-muted">Pastikan CSV punya header seperti (NIK Pengambil, Durasi Komplain, Waktu SLA, Status Komplain, Tanggal Diambil, Diambil Oleh / Dibuat Oleh / Diselesaikan Oleh).</small>
+      <small class="text-muted">Pastikan CSV punya header seperti (NIK Pengambil, Durasi Komplain, Waktu SLA, Status Komplain, Status SLA, Tanggal Diambil).</small>
     </div>
 
     <button id="generateBtn" class="btn btn-success mb-3">Generate Tabel</button>
@@ -56,6 +56,7 @@
             <th>Shift</th>
             <th>IndexCO</th>
             <th>TotalCO</th>
+            <th>SLA (Lewat)</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -128,25 +129,6 @@ function isAcceptedStatus(norm){
   return norm.includes("resolved") || norm.includes("closed") || norm.includes("in progress") || norm.includes("inprogress");
 }
 
-function levenshtein(a,b){
-  a = a||""; b = b||"";
-  const al=a.length, bl=b.length;
-  if (!al) return bl; if (!bl) return al;
-  const dp = Array.from({length:al+1},()=>new Array(bl+1).fill(0));
-  for (let i=0;i<=al;i++) dp[i][0]=i;
-  for (let j=0;j<=bl;j++) dp[0][j]=j;
-  for (let i=1;i<=al;i++)
-    for (let j=1;j<=bl;j++)
-      dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
-  return dp[al][bl];
-}
-function similarity(a,b){
-  a=normalizeName(a); b=normalizeName(b);
-  if (!a||!b) return 0;
-  const d=levenshtein(a,b);
-  return 1 - d/Math.max(a.length,b.length);
-}
-
 function ambilJamDariTanggal(s){
   if (!s) return "-";
   const m = s.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
@@ -170,17 +152,19 @@ document.getElementById("csvFile").addEventListener("change", (e)=>{
         const durasiRaw=getCol(r,['durasikomplain','durasi']);
         const waktuSlaRaw=getCol(r,['waktusla','waktu sla']);
         const statusRaw=getCol(r,['statuskomplain','status']);
+        const statusSlaRaw=getCol(r,['statussla','status sla']);
         const diambilRaw=getCol(r,['diambiloleh','diambil oleh']);
         const diselesaikanRaw=getCol(r,['diselesaikanoleh','diselesaikan oleh']);
         const dibuatRaw=getCol(r,['dibuatoleh','dibuat oleh']);
         const tglDiambilRaw=getCol(r,['tanggaldiambil','tgl diambil','tanggal diambil']);
-        const slaNum=parseFloat((waktuSlaRaw||"").replace(",","."));
+        const slaNum=parseFloat((waktuSlaRaw||"").replace(",",".")) || 0;
         return{
           nik:nikRaw,
           durasiRaw,
           durasiDetik:durasiKeDetik(durasiRaw),
-          waktuSlaDetik:isNaN(slaNum)?0:slaNum*3600,
+          waktuSlaDetik:slaNum*3600,
           status:statusRaw,
+          statusSLA:statusSlaRaw,
           statusNorm:normalizeStatus(statusRaw),
           diambilOleh:diambilRaw,
           diselesaikanOleh:diselesaikanRaw,
@@ -197,25 +181,14 @@ function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik/r.waktuSlaDetik :
 
 function rataRata_byNIK(nik){
   const rows=csvData.filter(r=>r.nik===nik && isAcceptedStatus(r.statusNorm));
-  if(!rows.length)return{avg:null,count:0,lastTime:"-"};
+  if(!rows.length)return{avg:null,count:0,lastTime:"-",sla:0};
   const sum=rows.reduce((a,b)=>a+computeC(b),0);
   const latest=rows.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
-  return{avg:sum/rows.length,count:rows.length,lastTime:ambilJamDariTanggal(latest)};
-}
-
-function rataRata_byName(nama,thr=0.65){
-  const matches=[];
-  for(const r of csvData){
-    if(!isAcceptedStatus(r.statusNorm))continue;
-    const candidates=[r.diambilOleh,r.diselesaikanOleh,r.dibuatOleh].filter(Boolean);
-    let best=0;
-    for(const c of candidates) best=Math.max(best,similarity(nama,c));
-    if(best>=thr) matches.push(r);
-  }
-  if(!matches.length)return{avg:null,count:0,lastTime:"-"};
-  const sum=matches.reduce((a,b)=>a+computeC(b),0);
-  const latest=matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
-  return{avg:sum/matches.length,count:matches.length,lastTime:ambilJamDariTanggal(latest)};
+  const slaCount = rows.filter(r=>{
+    const val = (r.statusSLA || "").toLowerCase().replace(/\s+/g,' ').trim();
+    return val === "lewat sla" || val.includes("lewat");
+  }).length;
+  return{avg:sum/rows.length,count:rows.length,lastTime:ambilJamDariTanggal(latest),sla:slaCount};
 }
 
 document.getElementById("generateBtn").addEventListener("click",()=>{
@@ -226,12 +199,7 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
   tbody.innerHTML="";
   for(let i=0;i<sheetData.length;i++){
     const k=sheetData[i];
-    let res=rataRata_byNIK(k.nik);
-    let method="byNIK";
-    if(!res.count){
-      res=rataRata_byName(k.nama);
-      method="byName";
-    }
+    const res=rataRata_byNIK(k.nik);
     const avg=res.avg!==null?res.avg.toFixed(3):"-";
     const ket=res.count>0?`${res.count} Co diambil`:"-";
     const tr=document.createElement("tr");
@@ -242,6 +210,7 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
       <td>${shift}</td>
       <td>${avg}</td>
       <td>${ket}</td>
+      <td>${res.sla}</td>
     `;
     tbody.appendChild(tr);
   }
@@ -259,5 +228,3 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
-
-
