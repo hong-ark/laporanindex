@@ -6,6 +6,7 @@
   <title>Laporan Index Shift</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
     body { background: #f6f7fb; padding: 20px; }
     .container { max-width: 1100px; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
@@ -37,9 +38,8 @@
     <hr />
 
     <div class="mb-3">
-      <label for="csvFile" class="form-label">Upload file CSV (dipisah dengan ;)</label>
+      <label for="csvFile" class="form-label">Upload file CSV (pemisah ;)</label>
       <input type="file" id="csvFile" class="form-control" accept=".csv" />
-      <small class="text-muted">Pastikan CSV memiliki header seperti di file contoh: "NIK Pengambil", "Durasi Komplain", "Waktu SLA", "Status Komplain", dan kolom nama seperti "Diambil Oleh" / "Dibuat Oleh" / "Diselesaikan Oleh".</small>
     </div>
 
     <button id="generateBtn" class="btn btn-success mb-3">Generate Tabel</button>
@@ -65,25 +65,26 @@
       <button id="downloadBtn" class="btn btn-outline-primary">Download JPG</button>
     </div>
 
-    <!-- optional debug area (hidden normally) -->
     <pre id="debug" class="debug" style="display:none;"></pre>
   </div>
 
 <script>
 const GAS_URL = "https://script.google.com/macros/s/AKfycbyoPTlFn5NSBWlDLAT5tvfui9ZKe-l1-INlSmjZ9wWTD3bva3XiP1xp9R2i7K5eTPHqIg/exec";
 
-let sheetData = [];   // [{nama: "...", nik: "..."?}, ...]
-let csvData = [];     // parsed rows with useful fields
+let sheetData = [];
+let csvData = [];
 
-// tanggal
-const today = new Date();
-document.getElementById("tanggalCek").textContent = today.toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
+// tampilkan tanggal hari ini
+document.getElementById("tanggalCek").textContent = new Date().toLocaleDateString("id-ID", {
+  day:"numeric", month:"long", year:"numeric"
+});
 
 // ambil nama dari GSheet
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
   if (!shift) return alert("Masukkan shift (M, P, atau S)");
   document.getElementById("statusText").textContent = "Mengambil data dari Google Sheet...";
+
   try {
     let shiftsToFetch = [shift];
     if (shift === "P") shiftsToFetch.push("P1");
@@ -93,7 +94,6 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
       const data = await res.json();
       if (data.karyawan && Array.isArray(data.karyawan)) allData = allData.concat(data.karyawan);
     }
-    // normalisasi: buat objek {nama, nik}
     const seen = new Set();
     sheetData = allData.filter(k => {
       const nama = (k.nama || "").toString().trim();
@@ -103,7 +103,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
       return true;
     }).map(k => ({
       nama: (k.nama || "").toString().trim(),
-      nik: (k.nik || k.NIK || "").toString().replace(/\D/g, "").trim() // kadang GAS punya field nik; bersihkan non-digit
+      nik: (k.nik || k.NIK || "").toString().replace(/\D/g, "").trim()
     }));
     document.getElementById("statusText").textContent = `Data ditemukan: ${sheetData.length} orang (Shift ${shiftsToFetch.join(" & ")})`;
   } catch (err) {
@@ -111,137 +111,63 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   }
 });
 
-// helper fuzzy similarity (Levenshtein-based normalized)
-function levenshtein(a, b) {
-  a = a || ""; b = b || "";
-  const al = a.length, bl = b.length;
-  if (al === 0) return bl;
-  if (bl === 0) return al;
-  const dp = Array.from({length: al+1}, (_,i)=> new Array(bl+1).fill(0));
-  for (let i=0;i<=al;i++) dp[i][0]=i;
-  for (let j=0;j<=bl;j++) dp[0][j]=j;
-  for (let i=1;i<=al;i++) {
-    for (let j=1;j<=bl;j++) {
-      dp[i][j] = Math.min(
-        dp[i-1][j] + 1,
-        dp[i][j-1] + 1,
-        dp[i-1][j-1] + (a[i-1]===b[j-1] ? 0 : 1)
-      );
-    }
-  }
-  return dp[al][bl];
-}
-function similarity(a,b){
-  a = (a||"").toString().toLowerCase().replace(/\s+/g,' ').trim();
-  b = (b||"").toString().toLowerCase().replace(/\s+/g,' ').trim();
-  if (!a || !b) return 0;
-  const dist = levenshtein(a,b);
-  return 1 - dist / Math.max(a.length, b.length);
-}
+// normalize status dari script akurat
+const normalizeStatus = s => {
+  if (!s && s !== 0) return "";
+  return String(s).replace(/\u00A0/g, ' ').replace(/[_\-]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+};
+const isAcceptedStatus = sNorm => {
+  if (!sNorm) return false;
+  return sNorm.includes("resolved")
+      || sNorm.includes("closed")
+      || sNorm.includes("in progress")
+      || sNorm.includes("inprogress")
+      || sNorm === "progress";
+};
+const extractHms = v => {
+  if (!v) return "00:00:00";
+  const s = String(v).trim();
+  const m = s.match(/(\d{1,2}:\d{2}:\d{2})$/);
+  return m ? m[1] : s;
+};
 
-// parse durasi -> detik (mendukung "0d 00:24:50" atau "00:05:09")
-function durasiKeDetik(v){
-  if (!v) return 0;
-  const s = v.toString().trim();
-  const m1 = s.match(/(\d+)\s*d\s*(\d{1,2}):(\d{2}):(\d{2})$/i);
-  if (m1) {
-    const hari = parseInt(m1[1],10);
-    const jam = parseInt(m1[2],10);
-    const menit = parseInt(m1[3],10);
-    const detik = parseInt(m1[4],10);
-    return hari*24*3600 + jam*3600 + menit*60 + detik;
-  }
-  const m2 = s.match(/(\d{1,2}):(\d{2}):(\d{2})$/);
-  if (m2) {
-    const jam = parseInt(m2[1],10);
-    const menit = parseInt(m2[2],10);
-    const detik = parseInt(m2[3],10);
-    return jam*3600 + menit*60 + detik;
-  }
-  // fallback: try numbers only
-  const digits = s.match(/\d+/g);
-  if (digits && digits.length >= 1) return parseInt(digits[0],10);
-  return 0;
-}
-
-// baca CSV (delimiter ;)
+// baca CSV
 document.getElementById("csvFile").addEventListener("change", (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (evt) => {
-    const text = evt.target.result;
-    const rows = text.split(/\r?\n/).filter(r=>r.trim()!=="");
-    const header = rows[0].split(";").map(h=>h.trim());
-    // cari indeks kolom penting (toleran terhadap penamaan)
-    const idx = {
-      nikPengambil: header.findIndex(h => /nik\s*pengambil/i.test(h)),
-      durasi: header.findIndex(h => /durasi\s*komplain/i.test(h)),
-      waktuSla: header.findIndex(h => /waktu\s*sla/i.test(h) || /^waktu sla$/i.test(h)),
-      status: header.findIndex(h => /status\s*komplain/i.test(h)),
-      diambilOleh: header.findIndex(h => /diambil\s*oleh/i.test(h)),
-      diselesaikanOleh: header.findIndex(h => /diselesaikan\s*oleh/i.test(h)),
-      dibuatOleh: header.findIndex(h => /dibuat\s*oleh/i.test(h))
-    };
-    // jika beberapa indeks -1, tetap lanjut (name-matching akan dipakai)
-    csvData = rows.slice(1).map(line => {
-      const cols = line.split(";");
-      return {
-        rawLine: line,
-        nik: (cols[idx.nikPengambil] || "").toString().replace(/\D/g,'').trim(),
-        durasiRaw: (cols[idx.durasi] || "").toString().trim(),
-        durasiDetik: durasiKeDetik(cols[idx.durasi] || ""),
-        waktuSlaHours: parseFloat((cols[idx.waktuSla] || "0").toString().replace(",", ".")) || 0,
-        waktuSlaDetik: (parseFloat((cols[idx.waktuSla] || "0").toString().replace(",", ".")) || 0) * 3600,
-        status: (cols[idx.status] || "").toString().trim().toUpperCase(),
-        diambilOleh: (cols[idx.diambilOleh] || "").toString().trim(),
-        diselesaikanOleh: (cols[idx.diselesaikanOleh] || "").toString().trim(),
-        dibuatOleh: (cols[idx.dibuatOleh] || "").toString().trim()
-      };
-    }).filter(r => r.rawLine.trim() !== "");
-    document.getElementById("statusText").textContent = `File CSV terbaca: ${csvData.length} baris.`;
-    // optional debug: show header/cols in console
-    console.log("CSV header indices:", idx);
-  };
-  reader.readAsText(file);
+  const f = e.target.files[0];
+  if (!f) return;
+  Papa.parse(f, {
+    header: true,
+    delimiter: ";",
+    skipEmptyLines: true,
+    complete: (res) => {
+      csvData = res.data;
+      document.getElementById("statusText").textContent = `File CSV terbaca: ${csvData.length} baris.`;
+    }
+  });
 });
 
-// fungsi cari rata-rata C untuk sebuah NIK / atau nama (fallback)
-function rataRataC_byNIK(nik) {
-  if (!nik) return {avg: null, count:0};
-  const rows = csvData.filter(r => r.nik === nik && ["RESOLVED","IN PROGRESS","CLOSED"].includes(r.status));
-  if (!rows.length) return {avg:null,count:0};
-  const sumC = rows.reduce((acc,r) => {
-    const A = r.waktuSlaDetik || 0;
-    const B = r.durasiDetik || 0;
-    const C = A>0 ? (B / A) : 0;
-    return acc + C;
-  }, 0);
-  return { avg: (sumC / rows.length), count: rows.length };
-}
-
-function rataRataC_byName(name, threshold=0.65) {
-  if (!name) return {avg:null, count:0};
-  const rowsMatched = [];
+// hitung rata-rata index per NIK langsung dari CSV (pakai logika akurat)
+function hitungRataC(nik) {
+  if (!nik) return {avg: null, count: 0};
+  const matched = [];
   for (const r of csvData) {
-    if (!["RESOLVED","IN PROGRESS","CLOSED"].includes(r.status)) continue;
-    // compare to diambilOleh, diselesaikanOleh, dibuatOleh (take best)
-    const candidates = [r.diambilOleh, r.diselesaikanOleh, r.dibuatOleh].filter(Boolean);
-    let best = 0;
-    for (const c of candidates) {
-      const s = similarity(name, c);
-      if (s > best) best = s;
-    }
-    if (best >= threshold) rowsMatched.push(r);
+    const nikCsv = (r["NIK Pengambil"] || r["Nik Pengambil"] || r["nik"] || "").toString().trim();
+    if (nikCsv !== nik) continue;
+    const sn = normalizeStatus(r["Status Komplain"] || r["Status"] || "");
+    if (!isAcceptedStatus(sn)) continue;
+
+    const waktuSLA = parseFloat(r["Waktu SLA"] || r["Waktu_SLA"] || 0) || 0;
+    const durRaw = r["Durasi Komplain"] || r["Durasi_Komplain"] || "";
+    const hms = extractHms(durRaw);
+    const [h,m,s] = hms.split(":").map(x => Number(x || 0));
+    const A = waktuSLA * 3600;
+    const B = (h*3600) + (m*60) + s;
+    const C = A > 0 ? (B / A) : 0;
+    matched.push(C);
   }
-  if (!rowsMatched.length) return {avg:null, count:0};
-  const sumC = rowsMatched.reduce((acc,r) => {
-    const A = r.waktuSlaDetik || 0;
-    const B = r.durasiDetik || 0;
-    const C = A>0 ? (B / A) : 0;
-    return acc + C;
-  }, 0);
-  return { avg: (sumC / rowsMatched.length), count: rowsMatched.length };
+  if (!matched.length) return {avg: null, count: 0};
+  const avg = matched.reduce((a,b)=>a+b,0)/matched.length;
+  return {avg, count: matched.length};
 }
 
 // generate tabel
@@ -254,25 +180,11 @@ document.getElementById("generateBtn").addEventListener("click", () => {
   tbody.innerHTML = "";
 
   const debugLines = [];
-  for (let i=0;i<sheetData.length;i++){
-    const k = sheetData[i];
-    let result = {avg:null, count:0, method: null};
 
-    // coba pakai nik dari sheet dulu (jika ada)
-    if (k.nik && k.nik.length > 0) {
-      result = rataRataC_byNIK(k.nik);
-      result.method = (result.count>0) ? "byNIK" : null;
-    }
-
-    // kalau nggak ada atau nggak ketemu, coba match by name (fuzzy)
-    if (!result.method) {
-      // gunakan nama uppercase dari sheet, cocokkan dengan nama pada kolom di CSV
-      result = rataRataC_byName(k.nama, 0.65);
-      result.method = (result.count>0) ? "byName" : null;
-    }
-
-    const avgDisplay = result.avg !== null ? Number(result.avg).toFixed(4) : "-";
-    const ket = result.count > 0 ? `✅ ${result.count} data (${result.method})` : "❌ Tidak ada";
+  sheetData.forEach((k, i) => {
+    const res = hitungRataC(k.nik);
+    const avgDisplay = res.avg !== null ? res.avg.toFixed(4) : "-";
+    const ket = res.count > 0 ? `✅ ${res.count} data` : "❌ Tidak ada";
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${i+1}</td>
@@ -283,13 +195,10 @@ document.getElementById("generateBtn").addEventListener("click", () => {
       <td>${ket}</td>
     `;
     tbody.appendChild(tr);
+    debugLines.push(`${k.nama} | ${k.nik} -> ${ket} | avg=${avgDisplay}`);
+  });
 
-    // debug info sample
-    debugLines.push(`${k.nama} | nik:${k.nik||"-"} -> ${ket} | avg:${avgDisplay}`);
-  }
-
-  document.getElementById("statusText").textContent = "✅ Tabel berhasil digenerate.";
-  // optional: show debug area if needed
+  document.getElementById("statusText").textContent = "✅ Perhitungan selesai.";
   const dbg = document.getElementById("debug");
   dbg.style.display = "block";
   dbg.textContent = debugLines.join("\n");
