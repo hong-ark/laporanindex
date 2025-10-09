@@ -1,163 +1,213 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <title>Laporan Index Shift Komplain</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Laporan Index Shift</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <style>
-    body {
-      background-color: #f7f9fb;
-    }
-    .container {
-      margin-top: 40px;
-      max-width: 900px;
-    }
-    .card {
-      border-radius: 15px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    table th {
-      background-color: #007bff;
-      color: white;
-    }
+    body { background: #f6f7fb; padding: 20px; }
+    .container { max-width: 1100px; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    table { font-size: 15px; }
+    #resultTable th { background: #f2f2f2; text-align: center; }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="card p-4">
-      <h3 class="text-center mb-3">📊 Laporan Index Komplain per Shift</h3>
+    <h4><b>Laporan Index Shift</b></h4>
+    <p>Silakan input shift, kemudian upload file CSV dari Telegram, lalu klik <b>Generate Tabel</b>.</p>
 
-      <div class="mb-3">
-        <label class="form-label">Pilih Shift:</label>
-        <select id="shiftSelect" class="form-select">
-          <option value="">-- Pilih Shift --</option>
-          <option value="M">Shift M (Pagi)</option>
-          <option value="P">Shift P (Siang)</option>
-          <option value="S">Shift S (Malam)</option>
-        </select>
+    <div class="mb-3 row">
+      <div class="col-md-2">
+        <label class="form-label">Shift</label>
+        <input type="text" id="shiftInput" class="form-control" maxlength="2" placeholder="M / P / S" />
       </div>
-
-      <div class="mb-3">
-        <label class="form-label">Upload File CSV:</label>
-        <input type="file" id="csvFile" accept=".csv" class="form-control">
+      <div class="col-md-4">
+        <label class="form-label">&nbsp;</label><br />
+        <button id="ambilNamaBtn" class="btn btn-primary">Ambil Nama dari GSheet Jadwal</button>
       </div>
-
-      <button class="btn btn-primary w-100 mb-3" onclick="prosesData()">🔍 Proses Data</button>
-
-      <div id="hasil" class="table-responsive" style="display:none;">
-        <h5 class="mt-4">Hasil Perhitungan Index</h5>
-        <table class="table table-bordered mt-2">
-          <thead>
-            <tr>
-              <th>No</th>
-              <th>Nama</th>
-              <th>NIK</th>
-              <th>Index</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody id="tabelHasil"></tbody>
-        </table>
+      <div class="col-md-6 text-end">
+        <label class="form-label">Tanggal yang dicek:</label>
+        <p id="tanggalCek"></p>
       </div>
+    </div>
 
-      <div id="notif" class="text-center text-danger mt-3"></div>
+    <hr />
+
+    <div class="mb-3">
+      <label for="csvFile" class="form-label">Upload file CSV (dipisah dengan ;)</label>
+      <input type="file" id="csvFile" class="form-control" accept=".csv" />
+      <small class="text-muted">Gunakan file CSV dengan kolom: NIK Pengambil, Durasi Komplain, Waktu SLA, Status Komplain.</small>
+    </div>
+
+    <button id="generateBtn" class="btn btn-success mb-3">Generate Tabel</button>
+    <span id="statusText" class="ms-2 text-muted"></span>
+
+    <div id="resultArea" class="mt-4" style="display:none;">
+      <table id="resultTable" class="table table-bordered table-striped">
+        <thead>
+          <tr>
+            <th>No</th>
+            <th>Nama Karyawan</th>
+            <th>NIK</th>
+            <th>Shift</th>
+            <th>Rata-rata Index</th>
+            <th>Keterangan</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="text-end mt-3">
+      <button id="downloadBtn" class="btn btn-outline-primary">Download JPG</button>
     </div>
   </div>
 
   <script>
     const GAS_URL = "https://script.google.com/macros/s/AKfycbyoPTlFn5NSBWlDLAT5tvfui9ZKe-l1-INlSmjZ9wWTD3bva3XiP1xp9R2i7K5eTPHqIg/exec";
+    let sheetData = [];
+    let csvLines = [];
 
-    async function prosesData() {
-      const shift = document.getElementById("shiftSelect").value;
-      const fileInput = document.getElementById("csvFile");
-      const notif = document.getElementById("notif");
-      const hasilDiv = document.getElementById("hasil");
-      const tbody = document.getElementById("tabelHasil");
+    // === Tanggal hari ini ===
+    const today = new Date();
+    document.getElementById("tanggalCek").textContent = today.toLocaleDateString("id-ID", {
+      day: "numeric", month: "long", year: "numeric"
+    });
 
-      notif.textContent = "";
-      hasilDiv.style.display = "none";
-      tbody.innerHTML = "";
-
-      if (!shift) return notif.textContent = "⚠️ Pilih shift terlebih dahulu!";
-      if (!fileInput.files.length) return notif.textContent = "⚠️ Upload file CSV terlebih dahulu!";
-
-      notif.textContent = "🔄 Memproses data, harap tunggu...";
+    // === Ambil nama dari Google Sheet ===
+    document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
+      const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
+      if (!shift) return alert("Masukkan shift (M, P, atau S)");
+      document.getElementById("statusText").textContent = "Mengambil data dari Google Sheet...";
 
       try {
-        // 1️⃣ Ambil nama dari Google Sheet
-        const res = await fetch(`${GAS_URL}?shift=${shift}`);
-        const dataShift = await res.json();
-        const daftarNama = dataShift.karyawan.map(k => k.nama.toUpperCase());
+        let shiftsToFetch = [shift];
+        if (shift === "P") shiftsToFetch.push("P1");
+        let allData = [];
 
-        // 2️⃣ Baca CSV
-        const csvText = await fileInput.files[0].text();
-        const lines = csvText.split("\n").map(r => r.trim()).filter(r => r);
-        const header = lines.shift().split(";").map(h => h.trim());
-
-        const idxStatus = header.indexOf("Status Komplain");
-        const idxDurasi = header.indexOf("Durasi Komplain");
-        const idxSLA = header.indexOf("Waktu SLA");
-        const idxNIK = header.indexOf("NIK Pengambil");
-
-        if (idxStatus < 0 || idxDurasi < 0 || idxSLA < 0 || idxNIK < 0)
-          throw new Error("Kolom wajib tidak ditemukan di CSV!");
-
-        // 3️⃣ Proses hitungan index per NIK
-        const dataPerNIK = {};
-        for (const line of lines) {
-          const row = line.split(";");
-          const status = row[idxStatus]?.trim().toUpperCase();
-          const nik = row[idxNIK]?.trim();
-          const durasiStr = row[idxDurasi]?.trim();
-          const slaStr = row[idxSLA]?.trim();
-
-          if (!nik || !durasiStr || !slaStr) continue;
-          if (!["RESOLVED","IN PROGRESS","CLOSED"].includes(status)) continue;
-
-          const durasi = parseDurasi(durasiStr);
-          const sla = parseFloat(slaStr.replace(",", "."));
-          const index = sla > 0 ? durasi / sla : 0;
-
-          if (!dataPerNIK[nik]) dataPerNIK[nik] = [];
-          dataPerNIK[nik].push(index);
+        for (let s of shiftsToFetch) {
+          const res = await fetch(`${GAS_URL}?shift=${s}`);
+          const data = await res.json();
+          if (data.karyawan && Array.isArray(data.karyawan)) {
+            allData = allData.concat(data.karyawan);
+          }
         }
 
-        // 4️⃣ Hitung rata-rata
-        const hasilNIK = Object.entries(dataPerNIK).map(([nik, arr]) => {
-          const avg = arr.reduce((a,b)=>a+b,0)/arr.length;
-          return { nik, avg: avg.toFixed(4) };
-        });
-
-        // 5️⃣ Gabungkan dengan nama shift aktif
-        let no = 1;
-        for (const nama of daftarNama) {
-          const nikEntry = hasilNIK.find(n => nama.includes(n.nik.slice(-4))) || null;
-          const indexVal = nikEntry ? nikEntry.avg : "-";
-          tbody.innerHTML += `
-            <tr>
-              <td>${no++}</td>
-              <td>${nama}</td>
-              <td>${nikEntry ? nikEntry.nik : "-"}</td>
-              <td>${indexVal}</td>
-              <td>${nikEntry ? "✅ Ditemukan" : "❌ Tidak ada data"}</td>
-            </tr>`;
+        // Hilangkan duplikat
+        const unique = [];
+        const seen = new Set();
+        for (const k of allData) {
+          if (!seen.has(k.nama)) {
+            seen.add(k.nama);
+            unique.push(k);
+          }
         }
 
-        notif.textContent = "✅ Selesai diproses.";
-        hasilDiv.style.display = "block";
+        sheetData = unique.map(k => ({
+          nama: k.nama.toUpperCase(),
+          nik: (k.nik || "").toString().trim()
+        }));
 
+        document.getElementById("statusText").textContent =
+          `Data ditemukan: ${sheetData.length} orang (Shift ${shiftsToFetch.join(" & ")})`;
       } catch (err) {
-        notif.textContent = "❌ Terjadi kesalahan: " + err.message;
+        document.getElementById("statusText").textContent = "Gagal memanggil API: " + err.message;
       }
+    });
+
+    // === Upload CSV ===
+    document.getElementById("csvFile").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const text = await file.text();
+      csvLines = text.split("\n").map(r => r.trim()).filter(r => r);
+      document.getElementById("statusText").textContent = `File CSV terbaca: ${csvLines.length - 1} baris.`;
+    });
+
+    // === Generate tabel ===
+    document.getElementById("generateBtn").addEventListener("click", () => {
+      if (!sheetData.length) return alert("Ambil nama dari Google Sheet dulu.");
+      if (!csvLines.length) return alert("Upload file CSV terlebih dahulu.");
+
+      const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
+      const header = csvLines[0].split(";").map(h => h.trim());
+      const idxStatus = header.indexOf("Status Komplain");
+      const idxDurasi = header.indexOf("Durasi Komplain");
+      const idxSLA = header.indexOf("Waktu SLA");
+      const idxNIK = header.indexOf("NIK Pengambil");
+
+      if (idxStatus < 0 || idxDurasi < 0 || idxSLA < 0 || idxNIK < 0) {
+        document.getElementById("statusText").textContent = "Kolom CSV tidak lengkap!";
+        return;
+      }
+
+      const dataPerNIK = {};
+      for (let i = 1; i < csvLines.length; i++) {
+        const cols = csvLines[i].split(";").map(x => x.trim());
+        const status = (cols[idxStatus] || "").toUpperCase();
+        const nik = (cols[idxNIK] || "").replace(/\D/g, "");
+        const durasiStr = cols[idxDurasi] || "";
+        const slaStr = cols[idxSLA] || "";
+
+        if (!nik || !durasiStr || !slaStr) continue;
+        if (!["RESOLVED","IN PROGRESS","CLOSED"].includes(status)) continue;
+
+        const durasi = parseDurasi(durasiStr);
+        const sla = parseFloat(slaStr.replace(",", "."));
+        const index = sla > 0 ? durasi / sla : 0;
+
+        if (!dataPerNIK[nik]) dataPerNIK[nik] = [];
+        dataPerNIK[nik].push(index);
+      }
+
+      const tbody = document.querySelector("#resultTable tbody");
+      tbody.innerHTML = "";
+      let no = 1;
+      for (const k of sheetData) {
+        const data = dataPerNIK[k.nik];
+        const rata = data ? (data.reduce((a,b)=>a+b,0)/data.length).toFixed(4) : "-";
+        const ket = data ? `✅ ${data.length} data` : "❌ Tidak ada";
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${no++}</td>
+          <td>${k.nama}</td>
+          <td>${k.nik}</td>
+          <td>${shift}</td>
+          <td>${rata}</td>
+          <td>${ket}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+
+      document.getElementById("resultArea").style.display = "block";
+      document.getElementById("statusText").textContent = "✅ Tabel berhasil digenerate.";
+    });
+
+    // === Fungsi konversi durasi ke jam ===
+    function parseDurasi(str) {
+      str = str.replace(",", ".").trim();
+      let hari = 0, jam = 0, menit = 0, detik = 0;
+      if (str.includes("d")) {
+        const match = str.match(/(\d+)d\s*(\d+):(\d+):(\d+)/);
+        if (match) [hari, jam, menit, detik] = match.slice(1).map(Number);
+      } else {
+        const match = str.match(/(\d+):(\d+):(\d+)/);
+        if (match) [jam, menit, detik] = match.map(Number).slice(1);
+      }
+      return hari * 24 + jam + (menit / 60) + (detik / 3600);
     }
 
-    function parseDurasi(str) {
-      const match = str.match(/(\d+)d\s*(\d+):(\d+):(\d+)/);
-      if (!match) return 0;
-      const [, d, h, m, s] = match.map(Number);
-      const totalJam = d*24 + h + m/60 + s/3600;
-      return totalJam.toFixed(4);
-    }
+    // === Download JPG ===
+    document.getElementById("downloadBtn").addEventListener("click", async () => {
+      const area = document.querySelector("#resultArea");
+      const canvas = await html2canvas(area, { scale: 2 });
+      const link = document.createElement("a");
+      link.download = "Laporan_Index_Shift.jpg";
+      link.href = canvas.toDataURL("image/jpeg");
+      link.click();
+    });
   </script>
 </body>
 </html>
