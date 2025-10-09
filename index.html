@@ -44,13 +44,14 @@
   <script>
     let csvData = [];
 
+    // === Upload CSV ===
     document.getElementById("csvFile").addEventListener("change", (e) => {
       const file = e.target.files[0];
       if (!file) return;
 
       Papa.parse(file, {
         header: true,
-        delimiter: ";",  // <-- PENTING: pakai semicolon
+        delimiter: ";", // sesuai format asli
         skipEmptyLines: true,
         complete: (results) => {
           csvData = results.data;
@@ -60,25 +61,28 @@
       });
     });
 
+    // === Proses Perhitungan ===
     document.getElementById("processBtn").addEventListener("click", () => {
       if (!csvData.length) return alert("Upload file CSV terlebih dahulu!");
 
-      // Filter status RESOLVED & IN PROGRESS
+      // Filter status komplain yang valid
       const filtered = csvData.filter(r => {
         const status = (r["Status Komplain"] || "").toLowerCase();
-        return status.includes("resolved") || status.includes("in progress");
+        return status.includes("resolved") || status.includes("in progress") || status.includes("closed");
       });
 
+      // Hitung rasio C = B / A
       const hasil = filtered.map(r => {
         const waktuSLA = parseFloat(r["Waktu SLA"] || 0);
         const durasi = r["Durasi Komplain"] || "00:00:00";
         const [h, m, s] = durasi.split(":").map(Number);
-        const A = waktuSLA * 3600;
-        const B = (h * 3600) + (m * 60) + s;
+        const A = waktuSLA * 3600; // Waktu SLA dalam detik
+        const B = (h * 3600) + (m * 60) + s; // Durasi dalam detik
         const C = A > 0 ? B / A : 0;
         return { nik: r["NIK Pengambil"], nilai: C };
       });
 
+      // Kelompokkan per NIK
       const perNIK = {};
       hasil.forEach(({ nik, nilai }) => {
         if (!nik) return;
@@ -86,13 +90,14 @@
         perNIK[nik].push(nilai);
       });
 
+      // Hitung rata-rata per NIK
       const avgResult = Object.entries(perNIK).map(([nik, arr]) => ({
         nik,
         count: arr.length,
         avg: (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(4)
       }));
 
-      // Tampilkan hasil
+      // Tampilkan di tabel
       const tbody = document.querySelector("#resultTable tbody");
       tbody.innerHTML = "";
       avgResult.forEach((r, i) => {
