@@ -273,7 +273,7 @@ document.getElementById("generateBtn").addEventListener("click", () => {
       if (res.count>0) res.method = 'byName';
     }
 
-    const avgDisplay = res.avg !== null ? Number(res.avg).toFixed(4) : "-";
+    const avgDisplay = res.avg !== null ? Number(res.avg).toFixed(3) : "-";
     const ket = res.count > 0 ? `✅ ${res.count} data (${res.method})` : "❌ Tidak ada";
     const tr = document.createElement("tr");
     tr.innerHTML = `
@@ -306,5 +306,6 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
 </script>
 </body>
 </html>
+
 
 
