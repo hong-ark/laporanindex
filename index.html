@@ -2,17 +2,17 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Laporan Index Shift</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Laporan Index Shift (perbaikan akurat)</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <style>
     body { background: #f6f7fb; padding: 20px; }
     .container { max-width: 1100px; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
     table { font-size: 15px; }
     #resultTable th { background: #f2f2f2; text-align: center; }
-    pre.debug { background:#fff9c4; padding:10px; border-radius:6px; font-size:13px; }
+    pre.debug { background:#fff9c4; padding:10px; border-radius:6px; font-size:13px; display:none; }
   </style>
 </head>
 <body>
@@ -38,8 +38,9 @@
     <hr />
 
     <div class="mb-3">
-      <label for="csvFile" class="form-label">Upload file CSV (pemisah ;)</label>
+      <label for="csvFile" class="form-label">Upload file CSV (dipisah dengan ;)</label>
       <input type="file" id="csvFile" class="form-control" accept=".csv" />
+      <small class="text-muted">Pastikan CSV punya header seperti contoh (NIK Pengambil, Durasi Komplain, Waktu SLA, Status Komplain, Diambil Oleh / Dibuat Oleh / Diselesaikan Oleh).</small>
     </div>
 
     <button id="generateBtn" class="btn btn-success mb-3">Generate Tabel</button>
@@ -65,31 +66,28 @@
       <button id="downloadBtn" class="btn btn-outline-primary">Download JPG</button>
     </div>
 
-    <pre id="debug" class="debug" style="display:none;"></pre>
+    <pre id="debug" class="debug"></pre>
   </div>
 
 <script>
 const GAS_URL = "https://script.google.com/macros/s/AKfycbyoPTlFn5NSBWlDLAT5tvfui9ZKe-l1-INlSmjZ9wWTD3bva3XiP1xp9R2i7K5eTPHqIg/exec";
 
-let sheetData = [];
-let csvData = [];
+let sheetData = [];   // [{nama, nik?}, ...]
+let csvData = [];     // parsed rows
 
-// tampilkan tanggal hari ini
-document.getElementById("tanggalCek").textContent = new Date().toLocaleDateString("id-ID", {
-  day:"numeric", month:"long", year:"numeric"
-});
+// tampil tanggal
+document.getElementById("tanggalCek").textContent = new Date().toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
 
 // ambil nama dari GSheet
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
   if (!shift) return alert("Masukkan shift (M, P, atau S)");
   document.getElementById("statusText").textContent = "Mengambil data dari Google Sheet...";
-
   try {
     let shiftsToFetch = [shift];
     if (shift === "P") shiftsToFetch.push("P1");
     let allData = [];
-    for (let s of shiftsToFetch) {
+    for (const s of shiftsToFetch) {
       const res = await fetch(`${GAS_URL}?shift=${s}`);
       const data = await res.json();
       if (data.karyawan && Array.isArray(data.karyawan)) allData = allData.concat(data.karyawan);
@@ -111,68 +109,149 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   }
 });
 
-// normalize status dari script akurat
-const normalizeStatus = s => {
-  if (!s && s !== 0) return "";
-  return String(s).replace(/\u00A0/g, ' ').replace(/[_\-]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
-};
-const isAcceptedStatus = sNorm => {
-  if (!sNorm) return false;
-  return sNorm.includes("resolved")
-      || sNorm.includes("closed")
-      || sNorm.includes("in progress")
-      || sNorm.includes("inprogress")
-      || sNorm === "progress";
-};
-const extractHms = v => {
-  if (!v) return "00:00:00";
-  const s = String(v).trim();
-  const m = s.match(/(\d{1,2}:\d{2}:\d{2})$/);
-  return m ? m[1] : s;
-};
+// util: normalize header text -> key (only letters+digits)
+function normKey(s){ return (s||"").toString().toLowerCase().replace(/[^a-z0-9]/g,''); }
+function normalizeName(s){ return (s||"").toString().toLowerCase().replace(/\s+/g,' ').replace(/[^\w\s]/g,'').trim(); }
 
-// baca CSV
+// durasi -> detik
+function durasiKeDetik(v){
+  if (!v) return 0;
+  const s = v.toString().trim();
+  const m1 = s.match(/(\d+)\s*d\s*(\d{1,2}):(\d{2}):(\d{2})$/i);
+  if (m1) {
+    const hari = +m1[1], jam = +m1[2], menit = +m1[3], detik = +m1[4];
+    return hari*24*3600 + jam*3600 + menit*60 + detik;
+  }
+  const m2 = s.match(/(\d{1,2}):(\d{2}):(\d{2})$/);
+  if (m2) return (+m2[1])*3600 + (+m2[2])*60 + (+m2[3]);
+  const digits = s.match(/\d+/g);
+  if (digits && digits.length) return +digits[0];
+  return 0;
+}
+
+// normalize status and acceptance
+function normalizeStatus(s){
+  if (!s && s !== 0) return "";
+  return String(s).replace(/\u00A0/g,' ').replace(/[_\-]/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
+}
+function isAcceptedStatus(norm){ 
+  if (!norm) return false;
+  return norm.includes("resolved") || norm.includes("closed") || norm.includes("in progress") || norm.includes("inprogress") || norm === "progress";
+}
+
+// similarity (Levenshtein)
+function levenshtein(a,b){
+  a = a||""; b = b||"";
+  const al = a.length, bl = b.length;
+  if (al===0) return bl; if (bl===0) return al;
+  const dp = Array.from({length:al+1},()=>new Array(bl+1).fill(0));
+  for (let i=0;i<=al;i++) dp[i][0]=i;
+  for (let j=0;j<=bl;j++) dp[0][j]=j;
+  for (let i=1;i<=al;i++){
+    for (let j=1;j<=bl;j++){
+      dp[i][j] = Math.min(dp[i-1][j]+1, dp[i][j-1]+1, dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+    }
+  }
+  return dp[al][bl];
+}
+function similarity(a,b){
+  a = normalizeName(a); b = normalizeName(b);
+  if (!a || !b) return 0;
+  const dist = levenshtein(a,b);
+  return 1 - dist / Math.max(a.length, b.length);
+}
+
+// baca CSV dengan PapaParse, buat headerMap & normalized csvData
 document.getElementById("csvFile").addEventListener("change", (e) => {
-  const f = e.target.files[0];
-  if (!f) return;
-  Papa.parse(f, {
+  const file = e.target.files[0];
+  if (!file) return;
+  Papa.parse(file, {
     header: true,
     delimiter: ";",
     skipEmptyLines: true,
     complete: (res) => {
-      csvData = res.data;
+      const rawFields = res.meta.fields || [];
+      // map normalized header -> actual header
+      const headerMap = {};
+      for (const f of rawFields) headerMap[normKey(f)] = f;
+      // helper to get column by several possible normalized names
+      const getCol = (row, candidates) => {
+        for (const c of candidates){
+          const key = headerMap[c];
+          if (key !== undefined && row.hasOwnProperty(key)) return (row[key]||"").toString();
+        }
+        return "";
+      };
+
+      csvData = res.data.map(row => {
+        const nikRaw = ( getCol(row, ['nikpengambil','nik_pengambil','nik']) ).replace(/\D/g,'').trim();
+        const durasiRaw = getCol(row, ['durasikomplain','durasi_komplain','durasi']);
+        const waktuSlaRaw = getCol(row, ['waktusla','waktu_sla','waktu sla','waktu']);
+        const statusRaw = getCol(row, ['statuskomplain','status_komplain','status']);
+        const diambilRaw = getCol(row, ['diambiloleh','diambil_oleh']);
+        const diselesaikanRaw = getCol(row, ['diselesaikanoleh','diselesaikan_oleh']);
+        const dibuatRaw = getCol(row, ['dibuatoleh','dibuat_oleh','dibuat']);
+        // convert sla hours to number
+        const slaNumber = parseFloat((waktuSlaRaw||"").toString().replace(",","."));
+        return {
+          raw: row,
+          nik: nikRaw,
+          durasiRaw: durasiRaw,
+          durasiDetik: durasiKeDetik(durasiRaw),
+          waktuSlaHours: isNaN(slaNumber) ? 0 : slaNumber,
+          waktuSlaDetik: (isNaN(slaNumber) ? 0 : slaNumber) * 3600,
+          status: (statusRaw||"").toString().trim(),
+          statusNorm: normalizeStatus(statusRaw),
+          diambilOleh: diambilRaw,
+          diselesaikanOleh: diselesaikanRaw,
+          dibuatOleh: dibuatRaw
+        };
+      });
       document.getElementById("statusText").textContent = `File CSV terbaca: ${csvData.length} baris.`;
+      console.log("headerMap:", headerMap);
     }
   });
 });
 
-// hitung rata-rata index per NIK langsung dari CSV (pakai logika akurat)
-function hitungRataC(nik) {
-  if (!nik) return {avg: null, count: 0};
-  const matched = [];
-  for (const r of csvData) {
-    const nikCsv = (r["NIK Pengambil"] || r["Nik Pengambil"] || r["nik"] || "").toString().trim();
-    if (nikCsv !== nik) continue;
-    const sn = normalizeStatus(r["Status Komplain"] || r["Status"] || "");
-    if (!isAcceptedStatus(sn)) continue;
-
-    const waktuSLA = parseFloat(r["Waktu SLA"] || r["Waktu_SLA"] || 0) || 0;
-    const durRaw = r["Durasi Komplain"] || r["Durasi_Komplain"] || "";
-    const hms = extractHms(durRaw);
-    const [h,m,s] = hms.split(":").map(x => Number(x || 0));
-    const A = waktuSLA * 3600;
-    const B = (h*3600) + (m*60) + s;
-    const C = A > 0 ? (B / A) : 0;
-    matched.push(C);
-  }
-  if (!matched.length) return {avg: null, count: 0};
-  const avg = matched.reduce((a,b)=>a+b,0)/matched.length;
-  return {avg, count: matched.length};
+// fungsi hitung C per baris: C = durasiDetik / (waktuSlaHours * 3600)
+function computeC(row){
+  const A = Number(row.waktuSlaDetik) || 0;
+  const B = Number(row.durasiDetik) || 0;
+  return A>0 ? (B / A) : 0;
 }
 
-// generate tabel
+// rata-rata by NIK
+function rataRata_byNIK(nik){
+  if (!nik) return {avg:null,count:0};
+  const rows = csvData.filter(r => (r.nik === nik) && isAcceptedStatus(r.statusNorm));
+  if (!rows.length) return {avg:null,count:0};
+  const sum = rows.reduce((acc,r)=> acc + computeC(r), 0);
+  return { avg: sum / rows.length, count: rows.length, rows };
+}
+
+// rata-rata by Name fuzzy on namaFields
+function rataRata_byName(nama, threshold=0.65){
+  if (!nama) return {avg:null,count:0};
+  const candidates = [];
+  for (const r of csvData){
+    if (!isAcceptedStatus(r.statusNorm)) continue;
+    // check diambilOleh/diselesaikan/dibuat
+    const names = [r.diambilOleh, r.diselesaikanOleh, r.dibuatOleh].filter(Boolean);
+    let best = 0;
+    for (const nm of names){
+      const s = similarity(nama, nm);
+      if (s > best) best = s;
+    }
+    if (best >= threshold) candidates.push({row:r,score:best});
+  }
+  if (!candidates.length) return {avg:null,count:0};
+  const sum = candidates.reduce((acc,c)=> acc + computeC(c.row), 0);
+  return { avg: sum / candidates.length, count: candidates.length, rows: candidates.map(c=>c.row) };
+}
+
+// generate table
 document.getElementById("generateBtn").addEventListener("click", () => {
-  if (!sheetData.length) return alert("Ambil nama dari Google Sheet dulu.");
+  if (!sheetData.length) return alert("Ambil nama dari GSheet dulu.");
   if (!csvData.length) return alert("Upload file CSV terlebih dahulu.");
 
   const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
@@ -180,11 +259,22 @@ document.getElementById("generateBtn").addEventListener("click", () => {
   tbody.innerHTML = "";
 
   const debugLines = [];
+  for (let i=0;i<sheetData.length;i++){
+    const k = sheetData[i];
+    // try by NIK first (if exists)
+    let res = {avg:null,count:0,method:null};
+    if (k.nik && k.nik.length>0){
+      res = rataRata_byNIK(k.nik);
+      if (res.count>0) res.method = 'byNIK';
+    }
+    // fallback by name if no result
+    if (!res.method){
+      res = rataRata_byName(k.nama, 0.65);
+      if (res.count>0) res.method = 'byName';
+    }
 
-  sheetData.forEach((k, i) => {
-    const res = hitungRataC(k.nik);
-    const avgDisplay = res.avg !== null ? res.avg.toFixed(4) : "-";
-    const ket = res.count > 0 ? `✅ ${res.count} data` : "❌ Tidak ada";
+    const avgDisplay = res.avg !== null ? Number(res.avg).toFixed(4) : "-";
+    const ket = res.count > 0 ? `✅ ${res.count} data (${res.method})` : "❌ Tidak ada";
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${i+1}</td>
@@ -195,8 +285,8 @@ document.getElementById("generateBtn").addEventListener("click", () => {
       <td>${ket}</td>
     `;
     tbody.appendChild(tr);
-    debugLines.push(`${k.nama} | ${k.nik} -> ${ket} | avg=${avgDisplay}`);
-  });
+    debugLines.push(`${k.nama} | nik:${k.nik || '-'} -> ${ket} | avg:${avgDisplay}`);
+  }
 
   document.getElementById("statusText").textContent = "✅ Perhitungan selesai.";
   const dbg = document.getElementById("debug");
