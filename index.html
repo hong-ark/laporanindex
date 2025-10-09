@@ -44,7 +44,7 @@
     <button id="generateBtn" class="btn btn-success mb-3">Generate Tabel</button>
     <span id="statusText" class="ms-2 text-muted"></span>
 
-    <div id="resultArea" class="mt-4" style="display:none;">
+    <div id="resultArea" class="mt-4">
       <table id="resultTable" class="table table-bordered table-striped">
         <thead>
           <tr>
@@ -67,19 +67,21 @@
 
   <script>
     const GAS_URL = "https://script.google.com/macros/s/AKfycbyoPTlFn5NSBWlDLAT5tvfui9ZKe-l1-INlSmjZ9wWTD3bva3XiP1xp9R2i7K5eTPHqIg/exec";
-    let sheetData = [];
-    let csvLines = [];
 
-    // === Tanggal hari ini ===
+    let sheetData = [];
+    let csvData = [];
+
+    // === tanggal ===
     const today = new Date();
     document.getElementById("tanggalCek").textContent = today.toLocaleDateString("id-ID", {
       day: "numeric", month: "long", year: "numeric"
     });
 
-    // === Ambil nama dari Google Sheet ===
+    // === ambil nama dari gsheet ===
     document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
       const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
       if (!shift) return alert("Masukkan shift (M, P, atau S)");
+
       document.getElementById("statusText").textContent = "Mengambil data dari Google Sheet...";
 
       try {
@@ -95,111 +97,90 @@
           }
         }
 
-        // Hilangkan duplikat
-        const unique = [];
+        // Hilangkan duplikat nama
         const seen = new Set();
-        for (const k of allData) {
-          if (!seen.has(k.nama)) {
-            seen.add(k.nama);
-            unique.push(k);
-          }
-        }
+        sheetData = allData.filter(k => {
+          if (seen.has(k.nama)) return false;
+          seen.add(k.nama);
+          return true;
+        });
 
-        sheetData = unique.map(k => ({
-          nama: k.nama.toUpperCase(),
-          nik: (k.nik || "").toString().trim()
-        }));
-
-        document.getElementById("statusText").textContent =
-          `Data ditemukan: ${sheetData.length} orang (Shift ${shiftsToFetch.join(" & ")})`;
+        document.getElementById("statusText").textContent = `Data ditemukan: ${sheetData.length} orang (Shift ${shiftsToFetch.join(" & ")})`;
       } catch (err) {
         document.getElementById("statusText").textContent = "Gagal memanggil API: " + err.message;
       }
     });
 
-    // === Upload CSV ===
-    document.getElementById("csvFile").addEventListener("change", async (e) => {
+    // === baca CSV ===
+    document.getElementById("csvFile").addEventListener("change", (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      const text = await file.text();
-      csvLines = text.split("\n").map(r => r.trim()).filter(r => r);
-      document.getElementById("statusText").textContent = `File CSV terbaca: ${csvLines.length - 1} baris.`;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const rows = evt.target.result.split(/\r?\n/).map(r => r.split(";"));
+        const header = rows[0].map(h => h.trim().toLowerCase());
+
+        const idxNik = header.findIndex(h => h.includes("nik pengambil"));
+        const idxDurasi = header.findIndex(h => h.includes("durasi komplain"));
+        const idxSla = header.findIndex(h => h.includes("waktu sla"));
+        const idxStatus = header.findIndex(h => h.includes("status komplain"));
+
+        csvData = rows.slice(1).map(r => ({
+          nik: (r[idxNik] || "").trim(),
+          durasi: (r[idxDurasi] || "").trim(),
+          sla: parseFloat(r[idxSla] || "0"),
+          status: (r[idxStatus] || "").trim().toUpperCase()
+        })).filter(x => x.nik);
+
+        document.getElementById("statusText").textContent = `File CSV terbaca: ${csvData.length} baris.`;
+      };
+      reader.readAsText(file);
     });
 
-    // === Generate tabel ===
-    document.getElementById("generateBtn").addEventListener("click", () => {
-      if (!sheetData.length) return alert("Ambil nama dari Google Sheet dulu.");
-      if (!csvLines.length) return alert("Upload file CSV terlebih dahulu.");
+    // === hitung index per NIK ===
+    function hitungIndexPerNik(nik) {
+      const dataNik = csvData.filter(d => d.nik === nik && ["RESOLVED", "IN PROGRESS", "CLOSED"].includes(d.status));
+      if (!dataNik.length) return null;
 
-      const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
-      const header = csvLines[0].split(";").map(h => h.trim());
-      const idxStatus = header.indexOf("Status Komplain");
-      const idxDurasi = header.indexOf("Durasi Komplain");
-      const idxSLA = header.indexOf("Waktu SLA");
-      const idxNIK = header.indexOf("NIK Pengambil");
+      let totalIndex = 0;
+      dataNik.forEach(d => {
+        const idx = parseFloat(d.sla);
+        if (!isNaN(idx)) totalIndex += idx;
+      });
 
-      if (idxStatus < 0 || idxDurasi < 0 || idxSLA < 0 || idxNIK < 0) {
-        document.getElementById("statusText").textContent = "Kolom CSV tidak lengkap!";
-        return;
-      }
-
-      const dataPerNIK = {};
-      for (let i = 1; i < csvLines.length; i++) {
-        const cols = csvLines[i].split(";").map(x => x.trim());
-        const status = (cols[idxStatus] || "").toUpperCase();
-        const nik = (cols[idxNIK] || "").replace(/\D/g, "");
-        const durasiStr = cols[idxDurasi] || "";
-        const slaStr = cols[idxSLA] || "";
-
-        if (!nik || !durasiStr || !slaStr) continue;
-        if (!["RESOLVED","IN PROGRESS","CLOSED"].includes(status)) continue;
-
-        const durasi = parseDurasi(durasiStr);
-        const sla = parseFloat(slaStr.replace(",", "."));
-        const index = sla > 0 ? durasi / sla : 0;
-
-        if (!dataPerNIK[nik]) dataPerNIK[nik] = [];
-        dataPerNIK[nik].push(index);
-      }
-
-      const tbody = document.querySelector("#resultTable tbody");
-      tbody.innerHTML = "";
-      let no = 1;
-      for (const k of sheetData) {
-        const data = dataPerNIK[k.nik];
-        const rata = data ? (data.reduce((a,b)=>a+b,0)/data.length).toFixed(4) : "-";
-        const ket = data ? `✅ ${data.length} data` : "❌ Tidak ada";
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${no++}</td>
-          <td>${k.nama}</td>
-          <td>${k.nik}</td>
-          <td>${shift}</td>
-          <td>${rata}</td>
-          <td>${ket}</td>
-        `;
-        tbody.appendChild(tr);
-      }
-
-      document.getElementById("resultArea").style.display = "block";
-      document.getElementById("statusText").textContent = "✅ Tabel berhasil digenerate.";
-    });
-
-    // === Fungsi konversi durasi ke jam ===
-    function parseDurasi(str) {
-      str = str.replace(",", ".").trim();
-      let hari = 0, jam = 0, menit = 0, detik = 0;
-      if (str.includes("d")) {
-        const match = str.match(/(\d+)d\s*(\d+):(\d+):(\d+)/);
-        if (match) [hari, jam, menit, detik] = match.slice(1).map(Number);
-      } else {
-        const match = str.match(/(\d+):(\d+):(\d+)/);
-        if (match) [jam, menit, detik] = match.map(Number).slice(1);
-      }
-      return hari * 24 + jam + (menit / 60) + (detik / 3600);
+      return (totalIndex / dataNik.length).toFixed(4);
     }
 
-    // === Download JPG ===
+    // === generate tabel ===
+    document.getElementById("generateBtn").addEventListener("click", () => {
+      if (!sheetData.length) return alert("Ambil nama dari Google Sheet dulu.");
+      if (!csvData.length) return alert("Upload file CSV terlebih dahulu.");
+
+      const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
+      const tbody = document.querySelector("#resultTable tbody");
+      tbody.innerHTML = "";
+
+      sheetData.forEach((k, i) => {
+        const avg = hitungIndexPerNik(k.nik);
+        const keterangan = avg ? "Ada" : "Tidak ada";
+        const icon = avg ? "✅" : "❌";
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${i + 1}</td>
+          <td>${k.nama}</td>
+          <td>${k.nik || ""}</td>
+          <td>${shift}</td>
+          <td>${avg || "-"}</td>
+          <td>${icon} ${keterangan}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById("statusText").textContent = "Tabel berhasil digenerate.";
+    });
+
+    // === download JPG ===
     document.getElementById("downloadBtn").addEventListener("click", async () => {
       const area = document.querySelector("#resultArea");
       const canvas = await html2canvas(area, { scale: 2 });
