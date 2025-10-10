@@ -126,8 +126,13 @@ function normalizeStatus(s){
   if (!s && s !== 0) return "";
   return String(s).replace(/\u00A0/g,' ').replace(/[_\-]/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
 }
+  
 function isAcceptedStatus(norm){ 
-  return norm.includes("resolved") || norm.includes("closed") || norm.includes("in progress") || norm.includes("inprogress");
+  return norm.includes("resolved") 
+      || norm.includes("closed") 
+      || norm.includes("in progress") 
+      || norm.includes("inprogress") 
+      || norm.includes("pending"); 
 }
 
 function levenshtein(a,b){
@@ -260,3 +265,4 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
