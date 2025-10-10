@@ -40,7 +40,7 @@
     <div class="mb-3">
       <label for="csvFile" class="form-label">Upload file CSV (dipisah dengan ;)</label>
       <input type="file" id="csvFile" class="form-control" accept=".csv" />
-      <small class="text-muted">Pastikan CSV punya header seperti (NIK Pengambil, Durasi Komplain, Waktu SLA, Status Komplain, Tanggal Diambil, Diambil Oleh / Dibuat Oleh / Diselesaikan Oleh).</small>
+      <small class="text-muted">Pastikan CSV punya header seperti (NIK Pengambil, Durasi Komplain, Waktu SLA, Status Komplain, Status SLA, Tanggal Diambil, Diambil Oleh / Dibuat Oleh).</small>
     </div>
 
     <button id="generateBtn" class="btn btn-success mb-3">Generate Tabel</button>
@@ -52,10 +52,11 @@
           <tr>
             <th>No</th>
             <th>Nama Karyawan</th>
-            <th>Jam Terakhir CO</th>
+            <th>LastCO</th>
             <th>Shift</th>
             <th>IndexCO</th>
             <th>TotalCO</th>
+            <th>SLA</th> <!-- Kolom SLA baru -->
           </tr>
         </thead>
         <tbody></tbody>
@@ -171,6 +172,7 @@ document.getElementById("csvFile").addEventListener("change", (e)=>{
         const waktuSlaRaw=getCol(r,['waktusla','waktu sla']);
         const statusRaw=getCol(r,['statuskomplain','status']);
         const diambilRaw=getCol(r,['diambiloleh','diambil oleh']);
+        const slaStatusRaw=getCol(r,['statussla','status sla']); // ambil Status SLA
         const dibuatRaw=getCol(r,['dibuatoleh','dibuat oleh']);
         const tglDiambilRaw=getCol(r,['tanggaldiambil','tgl diambil','tanggal diambil']);
         const slaNum=parseFloat((waktuSlaRaw||"").replace(",","."));
@@ -183,6 +185,7 @@ document.getElementById("csvFile").addEventListener("change", (e)=>{
           statusNorm:normalizeStatus(statusRaw),
           diambilOleh:diambilRaw,
           dibuatOleh:dibuatRaw,
+          statusSLA: (slaStatusRaw||"").trim().toLowerCase(), // normalisasi
           tanggalDiambil: tglDiambilRaw
         };
       });
@@ -216,6 +219,20 @@ function rataRata_byName(nama, thr=0.65){
   return {avg: sum/matches.length, count: matches.length, lastTime: ambilJamDariTanggal(latest)};
 }
 
+// Hitung SLA lewat
+function countLewatSLA_byNIK(nik){
+  const rows = csvData.filter(r => r.nik===nik && isAcceptedStatus(r.statusNorm));
+  return rows.filter(r => r.statusSLA === 'lewat sla').length;
+}
+function countLewatSLA_byName(nama, thr=0.65){
+  const matches = [];
+  for(const r of csvData){
+    if(!isAcceptedStatus(r.statusNorm)) continue;
+    const takenBy = r.diambilOleh;
+    if(takenBy && similarity(nama, takenBy) >= thr) matches.push(r);
+  }
+  return matches.filter(r => r.statusSLA === 'lewat sla').length;
+}
 
 document.getElementById("generateBtn").addEventListener("click",()=>{
   if(!sheetData.length)return alert("Ambil nama dari GSheet dulu.");
@@ -226,13 +243,15 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
   for(let i=0;i<sheetData.length;i++){
     const k=sheetData[i];
     let res=rataRata_byNIK(k.nik);
-    let method="byNIK";
-    if(!res.count){
-      res=rataRata_byName(k.nama);
-      method="byName";
-    }
+    if(!res.count) res=rataRata_byName(k.nama);
+
     const avg=res.avg!==null?res.avg.toFixed(3):"-";
     const ket=res.count>0?`${res.count} Co diambil`:"-";
+
+    const slaCount = res.count > 0 
+      ? countLewatSLA_byNIK(k.nik) 
+      : countLewatSLA_byName(k.nama);
+
     const tr=document.createElement("tr");
     tr.innerHTML=`
       <td>${i+1}</td>
@@ -241,6 +260,7 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
       <td>${shift}</td>
       <td>${avg}</td>
       <td>${ket}</td>
+      <td>${slaCount}</td> <!-- kolom SLA -->
     `;
     tbody.appendChild(tr);
   }
@@ -258,7 +278,3 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
-
-
-
-
