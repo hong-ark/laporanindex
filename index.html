@@ -237,7 +237,7 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
     let res=rataRata_byNIK(k.nik);
     if(!res.count) res=rataRata_byName(k.nama);
     const avg=res.avg!==null?res.avg.toFixed(3):"-";
-    const ket=res.count>0?`${res.count} Co diambil`:"-";
+    const ket=res.count>0?`${res.count}`:"-";
     const slaCount=res.slaCount||0;
     const tr=document.createElement("tr");
     tr.innerHTML=`
@@ -265,4 +265,5 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
