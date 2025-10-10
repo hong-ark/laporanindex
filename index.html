@@ -13,8 +13,6 @@
     table { font-size: 15px; }
     #resultTable th { background: #f2f2f2; text-align: center; }
     pre.debug { background:#fff9c4; padding:10px; border-radius:6px; font-size:13px; display:none; }
-    /* Style tombol upload */
-    .btn-upload { cursor: pointer; }
   </style>
 </head>
 <body>
@@ -40,10 +38,9 @@
     <hr />
 
     <div class="mb-3">
-      <label class="form-label">Upload file CSV (dipisah dengan ;)</label><br />
-      <input type="file" id="csvFile" class="d-none" accept=".csv" />
-      <label for="csvFile" class="btn btn-warning btn-upload mt-2">Upload File</label>
-      <small class="text-muted d-block mt-1">Pastikan CSV punya header seperti (NIK Pengambil, Durasi Komplain, Waktu SLA, Status Komplain, Status SLA, Tanggal Diambil, Diambil Oleh, Dibuat Oleh).</small>
+      <label for="csvFile" class="form-label">Upload file CSV (dipisah dengan ;)</label>
+      <input type="file" id="csvFile" class="form-control" accept=".csv" />
+      <small class="text-muted">Pastikan CSV punya header seperti (NIK Pengambil, Durasi Komplain, Waktu SLA, Status Komplain, Status SLA, Tanggal Diambil, Diambil Oleh, Dibuat Oleh).</small>
     </div>
 
     <button id="generateBtn" class="btn btn-success mb-3">Generate Tabel</button>
@@ -164,7 +161,7 @@ function ambilJamDariTanggal(s){
 }
 
 function jamKeMenit(jamStr){
-  if(!jamStr || jamStr === "-") return Infinity; 
+  if(!jamStr || jamStr === "-") return Infinity; // kosong di bawah
   const parts = jamStr.split(":");
   if(parts.length !== 2) return Infinity;
   return parseInt(parts[0])*60 + parseInt(parts[1]);
@@ -201,7 +198,7 @@ document.getElementById("csvFile").addEventListener("change", (e)=>{
           statusNorm:normalizeStatus(statusRaw),
           statusSLA:statusSlaRaw,
           diambilOleh:diambilRaw,
-                    dibuatOleh:dibuatRaw,
+          dibuatOleh:dibuatRaw,
           tanggalDiambil: tglDiambilRaw
         };
       });
@@ -248,7 +245,8 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
   });
 
   // Sort by Nama Karyawan A → Z
-  results.sort((a,b) => a.k.nama.localeCompare(b.k.nama, 'id'));
+results.sort((a,b) => a.k.nama.localeCompare(b.k.nama, 'id'));
+
 
   const tbody=document.querySelector("#resultTable tbody");
   tbody.innerHTML="";
@@ -283,4 +281,5 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
