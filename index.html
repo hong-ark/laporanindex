@@ -171,7 +171,6 @@ document.getElementById("csvFile").addEventListener("change", (e)=>{
         const waktuSlaRaw=getCol(r,['waktusla','waktu sla']);
         const statusRaw=getCol(r,['statuskomplain','status']);
         const diambilRaw=getCol(r,['diambiloleh','diambil oleh']);
-        const diselesaikanRaw=getCol(r,['diselesaikanoleh','diselesaikan oleh']);
         const dibuatRaw=getCol(r,['dibuatoleh','dibuat oleh']);
         const tglDiambilRaw=getCol(r,['tanggaldiambil','tgl diambil','tanggal diambil']);
         const slaNum=parseFloat((waktuSlaRaw||"").replace(",","."));
@@ -183,7 +182,6 @@ document.getElementById("csvFile").addEventListener("change", (e)=>{
           status:statusRaw,
           statusNorm:normalizeStatus(statusRaw),
           diambilOleh:diambilRaw,
-          diselesaikanOleh:diselesaikanRaw,
           dibuatOleh:dibuatRaw,
           tanggalDiambil: tglDiambilRaw
         };
@@ -260,6 +258,7 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
 
 
