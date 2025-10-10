@@ -244,9 +244,12 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
     return {k,res};
   });
 
-  // Sort by Nama Karyawan A → Z
-results.sort((a,b) => a.k.nama.localeCompare(b.k.nama, 'id'));
-
+// Sort by IndexCO descending (terbesar → terkecil)
+results.sort((a,b) => {
+  const indexA = a.res.avg !== null ? a.res.avg : -Infinity;
+  const indexB = b.res.avg !== null ? b.res.avg : -Infinity;
+  return indexB - indexA; // descending
+});
 
   const tbody=document.querySelector("#resultTable tbody");
   tbody.innerHTML="";
@@ -281,5 +284,6 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
 
