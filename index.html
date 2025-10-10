@@ -101,7 +101,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     }).map(k => ({
       nama: (k.nama || "").toString().trim(),
       nik: (k.nik || k.NIK || "").toString().replace(/\D/g, "").trim(),
-      shift: k.shift || shift // simpan shift dari sheet atau default input user
+      shift: k.shift || shift
     }));
     document.getElementById("statusText").textContent = `Data ditemukan: ${sheetData.length} orang (Shift ${shiftsToFetch.join(" & ")})`;
   } catch (err) {
@@ -160,6 +160,13 @@ function ambilJamDariTanggal(s){
   return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-";
 }
 
+function jamKeMenit(jamStr){
+  if(!jamStr || jamStr === "-") return Infinity; // kosong di bawah
+  const parts = jamStr.split(":");
+  if(parts.length !== 2) return Infinity;
+  return parseInt(parts[0])*60 + parseInt(parts[1]);
+}
+
 document.getElementById("csvFile").addEventListener("change", (e)=>{
   const file=e.target.files[0];
   if(!file)return;
@@ -181,12 +188,12 @@ document.getElementById("csvFile").addEventListener("change", (e)=>{
         const diambilRaw=getCol(r,['diambiloleh','diambil oleh']);
         const dibuatRaw=getCol(r,['dibuatoleh','dibuat oleh']);
         const tglDiambilRaw=getCol(r,['tanggaldiambil','tgl diambil','tanggal diambil']);
-        const slaNum=parseFloat((waktuSlaRaw||"").replace(",","."));
+        const slaNum=parseFloat((waktuSlaRaw||"").replace(",",".")) || 0;
         return{
           nik:nikRaw,
           durasiRaw,
           durasiDetik:durasiKeDetik(durasiRaw),
-          waktuSlaDetik:isNaN(slaNum)?0:slaNum*3600,
+          waktuSlaDetik:slaNum*3600,
           status:statusRaw,
           statusNorm:normalizeStatus(statusRaw),
           statusSLA:statusSlaRaw,
@@ -204,7 +211,7 @@ function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik/r.waktuSlaDetik :
 
 function rataRata_byNIK(nik){
   const rows=csvData.filter(r=>r.nik===nik && isAcceptedStatus(r.statusNorm));
-  if(!rows.length)return{avg:null,count:0,lastTime:"-"};
+  if(!rows.length)return{avg:null,count:0,lastTime:"-"}; 
   const sum=rows.reduce((a,b)=>a+computeC(b),0);
   const latest=rows.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
   const slaCount=rows.filter(r=>r.statusSLA && r.statusSLA.toLowerCase().includes("lewat")).length;
@@ -230,18 +237,26 @@ function rataRata_byName(nama, thr=0.65){
 document.getElementById("generateBtn").addEventListener("click",()=>{
   if(!sheetData.length)return alert("Ambil nama dari GSheet dulu.");
   if(!csvData.length)return alert("Upload file CSV dulu.");
-  const tbody=document.querySelector("#resultTable tbody");
-  tbody.innerHTML="";
-  for(let i=0;i<sheetData.length;i++){
-    const k=sheetData[i];
+
+  const results = sheetData.map((k,i)=>{
     let res=rataRata_byNIK(k.nik);
     if(!res.count) res=rataRata_byName(k.nama);
-    const avg=res.avg!==null ? (Math.round(res.avg * 100) / 100).toFixed(2) : "-";
-    const ket=res.count>0?`${res.count}`:"-";
+    return {k,res};
+  });
+
+  // Sort by LastCO dari Terlama → Terbaru
+  results.sort((a,b) => jamKeMenit(a.res.lastTime) - jamKeMenit(b.res.lastTime));
+
+  const tbody=document.querySelector("#resultTable tbody");
+  tbody.innerHTML="";
+  results.forEach((item,index)=>{
+    const {k,res} = item;
+    const avg=res.avg!==null ? (Math.round(res.avg*100)/100).toFixed(2) : "-";
+    const ket=res.count>0 ? `${res.count}` : "-";
     const slaCount=res.slaCount||0;
     const tr=document.createElement("tr");
     tr.innerHTML=`
-      <td>${i+1}</td>
+      <td>${index+1}</td>
       <td>${k.nama}</td>
       <td>${k.shift}</td>
       <td>${res.lastTime}</td>
@@ -250,7 +265,7 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
       <td>${slaCount}</td>
     `;
     tbody.appendChild(tr);
-  }
+  });
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 });
 
@@ -265,6 +280,3 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
-
-
-
