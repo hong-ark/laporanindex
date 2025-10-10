@@ -244,8 +244,9 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
     return {k,res};
   });
 
-  // Sort by LastCO dari Terlama → Terbaru
-  results.sort((a,b) => jamKeMenit(a.res.lastTime) - jamKeMenit(b.res.lastTime));
+  // Sort by Nama Karyawan A → Z
+results.sort((a,b) => a.k.nama.localeCompare(b.k.nama, 'id'));
+
 
   const tbody=document.querySelector("#resultTable tbody");
   tbody.innerHTML="";
@@ -280,3 +281,4 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
