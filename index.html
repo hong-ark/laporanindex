@@ -203,20 +203,21 @@ function rataRata_byNIK(nik){
   return{avg:sum/rows.length,count:rows.length,lastTime:ambilJamDariTanggal(latest)};
 }
 
-function rataRata_byName(nama,thr=0.65){
-  const matches=[];
+function rataRata_byName(nama, thr=0.65){
+  const matches = [];
   for(const r of csvData){
-    if(!isAcceptedStatus(r.statusNorm))continue;
-    const candidates=[r.diambilOleh,r.diselesaikanOleh,r.dibuatOleh].filter(Boolean);
-    let best=0;
-    for(const c of candidates) best=Math.max(best,similarity(nama,c));
-    if(best>=thr) matches.push(r);
+    if(!isAcceptedStatus(r.statusNorm)) continue;
+    const takenBy = r.diambilOleh;
+    if(takenBy && similarity(nama, takenBy) >= thr) {
+      matches.push(r);
+    }
   }
-  if(!matches.length)return{avg:null,count:0,lastTime:"-"};
-  const sum=matches.reduce((a,b)=>a+computeC(b),0);
-  const latest=matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
-  return{avg:sum/matches.length,count:matches.length,lastTime:ambilJamDariTanggal(latest)};
+  if(!matches.length) return {avg:null, count:0, lastTime:"-"};
+  const sum = matches.reduce((a,b)=>a+computeC(b),0);
+  const latest = matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
+  return {avg: sum/matches.length, count: matches.length, lastTime: ambilJamDariTanggal(latest)};
 }
+
 
 document.getElementById("generateBtn").addEventListener("click",()=>{
   if(!sheetData.length)return alert("Ambil nama dari GSheet dulu.");
@@ -259,5 +260,6 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
 
