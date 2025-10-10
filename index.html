@@ -13,17 +13,14 @@
     table { font-size: 15px; }
     #resultTable th { background: #f2f2f2; text-align: center; }
     pre.debug { background:#fff9c4; padding:10px; border-radius:6px; font-size:13px; display:none; }
-    /* Tombol upload file yang menonjol */
-    .btn-upload {
-      cursor: pointer;
-      font-weight: bold;
-    }
+    /* Style tombol upload */
+    .btn-upload { cursor: pointer; }
   </style>
 </head>
 <body>
   <div class="container">
     <h4><b>Laporan Index Shift</b></h4>
-    <p>Input shift → Ambil nama dari GSheet → Upload CSV (dipisah `;`) → Generate Tabel.</p>
+    <p>Input shift → Ambil nama dari GSheet → Upload CSV (pemisah `;`) → Generate Tabel.</p>
 
     <div class="mb-3 row">
       <div class="col-md-2">
@@ -42,12 +39,9 @@
 
     <hr />
 
-    <!-- Tombol upload file -->
     <div class="mb-3">
       <label class="form-label">Upload file CSV (dipisah dengan ;)</label><br />
-      <!-- input file disembunyikan -->
       <input type="file" id="csvFile" class="d-none" accept=".csv" />
-      <!-- label dijadikan tombol -->
       <label for="csvFile" class="btn btn-warning btn-upload mt-2">Upload File</label>
       <small class="text-muted d-block mt-1">Pastikan CSV punya header seperti (NIK Pengambil, Durasi Komplain, Waktu SLA, Status Komplain, Status SLA, Tanggal Diambil, Diambil Oleh, Dibuat Oleh).</small>
     </div>
@@ -170,7 +164,7 @@ function ambilJamDariTanggal(s){
 }
 
 function jamKeMenit(jamStr){
-  if(!jamStr || jamStr === "-") return Infinity; // kosong di bawah
+  if(!jamStr || jamStr === "-") return Infinity; 
   const parts = jamStr.split(":");
   if(parts.length !== 2) return Infinity;
   return parseInt(parts[0])*60 + parseInt(parts[1]);
@@ -207,16 +201,86 @@ document.getElementById("csvFile").addEventListener("change", (e)=>{
           statusNorm:normalizeStatus(statusRaw),
           statusSLA:statusSlaRaw,
           diambilOleh:diambilRaw,
-          dibuatOleh:dibu```
-Berikut revisi lengkap untuk tombol upload agar terlihat lebih jelas dan tetap berfungsi:  
+                    dibuatOleh:dibuatRaw,
+          tanggalDiambil: tglDiambilRaw
+        };
+      });
+      document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
+    }
+  });
+});
 
-```html
-<!-- Ganti bagian upload CSV -->
-<div class="mb-3">
-  <label class="form-label">Upload file CSV (dipisah dengan ;)</label><br />
-  <!-- input file disembunyikan -->
-  <input type="file" id="csvFile" class="d-none" accept=".csv" />
-  <!-- label dijadikan tombol -->
-  <label for="csvFile" class="btn btn-warning btn-upload mt-2">Upload File</label>
-  <small class="text-muted d-block mt-1">Pastikan CSV punya header seperti (NIK Pengambil, Durasi Komplain, Waktu SLA, Status Komplain, Status SLA, Tanggal Diambil, Diambil Oleh, Dibuat Oleh).</small>
-</div>
+function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik/r.waktuSlaDetik : 0; }
+
+function rataRata_byNIK(nik){
+  const rows=csvData.filter(r=>r.nik===nik && isAcceptedStatus(r.statusNorm));
+  if(!rows.length)return{avg:null,count:0,lastTime:"-"}; 
+  const sum=rows.reduce((a,b)=>a+computeC(b),0);
+  const latest=rows.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
+  const slaCount=rows.filter(r=>r.statusSLA && r.statusSLA.toLowerCase().includes("lewat")).length;
+  return{avg:sum/rows.length,count:rows.length,lastTime:ambilJamDariTanggal(latest),slaCount};
+}
+
+function rataRata_byName(nama, thr=0.65){
+  const matches = [];
+  for(const r of csvData){
+    if(!isAcceptedStatus(r.statusNorm)) continue;
+    const takenBy = r.diambilOleh;
+    if(takenBy && similarity(nama, takenBy) >= thr) {
+      matches.push(r);
+    }
+  }
+  if(!matches.length) return {avg:null, count:0, lastTime:"-", slaCount:0};
+  const sum = matches.reduce((a,b)=>a+computeC(b),0);
+  const latest = matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
+  const slaCount=matches.filter(r=>r.statusSLA && r.statusSLA.toLowerCase().includes("lewat")).length;
+  return {avg: sum/matches.length, count: matches.length, lastTime: ambilJamDariTanggal(latest), slaCount};
+}
+
+document.getElementById("generateBtn").addEventListener("click",()=>{
+  if(!sheetData.length)return alert("Ambil nama dari GSheet dulu.");
+  if(!csvData.length)return alert("Upload file CSV dulu.");
+
+  const results = sheetData.map((k,i)=>{
+    let res=rataRata_byNIK(k.nik);
+    if(!res.count) res=rataRata_byName(k.nama);
+    return {k,res};
+  });
+
+  // Sort by Nama Karyawan A → Z
+  results.sort((a,b) => a.k.nama.localeCompare(b.k.nama, 'id'));
+
+  const tbody=document.querySelector("#resultTable tbody");
+  tbody.innerHTML="";
+  results.forEach((item,index)=>{
+    const {k,res} = item;
+    const avg=res.avg!==null ? (Math.round(res.avg*100)/100).toFixed(2) : "-";
+    const ket=res.count>0 ? `${res.count}` : "-";
+    const slaCount=res.slaCount||0;
+    const tr=document.createElement("tr");
+    tr.innerHTML=`
+      <td>${index+1}</td>
+      <td>${k.nama}</td>
+      <td>${k.shift}</td>
+      <td>${res.lastTime}</td>
+      <td>${avg}</td>
+      <td>${ket}</td>
+      <td>${slaCount}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
+});
+
+document.getElementById("downloadBtn").addEventListener("click",async()=>{
+  const area=document.querySelector("#resultArea");
+  const canvas=await html2canvas(area,{scale:2});
+  const link=document.createElement("a");
+  link.download="Laporan_Index_Shift.jpg";
+  link.href=canvas.toDataURL("image/jpeg");
+  link.click();
+});
+</script>
+</body>
+</html>
+
