@@ -25,8 +25,8 @@
         <label class="form-label">Shift</label>
         <select id="shiftInput" class="form-select">
   <option value="">-- Pilih Shift --</option>
-  <option value="M">M </option>
-  <option value="M H-1"></option>
+  <option value="M">M H-1</option>
+  <option value="M">M</option>
   <option value="P">P</option>
   <option value="S">S</option>
 </select>
@@ -269,7 +269,7 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
     // Ambil shift M hari ini
     filteredResults = results.filter(r => r.k.shift.toUpperCase() === "M");
   } 
-  else if (shiftDipilih === "M H1") {
+  else if (shiftDipilih === "M H-1") {
     // Ambil shift M H-1, tapi tanggalnya tetap hari ini
     filteredResults = results.filter(r => r.k.shift.toUpperCase() === "M");
     // Jika kamu ingin label di tabel tetap menunjukkan "M H-1"
