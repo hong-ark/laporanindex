@@ -265,10 +265,13 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
 
-  if (shiftDipilih === "M") {
-    // Ambil shift M hari ini
-    filteredResults = results.filter(r => r.k.shift.toUpperCase() === "M");
-  } 
+  else if (shiftDipilih === "M") {
+  // Logika pengambilan shift M (sama seperti S, hanya huruf diganti)
+  filteredShiftData = sheetData.filter(row => {
+    const shiftValue = (row.shift || row.Shift || "").toUpperCase();
+    return shiftValue === "M";
+  });
+}
   else if (shiftDipilih === "M_H-1") {
     // Ambil shift M H-1, tapi tanggalnya tetap hari ini
     filteredResults = results.filter(r => r.k.shift.toUpperCase() === "M");
@@ -318,6 +321,7 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
 
 
