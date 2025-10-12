@@ -260,30 +260,32 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
   });
 
   // --- Filter hasil sesuai shift ---
-  let filteredResults = results;
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
+let filteredResults = results;
+const today = new Date();
+const yesterday = new Date(today);
+yesterday.setDate(today.getDate() - 1);
 
-  else if (shiftDipilih === "M") {
-  // Logika pengambilan shift M (sama seperti S, hanya huruf diganti)
-  filteredShiftData = sheetData.filter(row => {
-    const shiftValue = (row.shift || row.Shift || "").toUpperCase();
+if (shiftDipilih === "M") {
+  // Logika pengambilan shift M (sama seperti S)
+  filteredResults = results.filter(r => {
+    const shiftValue = (r.k.shift || "").toUpperCase();
     return shiftValue === "M";
   });
+
+} else if (shiftDipilih === "M_H-1") {
+  // Ambil shift M H-1, tapi tanggalnya tetap hari ini
+  filteredResults = results.filter(r => {
+    const shiftValue = (r.k.shift || "").toUpperCase();
+    return shiftValue === "M";
+  }).map(obj => ({ ...obj, k: { ...obj.k, shift: "M H-1" }}));
+
+} else if (shiftDipilih === "P") {
+  filteredResults = results.filter(r => (r.k.shift || "").toUpperCase().startsWith("P"));
+
+} else if (shiftDipilih === "S") {
+  filteredResults = results.filter(r => (r.k.shift || "").toUpperCase() === "S");
 }
-  else if (shiftDipilih === "M_H-1") {
-    // Ambil shift M H-1, tapi tanggalnya tetap hari ini
-    filteredResults = results.filter(r => r.k.shift.toUpperCase() === "M");
-    // Jika kamu ingin label di tabel tetap menunjukkan "M H-1"
-    filteredResults = filteredResults.map(obj => ({ ...obj, k: { ...obj.k, shift: "M H-1" }}));
-  } 
-  else if (shiftDipilih === "P") {
-    filteredResults = results.filter(r => r.k.shift.toUpperCase().startsWith("P"));
-  } 
-  else if (shiftDipilih === "S") {
-    filteredResults = results.filter(r => r.k.shift.toUpperCase() === "S");
-  }
+
 
   // --- Tampilkan ke tabel ---
   const tbody=document.querySelector("#resultTable tbody");
@@ -321,6 +323,7 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
 
 
