@@ -23,13 +23,7 @@
     <div class="mb-3 row">
       <div class="col-md-2">
         <label class="form-label">Shift</label>
-        <select id="shiftInput" class="form-select">
-  <option value="">-- Pilih Shift --</option>
-  <option value="M">M</option>
-  <option value="M_H-1">M H-1</option>
-  <option value="P">P</option>
-  <option value="S">S</option>
-</select>
+        <input type="text" id="shiftInput" class="form-control" maxlength="2" placeholder="M / P / S" />
       </div>
       <div class="col-md-4">
         <label class="form-label">&nbsp;</label><br />
@@ -244,50 +238,22 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
   if(!sheetData.length)return alert("Ambil nama dari GSheet dulu.");
   if(!csvData.length)return alert("Upload file CSV dulu.");
 
-  const shiftDipilih = document.getElementById("shiftInput").value.trim().toUpperCase();
-
   const results = sheetData.map((k,i)=>{
     let res=rataRata_byNIK(k.nik);
     if(!res.count) res=rataRata_byName(k.nama);
     return {k,res};
   });
 
-  // --- SORTING by IndexCO terbesar ke kecil ---
-  results.sort((a,b)=>{
-    const indexA = a.res.avg !== null ? a.res.avg : -Infinity;
-    const indexB = b.res.avg !== null ? b.res.avg : -Infinity;
-    return indexB - indexA;
-  });
+// Sort by IndexCO descending (terbesar → terkecil)
+results.sort((a,b) => {
+  const indexA = a.res.avg !== null ? a.res.avg : -Infinity;
+  const indexB = b.res.avg !== null ? b.res.avg : -Infinity;
+  return indexB - indexA; // descending
+});
 
- // --- Filter hasil sesuai shift ---
-let filteredResults = results;
-const today = new Date();
-const yesterday = new Date(today);
-yesterday.setDate(today.getDate() - 1);
-
-if (shiftDipilih === "M") {
-  // ✅ Ambil shift M hari ini
-  filteredResults = results.filter(r => (r.k.shift || "").toUpperCase() === "M");
-
-} else if (shiftDipilih === "M_H-1") {
-  // ✅ Ambil shift M dari tanggal kemarin (H-1)
-  filteredResults = results
-    .filter(r => (r.k.shift || "").toUpperCase() === "M" && r.k.tanggal === yesterday.toDateString())
-    .map(obj => ({ ...obj, k: { ...obj.k, shift: "M H-1" }}));
-
-} else if (shiftDipilih === "P") {
-  filteredResults = results.filter(r => (r.k.shift || "").toUpperCase().startsWith("P"));
-
-} else if (shiftDipilih === "S") {
-  filteredResults = results.filter(r => (r.k.shift || "").toUpperCase() === "S");
-}
-
-
-
-  // --- Tampilkan ke tabel ---
   const tbody=document.querySelector("#resultTable tbody");
   tbody.innerHTML="";
-  filteredResults.forEach((item,index)=>{
+  results.forEach((item,index)=>{
     const {k,res} = item;
     const avg=res.avg!==null ? (Math.round(res.avg*100)/100).toFixed(2) : "-";
     const ket=res.count>0 ? `${res.count}` : "-";
@@ -304,10 +270,8 @@ if (shiftDipilih === "M") {
     `;
     tbody.appendChild(tr);
   });
-
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 });
-
 
 document.getElementById("downloadBtn").addEventListener("click",async()=>{
   const area=document.querySelector("#resultArea");
@@ -320,12 +284,6 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
-
-
-
-
-
-
 
 
 
