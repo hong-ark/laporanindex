@@ -18,7 +18,7 @@
 <body>
   <div class="container">
     <h4><b>Laporan Index Shift</b></h4>
-    <p>Input shift → Ambil nama dari GSheet → Upload CSV (pemisah `;`) → Generate Tabel.</p>
+    <p>Input shift → Ambil nama dari GSheet → Upload CSV dari WEB CO → Generate Tabel.</p>
 
     <div class="mb-3 row">
       <div class="col-md-2">
@@ -38,7 +38,7 @@
     <hr />
 
     <div class="mb-3">
-      <label for="csvFile" class="form-label">Upload file CSV (dipisah dengan ;)</label>
+      <label for="csvFile" class="form-label">Upload file CSV dari WEB CO</label>
       <input type="file" id="csvFile" class="form-control" accept=".csv" />
       <small class="text-muted">Pastikan CSV punya header seperti (NIK Pengambil, Durasi Komplain, Waktu SLA, Status Komplain, Status SLA, Tanggal Diambil, Diambil Oleh, Dibuat Oleh).</small>
     </div>
@@ -284,6 +284,7 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
 
 
