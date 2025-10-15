@@ -11,10 +11,17 @@
     body { background: #f6f7fb; padding: 20px; }
     .container { max-width: 1100px; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
     table { font-size: 15px; }
-    #resultTable th { background: #f2f2f2; text-align: center; cursor: pointer; position: relative; }
+    #resultTable th { background: #f2f2f2; text-align: center; cursor: pointer; user-select: none; position: relative; }
+    #resultTable th:hover { background: #e0e0e0; }
     #resultTable th.no-sort { cursor: default; }
-    #resultTable th.sort-asc::after { content: "▲"; position: absolute; right: 6px; font-size: 10px; }
-    #resultTable th.sort-desc::after { content: "▼"; position: absolute; right: 6px; font-size: 10px; }
+    #resultTable th::after {
+      content: "⇅";
+      position: absolute;
+      right: 8px;
+      font-size: 0.8em;
+      opacity: 0.4;
+    }
+    #resultTable th.no-sort::after { content: ""; }
     pre.debug { background:#fff9c4; padding:10px; border-radius:6px; font-size:13px; display:none; }
   </style>
 </head>
@@ -78,6 +85,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbyoPTlFn5NSBWlDLAT5tvfu
 
 let sheetData = [];
 let csvData = [];
+let tableResults = []; // untuk menyimpan hasil terakhir agar bisa disort ulang
 let currentSort = { key: '', asc: true };
 
 document.getElementById("tanggalCek").textContent = new Date().toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
@@ -130,20 +138,16 @@ function normalizeStatus(s){
   if (!s && s !== 0) return "";
   return String(s).replace(/\u00A0/g,' ').replace(/[_\-]/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
 }
-  
+
 function isAcceptedStatus(norm){ 
-  return norm.includes("resolved") 
-      || norm.includes("closed") 
-      || norm.includes("in progress") 
-      || norm.includes("inprogress") 
-      || norm.includes("pending"); 
+  return norm.includes("resolved") || norm.includes("closed") || norm.includes("in progress") || norm.includes("inprogress") || norm.includes("pending"); 
 }
 
 function levenshtein(a,b){
-  a = a||""; b = b||"";
+  a=a||""; b=b||"";
   const al=a.length, bl=b.length;
   if (!al) return bl; if (!bl) return al;
-  const dp = Array.from({length:al+1},()=>new Array(bl+1).fill(0));
+  const dp=Array.from({length:al+1},()=>new Array(bl+1).fill(0));
   for (let i=0;i<=al;i++) dp[i][0]=i;
   for (let j=0;j<=bl;j++) dp[0][j]=j;
   for (let i=1;i<=al;i++)
@@ -151,6 +155,7 @@ function levenshtein(a,b){
       dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
   return dp[al][bl];
 }
+
 function similarity(a,b){
   a=normalizeName(a); b=normalizeName(b);
   if (!a||!b) return 0;
@@ -188,8 +193,10 @@ document.getElementById("csvFile").addEventListener("change", (e)=>{
         const slaNum=parseFloat((waktuSlaRaw||"").replace(",",".")) || 0;
         return{
           nik:nikRaw,
+          durasiRaw,
           durasiDetik:durasiKeDetik(durasiRaw),
           waktuSlaDetik:slaNum*3600,
+          status:statusRaw,
           statusNorm:normalizeStatus(statusRaw),
           statusSLA:statusSlaRaw,
           diambilOleh:diambilRaw,
@@ -206,78 +213,92 @@ function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik/r.waktuSlaDetik :
 
 function rataRata_byNIK(nik){
   const rows=csvData.filter(r=>r.nik===nik && isAcceptedStatus(r.statusNorm));
-  if(!rows.length)return{avg:null,count:0,lastTime:"-"}; 
+  if(!rows.length)return{avg:null,count:0,lastTime:"-",slaCount:0}; 
   const sum=rows.reduce((a,b)=>a+computeC(b),0);
   const latest=rows.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
   const slaCount=rows.filter(r=>r.statusSLA && r.statusSLA.toLowerCase().includes("lewat")).length;
   return{avg:sum/rows.length,count:rows.length,lastTime:ambilJamDariTanggal(latest),slaCount};
 }
 
-function rataRata_byName(nama, thr=0.65){
-  const matches = [];
+function rataRata_byName(nama,thr=0.65){
+  const matches=[];
   for(const r of csvData){
     if(!isAcceptedStatus(r.statusNorm)) continue;
-    const takenBy = r.diambilOleh;
-    if(takenBy && similarity(nama, takenBy) >= thr) {
-      matches.push(r);
-    }
+    const takenBy=r.diambilOleh;
+    if(takenBy && similarity(nama,takenBy)>=thr){ matches.push(r); }
   }
-  if(!matches.length) return {avg:null, count:0, lastTime:"-", slaCount:0};
-  const sum = matches.reduce((a,b)=>a+computeC(b),0);
-  const latest = matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
+  if(!matches.length)return{avg:null,count:0,lastTime:"-",slaCount:0};
+  const sum=matches.reduce((a,b)=>a+computeC(b),0);
+  const latest=matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
   const slaCount=matches.filter(r=>r.statusSLA && r.statusSLA.toLowerCase().includes("lewat")).length;
-  return {avg: sum/matches.length, count: matches.length, lastTime: ambilJamDariTanggal(latest), slaCount};
+  return{avg:sum/matches.length,count:matches.length,lastTime:ambilJamDariTanggal(latest),slaCount};
 }
-
-let currentData = [];
 
 document.getElementById("generateBtn").addEventListener("click",()=>{
   if(!sheetData.length)return alert("Ambil nama dari GSheet dulu.");
   if(!csvData.length)return alert("Upload file CSV dulu.");
 
-  const results = sheetData.map((k)=>{
+  const results=sheetData.map(k=>{
     let res=rataRata_byNIK(k.nik);
     if(!res.count) res=rataRata_byName(k.nama);
-    return {nama:k.nama, shift:k.shift, lastCO:res.lastTime, indexCO:res.avg, totalCO:res.count, sla:res.slaCount};
+    return{k,res};
   });
 
-  currentData = results;
-  renderTable(currentData);
+  tableResults = results;
+  renderTable(tableResults);
+  document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 });
 
-function renderTable(data){
+// === fungsi render tabel dan sort ===
+function renderTable(results){
   const tbody=document.querySelector("#resultTable tbody");
   tbody.innerHTML="";
-  data.forEach((r,i)=>{
-    const avg=r.indexCO!==null && r.indexCO!==undefined ? (Math.round(r.indexCO*100)/100).toFixed(2) : "-";
-    const tr=document.createElement("tr");
-    tr.innerHTML=`
-      <td>${i+1}</td>
-      <td>${r.nama}</td>
-      <td>${r.shift}</td>
-      <td>${r.lastCO}</td>
-      <td>${avg}</td>
-      <td>${r.totalCO}</td>
-      <td>${r.sla}</td>`;
-    tbody.appendChild(tr);
+  results.forEach((item,i)=>{
+    const {k,res}=item;
+    const avg=res.avg!==null ? (Math.round(res.avg*100)/100).toFixed(2) : "-";
+    tbody.innerHTML += `
+      <tr>
+        <td>${i+1}</td>
+        <td>${k.nama}</td>
+        <td>${k.shift}</td>
+        <td>${res.lastTime}</td>
+        <td>${avg}</td>
+        <td>${res.count}</td>
+        <td>${res.slaCount}</td>
+      </tr>`;
   });
 }
 
-// === SORT HEADER ===
+// === logic sort header ===
 document.querySelectorAll("#resultTable th:not(.no-sort)").forEach((th,idx)=>{
   th.addEventListener("click",()=>{
-    const keyMap=["nama","shift","lastCO","indexCO","totalCO","sla"];
-    const key=keyMap[idx-1] || keyMap[idx]; 
-    if(currentSort.key===key) currentSort.asc=!currentSort.asc;
-    else {currentSort.key=key; currentSort.asc=true;}
-    document.querySelectorAll("#resultTable th").forEach(th=>th.classList.remove("sort-asc","sort-desc"));
-    th.classList.add(currentSort.asc?"sort-asc":"sort-desc");
-    currentData.sort((a,b)=>{
-      const valA=a[key]||"", valB=b[key]||"";
-      if(!isNaN(valA)&&!isNaN(valB)) return currentSort.asc?valA-valB:valB-valA;
-      return currentSort.asc?String(valA).localeCompare(String(valB)):String(valB).localeCompare(String(valA));
+    const keyMap=["nama","shift","lastTime","avg","count","slaCount"];
+    const key=keyMap[idx-1]; // karena kolom No tidak ikut
+    if(!key)return;
+
+    if(currentSort.key===key){
+      currentSort.asc=!currentSort.asc;
+    }else{
+      currentSort.key=key;
+      currentSort.asc=true;
+    }
+
+    tableResults.sort((a,b)=>{
+      let A="",B="";
+      if(key==="nama") {A=a.k.nama;B=b.k.nama;}
+      else if(key==="shift"){A=a.k.shift;B=b.k.shift;}
+      else if(key==="lastTime"){A=a.res.lastTime;B=b.res.lastTime;}
+      else if(key==="avg"){A=a.res.avg||0;B=b.res.avg||0;}
+      else if(key==="count"){A=a.res.count||0;B=b.res.count||0;}
+      else if(key==="slaCount"){A=a.res.slaCount||0;B=b.res.slaCount||0;}
+      if(typeof A==="string")A=A.toLowerCase();
+      if(typeof B==="string")B=B.toLowerCase();
+      if(A<B)return currentSort.asc?-1:1;
+      if(A>B)return currentSort.asc?1:-1;
+      return 0;
     });
-    renderTable(currentData);
+
+    renderTable(tableResults);
   });
 });
 
