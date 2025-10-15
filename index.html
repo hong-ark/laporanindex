@@ -79,24 +79,17 @@ let sheetData = [];
 let csvData = [];
 let lastResults = [];
 let sortAscInProgress = false;
+let sortAscNama = true;
+let sortAscIndex = false;
+let sortAscTotal = true;
+let sortAscSLA = false;
 
 document.getElementById("tanggalCek").textContent =
   new Date().toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
 
-// ==== FUNGSI BANTU ====
+// ==== Fungsi bantu umum ====
 function normKey(s){ return (s||"").toString().toLowerCase().replace(/[^a-z0-9]/g,''); }
 function normalizeName(s){ return (s||"").toString().toLowerCase().replace(/\s+/g,' ').replace(/[^\w\s]/g,'').trim(); }
-
-function similarity(a,b){
-  a = normalizeName(a); b = normalizeName(b);
-  if (!a || !b) return 0;
-  let longer = a.length > b.length ? a : b;
-  let shorter = a.length > b.length ? b : a;
-  let longerLength = longer.length;
-  let sameCount = 0;
-  for (let i=0;i<shorter.length;i++) if (longer.includes(shorter[i])) sameCount++;
-  return sameCount / longerLength;
-}
 
 function durasiKeDetik(v){
   if (!v) return 0;
@@ -118,13 +111,32 @@ function isAcceptedStatus(norm){
          norm.includes("pending"); 
 }
 
+function levenshtein(a,b){
+  a=a||""; b=b||"";
+  const al=a.length, bl=b.length;
+  if(!al)return bl; if(!bl)return al;
+  const dp=Array.from({length:al+1},()=>new Array(bl+1).fill(0));
+  for(let i=0;i<=al;i++)dp[i][0]=i;
+  for(let j=0;j<=bl;j++)dp[0][j]=j;
+  for(let i=1;i<=al;i++)
+    for(let j=1;j<=bl;j++)
+      dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+  return dp[al][bl];
+}
+function similarity(a,b){
+  a=normalizeName(a); b=normalizeName(b);
+  if(!a||!b)return 0;
+  const d=levenshtein(a,b);
+  return 1 - d/Math.max(a.length,b.length);
+}
+
 function ambilJamDariTanggal(s){
   if(!s)return "-";
   const m=s.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
   return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-";
 }
 
-// ==== AMBIL DATA GSheet ====
+// ==== Ambil data dari GSheet ====
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
   if (!shift) return alert("Masukkan shift (M, P, atau S)");
@@ -146,7 +158,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   }
 });
 
-// ==== UPLOAD CSV ====
+// ==== Upload CSV ====
 document.getElementById("csvFile").addEventListener("change",(e)=>{
   const file=e.target.files[0];
   if(!file)return;
@@ -158,7 +170,6 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
       const headerMap={};
       (res.meta.fields||[]).forEach(f=>headerMap[normKey(f)]=f);
       const getCol=(row,arr)=>{ for(const c of arr){ const k=headerMap[c]; if(k&&row[k]) return row[k].toString(); } return ""; };
-
       csvData=res.data.map(r=>{
         const nikRaw=(getCol(r,['nikpengambil','nik'])).replace(/\D/g,'').trim();
         const diambilOleh=getCol(r,['diambiloleh','diambil oleh']);
@@ -185,32 +196,24 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
   });
 });
 
-// ==== LOGIKA PENGHITUNGAN ====
+// ==== Perhitungan ====
 function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik/r.waktuSlaDetik : 0; }
 
-function rataRata_byNIK(nik){
-  const rows=csvData.filter(r=>r.nik===nik && isAcceptedStatus(r.statusNorm));
-  if(!rows.length)return{avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0};
-  const sum=rows.reduce((a,b)=>a+computeC(b),0);
-  const latest=rows.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
-  const slaCount=rows.filter(r=>r.statusSLA && r.statusSLA.toLowerCase().includes("lewat")).length;
-  const inProgressCount=rows.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length;
-  return{avg:sum/rows.length,count:rows.length,lastTime:ambilJamDariTanggal(latest),slaCount,inProgressCount};
-}
-
-function rataRata_byName(nama){
-  const matches=csvData.filter(r=>{
-    return isAcceptedStatus(r.statusNorm) && similarity(nama,r.diambilOleh)>=0.65;
-  });
+function rataRata_byName(nama,thr=0.65){
+  const matches=[];
+  for(const r of csvData){
+    if(!isAcceptedStatus(r.statusNorm))continue;
+    if(similarity(nama,r.diambilOleh)>=thr)matches.push(r);
+  }
   if(!matches.length)return{avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0};
   const sum=matches.reduce((a,b)=>a+computeC(b),0);
   const latest=matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
-  const slaCount=matches.filter(r=>r.statusSLA && r.statusSLA.toLowerCase().includes("lewat")).length;
+  const slaCount=matches.filter(r=>r.statusSLA&&r.statusSLA.toLowerCase().includes("lewat")).length;
   const inProgressCount=matches.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length;
   return{avg:sum/matches.length,count:matches.length,lastTime:ambilJamDariTanggal(latest),slaCount,inProgressCount};
 }
 
-// ==== RENDER TABEL ====
+// ==== Render tabel ====
 function renderTable(results){
   const tbody=document.querySelector("#resultTable tbody");
   tbody.innerHTML="";
@@ -231,21 +234,17 @@ function renderTable(results){
   });
 }
 
-// ==== GENERATE TABEL ====
+// ==== Generate tabel utama ====
 document.getElementById("generateBtn").addEventListener("click",()=>{
   if(!sheetData.length)return alert("Ambil nama dari GSheet dulu.");
   if(!csvData.length)return alert("Upload file CSV dulu.");
-  const results=sheetData.map(k=>{
-    let res=rataRata_byNIK(k.nik);
-    if(!res.count)res=rataRata_byName(k.nama);
-    return{k,res};
-  });
+  const results=sheetData.map(k=>({k,res:rataRata_byName(k.nama)}));
   lastResults=results;
   renderTable(results);
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 });
 
-// ==== SORT KOLOM InProgress ====
+// ==== Sort kolom InProgress ====
 document.getElementById("sortInProgress").addEventListener("click",()=>{
   if(!lastResults.length)return alert("Belum ada data tabel.");
   sortAscInProgress=!sortAscInProgress;
@@ -257,7 +256,7 @@ document.getElementById("sortInProgress").addEventListener("click",()=>{
   document.getElementById("sortInProgress").textContent=`InProgress ${sortAscInProgress?"↑":"↓"}`;
 });
 
-// ==== DOWNLOAD JPG ====
+// ==== Download JPG ====
 document.getElementById("downloadBtn").addEventListener("click",async()=>{
   const area=document.querySelector("#resultArea");
   const canvas=await html2canvas(area,{scale:2});
