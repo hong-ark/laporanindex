@@ -51,7 +51,7 @@
         <thead>
           <tr>
             <th>No</th>
-            <th>Nama Karyawan</th>
+            <th id="sortNama">Nama Karyawan ⬍</th>
             <th>Shift</th>
             <th id="sortLastCO">LastCO ⬍</th>
             <th id="sortIndexCO">IndexCO ⬍</th>
@@ -74,6 +74,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbyoPTlFn5NSBWlDLAT5tvfu
 let sheetData = [];
 let csvData = [];
 let lastResults = [];
+let sortAscNama = true;
 let sortAscIndex = false;
 let sortAscTotal = true;
 let sortAscLastCO = false;
@@ -81,6 +82,7 @@ let sortAscLastCO = false;
 document.getElementById("tanggalCek").textContent =
   new Date().toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
 
+// ==== Fungsi bantu umum ====
 function normKey(s){ return (s||"").toString().toLowerCase().replace(/[^a-z0-9]/g,''); }
 function normalizeName(s){ return (s||"").toString().toLowerCase().replace(/\s+/g,' ').replace(/[^\w\s]/g,'').trim(); }
 
@@ -128,6 +130,7 @@ function ambilJamDariTanggal(s){
   return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-";
 }
 
+// ==== Ambil data GSheet ====
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
   if (!shift) return alert("Masukkan shift (M, P, atau S)");
@@ -152,6 +155,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   }
 });
 
+// ==== Upload CSV ====
 document.getElementById("csvFile").addEventListener("change",(e)=>{
   const file=e.target.files[0];
   if(!file)return;
@@ -192,6 +196,7 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
   });
 });
 
+// ==== Perhitungan ====
 function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik/r.waktuSlaDetik : 0; }
 
 function rataRata_byNIK(nik){
@@ -217,6 +222,7 @@ function rataRata_byName(nama,thr=0.65){
   return{avg:sum/matches.length,count:matches.length,lastTime:ambilJamDariTanggal(latest),slaCount};
 }
 
+// ==== Render tabel ====
 function renderTable(results){
   const tbody=document.querySelector("#resultTable tbody");
   tbody.innerHTML="";
@@ -238,6 +244,7 @@ function renderTable(results){
   });
 }
 
+// ==== Generate tabel utama ====
 document.getElementById("generateBtn").addEventListener("click",()=>{
   if(!sheetData.length)return alert("Ambil nama dari GSheet dulu.");
   if(!csvData.length)return alert("Upload file CSV dulu.");
@@ -248,7 +255,6 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
     return{k,res};
   });
 
-  // default sort: IndexCO descending
   results.sort((a,b)=>{
     const indexA=a.res.avg!==null?a.res.avg:-Infinity;
     const indexB=b.res.avg!==null?b.res.avg:-Infinity;
@@ -260,7 +266,19 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 });
 
-// === Sort IndexCO ===
+// ==== Sorting tombol header ====
+document.getElementById("sortNama").addEventListener("click",()=>{
+  if(!lastResults.length)return alert("Belum ada data tabel.");
+  sortAscNama=!sortAscNama;
+  lastResults.sort((a,b)=>{
+    const namaA=a.k.nama.toLowerCase();
+    const namaB=b.k.nama.toLowerCase();
+    return sortAscNama?namaA.localeCompare(namaB):namaB.localeCompare(namaA);
+  });
+  renderTable(lastResults);
+  document.getElementById("sortNama").textContent=`Nama Karyawan ${sortAscNama?"↑":"↓"}`;
+});
+
 document.getElementById("sortIndexCO").addEventListener("click",()=>{
   if(!lastResults.length)return alert("Belum ada data tabel.");
   sortAscIndex=!sortAscIndex;
@@ -273,7 +291,6 @@ document.getElementById("sortIndexCO").addEventListener("click",()=>{
   document.getElementById("sortIndexCO").textContent=`IndexCO ${sortAscIndex?"↑":"↓"}`;
 });
 
-// === Sort TotalCO ===
 document.getElementById("sortTotalCO").addEventListener("click",()=>{
   if(!lastResults.length)return alert("Belum ada data tabel.");
   sortAscTotal=!sortAscTotal;
@@ -286,7 +303,6 @@ document.getElementById("sortTotalCO").addEventListener("click",()=>{
   document.getElementById("sortTotalCO").textContent=`TotalCO ${sortAscTotal?"↑":"↓"}`;
 });
 
-// === Sort LastCO (berdasarkan jam) ===
 document.getElementById("sortLastCO").addEventListener("click",()=>{
   if(!lastResults.length)return alert("Belum ada data tabel.");
   sortAscLastCO=!sortAscLastCO;
@@ -299,7 +315,7 @@ document.getElementById("sortLastCO").addEventListener("click",()=>{
   document.getElementById("sortLastCO").textContent=`LastCO ${sortAscLastCO?"↑":"↓"}`;
 });
 
-// === Download JPG ===
+// ==== Download JPG ====
 document.getElementById("downloadBtn").addEventListener("click",async()=>{
   const area=document.querySelector("#resultArea");
   const canvas=await html2canvas(area,{scale:2});
