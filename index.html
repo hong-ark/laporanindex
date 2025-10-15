@@ -40,7 +40,10 @@
     <div class="mb-3">
       <label for="csvFile" class="form-label">Upload file CSV dari WEB CO</label>
       <input type="file" id="csvFile" class="form-control" accept=".csv" />
-      <small class="text-muted">Pastikan CSV punya header seperti (NIK Pengambil, Durasi Komplain, Waktu SLA, Status Komplain, Status SLA, Tanggal Diambil, Diambil Oleh, Dibuat Oleh).</small>
+      <small class="text-muted">
+        Pastikan CSV punya header seperti (NIK Pengambil, Durasi Komplain, Waktu SLA, Status Komplain, Status SLA, 
+        Tanggal Diambil, Diambil Oleh, Dibuat Oleh).
+      </small>
     </div>
 
     <button id="generateBtn" class="btn btn-success mb-3" disabled>Generate Tabel</button>
@@ -75,17 +78,12 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbyoPTlFn5NSBWlDLAT5tvfu
 let sheetData = [];
 let csvData = [];
 let lastResults = [];
-let sortAscNama = true;
-let sortAscIndex = false;
-let sortAscTotal = true;
-let sortAscLastCO = false;
-let sortAscSLA = false;
 let sortAscInProgress = false;
 
 document.getElementById("tanggalCek").textContent =
   new Date().toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
 
-// ==== Fungsi bantu umum ====
+// ==== Fungsi bantu ====
 function normKey(s){ return (s||"").toString().toLowerCase().replace(/[^a-z0-9]/g,''); }
 function normalizeName(s){ return (s||"").toString().toLowerCase().replace(/\s+/g,' ').replace(/[^\w\s]/g,'').trim(); }
 
@@ -115,7 +113,7 @@ function ambilJamDariTanggal(s){
   return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-";
 }
 
-// ==== Ambil data GSheet ====
+// ==== Ambil data dari GSheet ====
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
   if (!shift) return alert("Masukkan shift (M, P, atau S)");
@@ -124,17 +122,14 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     const res = await fetch(`${GAS_URL}?shift=${shift}`);
     const data = await res.json();
     sheetData = (data.karyawan || []).map(k => ({
-      nama: (k.nama || "").toString().trim(),
-      nik: (k.nik || "").toString().trim(),
-      shift: shift
+      nama: (k.nama || "").trim(),
+      nik: (k.nik || "").trim(),
+      shift
     }));
-    if(sheetData.length > 0){
-      document.getElementById("statusText").textContent = `✅ Data ditemukan: ${sheetData.length} orang (Shift ${shift})`;
-      document.getElementById("generateBtn").disabled = false;
-    } else {
-      document.getElementById("statusText").textContent = "⚠️ Tidak ada data karyawan ditemukan.";
-      document.getElementById("generateBtn").disabled = true;
-    }
+    document.getElementById("statusText").textContent =
+      sheetData.length ? `✅ Data ditemukan: ${sheetData.length} orang (Shift ${shift})`
+                       : "⚠️ Tidak ada data karyawan ditemukan.";
+    document.getElementById("generateBtn").disabled = !sheetData.length;
   } catch (err) {
     document.getElementById("statusText").textContent = "Gagal memanggil API: " + err.message;
   }
@@ -149,12 +144,13 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
     delimiter:";",
     skipEmptyLines:true,
     complete:(res)=>{
-      const rawFields=res.meta.fields||[];
       const headerMap={};
-      for(const f of rawFields) headerMap[normKey(f)]=f;
-      const getCol=(row,arr)=>{ for(const c of arr){ const k=headerMap[c]; if(k&&row.hasOwnProperty(k)) return (row[k]||"").toString(); } return ""; };
+      (res.meta.fields||[]).forEach(f=>headerMap[normKey(f)]=f);
+      const getCol=(row,arr)=>{ for(const c of arr){ const k=headerMap[c]; if(k&&row[k]) return row[k].toString(); } return ""; };
+
       csvData=res.data.map(r=>{
         const nikRaw=(getCol(r,['nikpengambil','nik'])).replace(/\D/g,'').trim();
+        const diambilOleh=getCol(r,['diambiloleh','diambil oleh']);
         const durasiRaw=getCol(r,['durasikomplain','durasi']);
         const waktuSlaRaw=getCol(r,['waktusla','waktu sla']);
         const statusRaw=getCol(r,['statuskomplain','status']);
@@ -163,6 +159,7 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
         const slaNum=parseFloat((waktuSlaRaw||"").replace(",","."))||0;
         return{
           nik:nikRaw,
+          diambilOleh,
           durasiRaw,
           durasiDetik:durasiKeDetik(durasiRaw),
           waktuSlaDetik:slaNum*3600,
@@ -177,7 +174,7 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
   });
 });
 
-// ==== Perhitungan ====
+// ==== Logika perhitungan ====
 function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik/r.waktuSlaDetik : 0; }
 
 function rataRata_byNIK(nik){
@@ -185,21 +182,19 @@ function rataRata_byNIK(nik){
   if(!rows.length)return{avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0};
   const sum=rows.reduce((a,b)=>a+computeC(b),0);
   const latest=rows.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
-  const slaCount=rows.filter(r=>r.statusSLA&&r.statusSLA.toLowerCase().includes("lewat")).length;
+  const slaCount=rows.filter(r=>r.statusSLA && r.statusSLA.toLowerCase().includes("lewat")).length;
   const inProgressCount=rows.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length;
   return{avg:sum/rows.length,count:rows.length,lastTime:ambilJamDariTanggal(latest),slaCount,inProgressCount};
 }
 
-function rataRata_byName(nama,thr=0.65){
-  const matches=[];
-  for(const r of csvData){
-    if(!isAcceptedStatus(r.statusNorm))continue;
-    if(normalizeName(r.diambilOleh||"")===normalizeName(nama))matches.push(r);
-  }
+function rataRata_byName(nama){
+  const matches=csvData.filter(r=>{
+    return isAcceptedStatus(r.statusNorm) && normalizeName(r.diambilOleh)===normalizeName(nama);
+  });
   if(!matches.length)return{avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0};
   const sum=matches.reduce((a,b)=>a+computeC(b),0);
   const latest=matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
-  const slaCount=matches.filter(r=>r.statusSLA&&r.statusSLA.toLowerCase().includes("lewat")).length;
+  const slaCount=matches.filter(r=>r.statusSLA && r.statusSLA.toLowerCase().includes("lewat")).length;
   const inProgressCount=matches.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length;
   return{avg:sum/matches.length,count:matches.length,lastTime:ambilJamDariTanggal(latest),slaCount,inProgressCount};
 }
@@ -211,9 +206,6 @@ function renderTable(results){
   results.forEach((item,index)=>{
     const {k,res}=item;
     const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
-    const totalCO=res.count>0?`${res.count}`:"-";
-    const slaCount=res.slaCount||0;
-    const inProgress=res.inProgressCount||0;
     const tr=document.createElement("tr");
     tr.innerHTML=`
       <td>${index+1}</td>
@@ -221,9 +213,9 @@ function renderTable(results){
       <td>${k.shift}</td>
       <td>${res.lastTime}</td>
       <td>${avg}</td>
-      <td>${totalCO}</td>
-      <td>${slaCount}</td>
-      <td>${inProgress}</td>`;
+      <td>${res.count||0}</td>
+      <td>${res.slaCount||0}</td>
+      <td>${res.inProgressCount||0}</td>`;
     tbody.appendChild(tr);
   });
 }
@@ -232,32 +224,23 @@ function renderTable(results){
 document.getElementById("generateBtn").addEventListener("click",()=>{
   if(!sheetData.length)return alert("Ambil nama dari GSheet dulu.");
   if(!csvData.length)return alert("Upload file CSV dulu.");
-
   const results=sheetData.map(k=>{
     let res=rataRata_byNIK(k.nik);
     if(!res.count)res=rataRata_byName(k.nama);
     return{k,res};
   });
-
-  results.sort((a,b)=>{
-    const indexA=a.res.avg!==null?a.res.avg:-Infinity;
-    const indexB=b.res.avg!==null?b.res.avg:-Infinity;
-    return indexB-indexA;
-  });
-
   lastResults=results;
   renderTable(results);
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 });
 
-// ==== Sorting tambahan untuk InProgress ====
+// ==== Sort kolom InProgress ====
 document.getElementById("sortInProgress").addEventListener("click",()=>{
   if(!lastResults.length)return alert("Belum ada data tabel.");
   sortAscInProgress=!sortAscInProgress;
   lastResults.sort((a,b)=>{
-    const valA=a.res.inProgressCount||0;
-    const valB=b.res.inProgressCount||0;
-    return sortAscInProgress?valA-valB:valB-valA;
+    const A=a.res.inProgressCount||0, B=b.res.inProgressCount||0;
+    return sortAscInProgress?A-B:B-A;
   });
   renderTable(lastResults);
   document.getElementById("sortInProgress").textContent=`InProgress ${sortAscInProgress?"↑":"↓"}`;
