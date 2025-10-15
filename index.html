@@ -11,7 +11,7 @@
     body { background: #f6f7fb; padding: 20px; }
     .container { max-width: 1100px; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
     table { font-size: 15px; }
-    #resultTable th { background: #f2f2f2; text-align: center; }
+    #resultTable th { background: #f2f2f2; text-align: center; cursor: pointer; }
     #resultTable th:hover { background:#e8e8e8; }
   </style>
 </head>
@@ -53,9 +53,9 @@
             <th>No</th>
             <th>Nama Karyawan</th>
             <th>Shift</th>
-            <th>LastCO</th>
-            <th id="sortIndexCO" style="cursor:pointer;">IndexCO ⬍</th>
-            <th id="sortTotalCO" style="cursor:pointer;">TotalCO ⬍</th>
+            <th id="sortLastCO">LastCO ⬍</th>
+            <th id="sortIndexCO">IndexCO ⬍</th>
+            <th id="sortTotalCO">TotalCO ⬍</th>
             <th>SLA</th>
           </tr>
         </thead>
@@ -74,8 +74,9 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbyoPTlFn5NSBWlDLAT5tvfu
 let sheetData = [];
 let csvData = [];
 let lastResults = [];
-let sortAscIndex = false; // default IndexCO descending
-let sortAscTotal = true;  // default TotalCO ascending
+let sortAscIndex = false;
+let sortAscTotal = true;
+let sortAscLastCO = false;
 
 document.getElementById("tanggalCek").textContent =
   new Date().toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
@@ -247,6 +248,7 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
     return{k,res};
   });
 
+  // default sort: IndexCO descending
   results.sort((a,b)=>{
     const indexA=a.res.avg!==null?a.res.avg:-Infinity;
     const indexB=b.res.avg!==null?b.res.avg:-Infinity;
@@ -258,18 +260,20 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 });
 
+// === Sort IndexCO ===
 document.getElementById("sortIndexCO").addEventListener("click",()=>{
   if(!lastResults.length)return alert("Belum ada data tabel.");
   sortAscIndex=!sortAscIndex;
   lastResults.sort((a,b)=>{
-    const valA=a.res.avg!==null?a.res.avg:-Infinity;
-    const valB=b.res.avg!==null?b.res.avg:-Infinity;
+    const valA=a.res.avg||0;
+    const valB=b.res.avg||0;
     return sortAscIndex?valA-valB:valB-valA;
   });
   renderTable(lastResults);
   document.getElementById("sortIndexCO").textContent=`IndexCO ${sortAscIndex?"↑":"↓"}`;
 });
 
+// === Sort TotalCO ===
 document.getElementById("sortTotalCO").addEventListener("click",()=>{
   if(!lastResults.length)return alert("Belum ada data tabel.");
   sortAscTotal=!sortAscTotal;
@@ -282,6 +286,20 @@ document.getElementById("sortTotalCO").addEventListener("click",()=>{
   document.getElementById("sortTotalCO").textContent=`TotalCO ${sortAscTotal?"↑":"↓"}`;
 });
 
+// === Sort LastCO (berdasarkan jam) ===
+document.getElementById("sortLastCO").addEventListener("click",()=>{
+  if(!lastResults.length)return alert("Belum ada data tabel.");
+  sortAscLastCO=!sortAscLastCO;
+  lastResults.sort((a,b)=>{
+    const valA=a.res.lastTime==="-"?0:parseInt(a.res.lastTime.replace(":",""));
+    const valB=b.res.lastTime==="-"?0:parseInt(b.res.lastTime.replace(":",""));
+    return sortAscLastCO?valA-valB:valB-valA;
+  });
+  renderTable(lastResults);
+  document.getElementById("sortLastCO").textContent=`LastCO ${sortAscLastCO?"↑":"↓"}`;
+});
+
+// === Download JPG ===
 document.getElementById("downloadBtn").addEventListener("click",async()=>{
   const area=document.querySelector("#resultArea");
   const canvas=await html2canvas(area,{scale:2});
