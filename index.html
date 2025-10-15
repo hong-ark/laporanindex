@@ -41,6 +41,7 @@
     <div class="mb-3">
       <label for="csvFile" class="form-label">Upload file CSV dari WEB CO</label>
       <input type="file" id="csvFile" class="form-control" accept=".csv" />
+      <small class="text-muted">Pastikan CSV memiliki header seperti (NIK Pengambil, Durasi Komplain, Waktu SLA, Status Komplain, Status SLA, Tanggal Diambil, Diambil Oleh, Dibuat Oleh).</small>
     </div>
 
     <button id="generateBtn" class="btn btn-success mb-3">Generate Tabel</button>
@@ -74,26 +75,25 @@ let sheetData = [];
 let csvData = [];
 let lastResults = [];
 let sortTotalAsc = true;
-let sortIndexAsc = false; // default arah sort untuk IndexCO
+let sortIndexAsc = false;
 
-document.getElementById("tanggalCek").textContent = new Date().toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
+document.getElementById("tanggalCek").textContent = new Date().toLocaleDateString("id-ID", {
+  day:"numeric", month:"long", year:"numeric"
+});
 
 // === Ambil Nama dari GSheet ===
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   const shift = document.getElementById("shiftInput").value.trim();
-  if (!shift) return alert("Masukkan kode shift (M / P / S).");
-
+  if (!shift) return;
+  document.getElementById("statusText").textContent = "🔄 Mengambil data GSheet...";
   try {
-    document.getElementById("statusText").textContent = "🔄 Mengambil data GSheet...";
     const res = await fetch(`${GAS_URL}?shift=${shift}`);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     sheetData = data;
-    alert(`✅ Data ${sheetData.length} karyawan shift ${shift} berhasil diambil.`);
-    document.getElementById("statusText").textContent = "✅ Data GSheet berhasil diambil.";
+    document.getElementById("statusText").textContent = `✅ Data ${sheetData.length} karyawan shift ${shift} berhasil diambil.`;
   } catch (err) {
-    console.error(err);
-    alert("Gagal mengambil data GSheet: " + err.message);
+    document.getElementById("statusText").textContent = `❌ Gagal mengambil data GSheet: ${err.message}`;
   }
 });
 
@@ -101,16 +101,17 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
 document.getElementById("csvFile").addEventListener("change", function(e) {
   const file = e.target.files[0];
   if (!file) return;
+  document.getElementById("statusText").textContent = "🔄 Memproses file CSV...";
   Papa.parse(file, {
     header: true,
     complete: (results) => {
       csvData = results.data;
-      alert(`✅ File CSV berhasil dimuat (${csvData.length} baris).`);
+      document.getElementById("statusText").textContent = `✅ File CSV berhasil dimuat (${csvData.length} baris).`;
     }
   });
 });
 
-// === Fungsi bantu perhitungan (disingkat) ===
+// === Fungsi bantu ===
 function rataRata_byNIK(nik) {
   const rows = csvData.filter(r => (r["NIK Pengambil"] || "").trim() == nik);
   if (!rows.length) return { avg:null, count:0, slaCount:0, lastTime:"-" };
@@ -156,8 +157,8 @@ function renderTable(results) {
 
 // === Generate Tabel ===
 document.getElementById("generateBtn").addEventListener("click",()=>{
-  if(!sheetData.length)return alert("Ambil nama dari GSheet dulu.");
-  if(!csvData.length)return alert("Upload file CSV dulu.");
+  if(!sheetData.length)return;
+  if(!csvData.length)return;
 
   const results = sheetData.map(k=>{
     let res=rataRata_byNIK(k.nik);
@@ -179,7 +180,7 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
 
 // === Sort by TotalCO ===
 document.getElementById("sortTotalCO").addEventListener("click",()=>{
-  if(!lastResults.length) return alert("Belum ada data tabel.");
+  if(!lastResults.length) return;
   sortTotalAsc = !sortTotalAsc;
   lastResults.sort((a,b)=>{
     const totalA = a.res.count || 0;
@@ -192,7 +193,7 @@ document.getElementById("sortTotalCO").addEventListener("click",()=>{
 
 // === Sort by IndexCO ===
 document.getElementById("sortIndexCO").addEventListener("click",()=>{
-  if(!lastResults.length) return alert("Belum ada data tabel.");
+  if(!lastResults.length) return;
   sortIndexAsc = !sortIndexAsc;
   lastResults.sort((a,b)=>{
     const valA = a.res.avg || 0;
