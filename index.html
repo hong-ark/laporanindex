@@ -80,12 +80,12 @@ let sortAscIndex = false;
 let sortAscTotal = true;
 let sortAscLastCO = false;
 let sortAscSLA = false;
-let sortAscInProgress = true;
+let sortAscInProgress = false;
 
 document.getElementById("tanggalCek").textContent =
   new Date().toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
 
-// ==== Fungsi bantu ====
+// ==== Fungsi bantu umum ====
 function normKey(s){ return (s||"").toString().toLowerCase().replace(/[^a-z0-9]/g,''); }
 function normalizeName(s){ return (s||"").toString().toLowerCase().replace(/\s+/g,' ').replace(/[^\w\s]/g,'').trim(); }
 
@@ -163,8 +163,10 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
         const slaNum=parseFloat((waktuSlaRaw||"").replace(",","."))||0;
         return{
           nik:nikRaw,
+          durasiRaw,
           durasiDetik:durasiKeDetik(durasiRaw),
           waktuSlaDetik:slaNum*3600,
+          status:statusRaw,
           statusNorm:normalizeStatus(statusRaw),
           statusSLA:statusSlaRaw,
           tanggalDiambil:tglDiambilRaw
@@ -184,8 +186,22 @@ function rataRata_byNIK(nik){
   const sum=rows.reduce((a,b)=>a+computeC(b),0);
   const latest=rows.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
   const slaCount=rows.filter(r=>r.statusSLA&&r.statusSLA.toLowerCase().includes("lewat")).length;
-  const inProgressCount=rows.filter(r=>r.statusNorm==="inprogress"||r.statusNorm==="in progress").length;
+  const inProgressCount=rows.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length;
   return{avg:sum/rows.length,count:rows.length,lastTime:ambilJamDariTanggal(latest),slaCount,inProgressCount};
+}
+
+function rataRata_byName(nama,thr=0.65){
+  const matches=[];
+  for(const r of csvData){
+    if(!isAcceptedStatus(r.statusNorm))continue;
+    if(normalizeName(r.diambilOleh||"")===normalizeName(nama))matches.push(r);
+  }
+  if(!matches.length)return{avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0};
+  const sum=matches.reduce((a,b)=>a+computeC(b),0);
+  const latest=matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
+  const slaCount=matches.filter(r=>r.statusSLA&&r.statusSLA.toLowerCase().includes("lewat")).length;
+  const inProgressCount=matches.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length;
+  return{avg:sum/matches.length,count:matches.length,lastTime:ambilJamDariTanggal(latest),slaCount,inProgressCount};
 }
 
 // ==== Render tabel ====
@@ -195,6 +211,9 @@ function renderTable(results){
   results.forEach((item,index)=>{
     const {k,res}=item;
     const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
+    const totalCO=res.count>0?`${res.count}`:"-";
+    const slaCount=res.slaCount||0;
+    const inProgress=res.inProgressCount||0;
     const tr=document.createElement("tr");
     tr.innerHTML=`
       <td>${index+1}</td>
@@ -202,37 +221,44 @@ function renderTable(results){
       <td>${k.shift}</td>
       <td>${res.lastTime}</td>
       <td>${avg}</td>
-      <td>${res.count||0}</td>
-      <td>${res.slaCount||0}</td>
-      <td>${res.inProgressCount||0}</td>`;
+      <td>${totalCO}</td>
+      <td>${slaCount}</td>
+      <td>${inProgress}</td>`;
     tbody.appendChild(tr);
   });
 }
 
-// ==== Generate tabel ====
+// ==== Generate tabel utama ====
 document.getElementById("generateBtn").addEventListener("click",()=>{
   if(!sheetData.length)return alert("Ambil nama dari GSheet dulu.");
   if(!csvData.length)return alert("Upload file CSV dulu.");
 
   const results=sheetData.map(k=>{
     let res=rataRata_byNIK(k.nik);
+    if(!res.count)res=rataRata_byName(k.nama);
     return{k,res};
   });
 
-  results.sort((a,b)=> (b.res.avg||0)-(a.res.avg||0));
+  results.sort((a,b)=>{
+    const indexA=a.res.avg!==null?a.res.avg:-Infinity;
+    const indexB=b.res.avg!==null?b.res.avg:-Infinity;
+    return indexB-indexA;
+  });
+
   lastResults=results;
   renderTable(results);
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 });
 
-// ==== Sorting tombol baru (InProgress) ====
+// ==== Sorting tambahan untuk InProgress ====
 document.getElementById("sortInProgress").addEventListener("click",()=>{
   if(!lastResults.length)return alert("Belum ada data tabel.");
   sortAscInProgress=!sortAscInProgress;
-  lastResults.sort((a,b)=> sortAscInProgress ?
-    (a.res.inProgressCount||0)-(b.res.inProgressCount||0) :
-    (b.res.inProgressCount||0)-(a.res.inProgressCount||0)
-  );
+  lastResults.sort((a,b)=>{
+    const valA=a.res.inProgressCount||0;
+    const valB=b.res.inProgressCount||0;
+    return sortAscInProgress?valA-valB:valB-valA;
+  });
   renderTable(lastResults);
   document.getElementById("sortInProgress").textContent=`InProgress ${sortAscInProgress?"↑":"↓"}`;
 });
