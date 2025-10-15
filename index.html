@@ -1,161 +1,254 @@
-<script>
-async function loadData() {
-  const sheetUrl = "https://script.google.com/macros/s/AKfycbyoPTlFn5NSBWlDLAT5tvfui9ZKe-l1-INlSmjZ9wWTD3bva3XiP1xp9R2i7K5eTPHqIg/exec?shift=S";
-  const resp = await fetch(sheetUrl);
-  const data = await resp.json();
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Laporan Index Shift (Index terakhir CO)</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    body {
+      background-color: #f8f9fa;
+      padding: 20px;
+      font-family: "Segoe UI", sans-serif;
+    }
+    h3 {
+      text-align: center;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+    table {
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    th {
+      background: #dee2e6;
+      cursor: pointer;
+      text-align: center;
+      user-select: none;
+    }
+    th.asc::after { content: " 🔼"; }
+    th.desc::after { content: " 🔽"; }
+    td, th {
+      text-align: center;
+      vertical-align: middle;
+    }
+  </style>
+</head>
 
-  const tableBody = document.querySelector("#data-table tbody");
-  tableBody.innerHTML = "";
+<body>
+  <h3>LAPORAN INDEX SHIFT (INDEX TERAKHIR CO)</h3>
+  <div class="d-flex justify-content-between mb-3">
+    <div>
+      <button class="btn btn-success btn-sm" onclick="loadData()">Ambil Nama dari Gsheet Jadwal</button>
+      <input type="file" id="csvFile" accept=".csv" class="form-control-sm" onchange="uploadCSV(event)">
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="downloadAsImage()">Download JPEG</button>
+  </div>
 
-  // --- fungsi pembantu ---
-  function similarity(a, b) {
-    a = (a || "").toLowerCase().replace(/\s+/g, " ").trim();
-    b = (b || "").toLowerCase().replace(/\s+/g, " ").trim();
-    if (!a || !b) return 0;
-    const dp = Array(a.length + 1)
-      .fill(null)
-      .map(() => Array(b.length + 1).fill(0));
-    for (let i = 0; i <= a.length; i++) dp[i][0] = i;
-    for (let j = 0; j <= b.length; j++) dp[0][j] = j;
-    for (let i = 1; i <= a.length; i++) {
-      for (let j = 1; j <= b.length; j++) {
-        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-        dp[i][j] = Math.min(
-          dp[i - 1][j] + 1,
-          dp[i][j - 1] + 1,
-          dp[i - 1][j - 1] + cost
+  <div class="table-responsive">
+    <table class="table table-bordered table-striped" id="data-table">
+      <thead class="table-light">
+        <tr>
+          <th>No</th>
+          <th>Nama</th>
+          <th>Shift</th>
+          <th>LastCO ⬍</th>
+          <th>IndexCO ⬍</th>
+          <th>TotalCO ⬍</th>
+          <th>SLA ⬍</th>
+          <th>InProgress ⬍</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script>
+    async function loadData() {
+      const sheetUrl = "https://script.google.com/macros/s/AKfycbyoPTlFn5NSBWlDLAT5tvfui9ZKe-l1-INlSmjZ9wWTD3bva3XiP1xp9R2i7K5eTPHqIg/exec?shift=S";
+      const resp = await fetch(sheetUrl);
+      const data = await resp.json();
+
+      const tableBody = document.querySelector("#data-table tbody");
+      tableBody.innerHTML = "";
+
+      // Fungsi fuzzy matching
+      function similarity(a, b) {
+        a = (a || "").toLowerCase().replace(/\s+/g, " ").trim();
+        b = (b || "").toLowerCase().replace(/\s+/g, " ").trim();
+        if (!a || !b) return 0;
+        const dp = Array(a.length + 1)
+          .fill(null)
+          .map(() => Array(b.length + 1).fill(0));
+        for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+        for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+        for (let i = 1; i <= a.length; i++) {
+          for (let j = 1; j <= b.length; j++) {
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            dp[i][j] = Math.min(
+              dp[i - 1][j] + 1,
+              dp[i][j - 1] + 1,
+              dp[i - 1][j - 1] + cost
+            );
+          }
+        }
+        const dist = dp[a.length][b.length];
+        return 1 - dist / Math.max(a.length, b.length);
+      }
+
+      function isAcceptedStatus(status) {
+        if (!status) return false;
+        const norm = status.toString().toLowerCase();
+        return (
+          norm.includes("resolved") ||
+          norm.includes("closed") ||
+          norm.includes("in progress") ||
+          norm.includes("inprogress") ||
+          norm.includes("pending")
         );
       }
-    }
-    const dist = dp[a.length][b.length];
-    return 1 - dist / Math.max(a.length, b.length);
-  }
 
-  function isAcceptedStatus(status) {
-    if (!status) return false;
-    const norm = status.toString().toLowerCase();
-    return (
-      norm.includes("resolved") ||
-      norm.includes("closed") ||
-      norm.includes("in progress") ||
-      norm.includes("inprogress") ||
-      norm.includes("pending")
-    );
-  }
+      const COresp = await fetch("https://script.google.com/macros/s/AKfycbx6TwVku61D6NslA4nDa4XPGXkzEAIcAMMWRlIMxkTW9I1xWSo/exec");
+      const COdata = await COresp.json();
 
-  const COresp = await fetch("https://script.google.com/macros/s/AKfycbx6TwVku61D6NslA4nDa4XPGXkzEAIcAMMWRlIMxkTW9I1xWSo/exec");
-  const COdata = await COresp.json();
+      const KomplainResp = await fetch("https://script.google.com/macros/s/AKfycbya8QdHK2EosDbJH5LEp0-8yH_XJg8E8m4UIgD8F8TuwGLgU1IbLz-ZYAhYAlD_ObqZ/exec");
+      const KomplainData = await KomplainResp.json();
 
-  const KomplainResp = await fetch("https://script.google.com/macros/s/AKfycbya8QdHK2EosDbJH5LEp0-8yH_XJg8E8m4UIgD8F8TuwGLgU1IbLz-ZYAhYAlD_ObqZ/exec");
-  const KomplainData = await KomplainResp.json();
-
-  function rataRata_byNIK(nik) {
-    const rows = COdata.filter(
-      (r) => r.nik && r.nik.toString().trim() === nik.toString().trim()
-    );
-    if (rows.length === 0) return { count: 0 };
-    const last = rows[rows.length - 1];
-    const total = rows.reduce((a, c) => a + (parseFloat(c.indexCO) || 0), 0);
-    return {
-      count: rows.length,
-      lastCO: last.lastCO || "",
-      indexCO: parseFloat(last.indexCO) || 0,
-      totalCO: rows.length,
-      sla: 0,
-    };
-  }
-
-  function rataRata_byName(nama) {
-    let best = null;
-    let bestScore = 0;
-    for (const r of COdata) {
-      const s = similarity(nama, r.nama);
-      if (s > bestScore && s >= 0.65) {
-        bestScore = s;
-        best = r;
+      function rataRata_byNIK(nik) {
+        const rows = COdata.filter(r => r.nik && r.nik.toString().trim() === nik.toString().trim());
+        if (rows.length === 0) return { count: 0 };
+        const last = rows[rows.length - 1];
+        return {
+          count: rows.length,
+          lastCO: last.lastCO || "-",
+          indexCO: parseFloat(last.indexCO) || 0,
+          totalCO: rows.length,
+          sla: 0,
+        };
       }
-    }
-    if (!best) return { count: 0 };
-    const total = COdata.filter(
-      (r) => similarity(nama, r.nama) >= 0.65
-    ).length;
-    return {
-      count: total,
-      lastCO: best.lastCO || "",
-      indexCO: parseFloat(best.indexCO) || 0,
-      totalCO: total,
-      sla: 0,
-    };
-  }
 
-  function countInProgress(nama, nik) {
-    const filtered = KomplainData.filter((r) => {
-      if (!isAcceptedStatus(r.status)) return false;
-      const nameSim = similarity(nama, r.nama);
-      const matchNIK =
-        r.nik && nik && r.nik.toString().trim() === nik.toString().trim();
-      return matchNIK || nameSim >= 0.65;
-    });
-    const inprogressRows = filtered.filter(
-      (r) =>
-        r.status &&
-        (r.status.toLowerCase().includes("in progress") ||
-          r.status.toLowerCase().includes("inprogress"))
-    );
-    return inprogressRows.length;
-  }
-
-  data.forEach((k, i) => {
-    let res = rataRata_byNIK(k.nik);
-    if (!res.count) res = rataRata_byName(k.nama);
-
-    const inprogressCount = countInProgress(k.nama, k.nik);
-
-    const row = document.createElement("tr");
-    row.innerHTML = `
-      <td>${i + 1}</td>
-      <td>${k.nama}</td>
-      <td>${k.shift}</td>
-      <td>${res.lastCO || "-"}</td>
-      <td>${res.indexCO || 0}</td>
-      <td>${res.totalCO || 0}</td>
-      <td>${res.sla || 0}</td>
-      <td>${inprogressCount}</td>
-    `;
-    tableBody.appendChild(row);
-  });
-
-  // ==== Fungsi AutoSort universal ====
-  const table = document.getElementById("data-table");
-  const headers = table.querySelectorAll("th");
-
-  headers.forEach((header, index) => {
-    header.addEventListener("click", () => {
-      if (index < 3) return; // kolom No, Nama, Shift jangan disort
-      const rows = Array.from(tableBody.querySelectorAll("tr"));
-      const asc = !header.classList.contains("asc");
-      headers.forEach((h) => h.classList.remove("asc", "desc"));
-      header.classList.add(asc ? "asc" : "desc");
-
-      rows.sort((a, b) => {
-        const aText = a.children[index].innerText.trim();
-        const bText = b.children[index].innerText.trim();
-        const aNum = parseFloat(aText.replace(",", ".")) || 0;
-        const bNum = parseFloat(bText.replace(",", ".")) || 0;
-
-        if (!isNaN(aNum) && !isNaN(bNum)) {
-          return asc ? aNum - bNum : bNum - aNum;
-        } else {
-          return asc
-            ? aText.localeCompare(bText)
-            : bText.localeCompare(aText);
+      function rataRata_byName(nama) {
+        let best = null;
+        let bestScore = 0;
+        for (const r of COdata) {
+          const s = similarity(nama, r.nama);
+          if (s > bestScore && s >= 0.65) {
+            bestScore = s;
+            best = r;
+          }
         }
+        if (!best) return { count: 0 };
+        const total = COdata.filter(r => similarity(nama, r.nama) >= 0.65).length;
+        return {
+          count: total,
+          lastCO: best.lastCO || "-",
+          indexCO: parseFloat(best.indexCO) || 0,
+          totalCO: total,
+          sla: 0,
+        };
+      }
+
+      function countInProgress(nama, nik) {
+        const filtered = KomplainData.filter(r => {
+          if (!isAcceptedStatus(r.status)) return false;
+          const nameSim = similarity(nama, r.nama);
+          const matchNIK = r.nik && nik && r.nik.toString().trim() === nik.toString().trim();
+          return matchNIK || nameSim >= 0.65;
+        });
+        const inprogressRows = filtered.filter(r =>
+          r.status && (r.status.toLowerCase().includes("in progress") || r.status.toLowerCase().includes("inprogress"))
+        );
+        return inprogressRows.length;
+      }
+
+      data.forEach((k, i) => {
+        let res = rataRata_byNIK(k.nik);
+        if (!res.count) res = rataRata_byName(k.nama);
+
+        const inprogressCount = countInProgress(k.nama, k.nik);
+
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${i + 1}</td>
+          <td>${k.nama}</td>
+          <td>${k.shift}</td>
+          <td>${res.lastCO || "-"}</td>
+          <td>${res.indexCO || 0}</td>
+          <td>${res.totalCO || 0}</td>
+          <td>${res.sla || 0}</td>
+          <td>${inprogressCount}</td>
+        `;
+        tableBody.appendChild(row);
       });
 
-      rows.forEach((r) => tableBody.appendChild(r));
-    });
-  });
-}
+      // === AUTOSORT ===
+      const table = document.getElementById("data-table");
+      const headers = table.querySelectorAll("th");
+      headers.forEach((header, index) => {
+        header.addEventListener("click", () => {
+          if (index < 3) return; // Skip No, Nama, Shift
+          const rows = Array.from(tableBody.querySelectorAll("tr"));
+          const asc = !header.classList.contains("asc");
+          headers.forEach(h => h.classList.remove("asc", "desc"));
+          header.classList.add(asc ? "asc" : "desc");
 
-loadData();
-</script>
+          rows.sort((a, b) => {
+            const aText = a.children[index].innerText.trim();
+            const bText = b.children[index].innerText.trim();
+            const aNum = parseFloat(aText.replace(",", ".")) || 0;
+            const bNum = parseFloat(bText.replace(",", ".")) || 0;
+            if (!isNaN(aNum) && !isNaN(bNum)) {
+              return asc ? aNum - bNum : bNum - aNum;
+            } else {
+              return asc ? aText.localeCompare(bText) : bText.localeCompare(aText);
+            }
+          });
+          rows.forEach(r => tableBody.appendChild(r));
+        });
+      });
+    }
+
+    function uploadCSV(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const rows = e.target.result.split("\n").map(r => r.split(","));
+        const tableBody = document.querySelector("#data-table tbody");
+        tableBody.innerHTML = "";
+        rows.slice(1).forEach((r, i) => {
+          if (!r[0]) return;
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${i + 1}</td>
+            <td>${r[0]}</td>
+            <td>${r[1]}</td>
+            <td>${r[2] || "-"}</td>
+            <td>${r[3] || 0}</td>
+            <td>${r[4] || 0}</td>
+            <td>${r[5] || 0}</td>
+            <td>${r[6] || 0}</td>
+          `;
+          tableBody.appendChild(tr);
+        });
+      };
+      reader.readAsText(file);
+    }
+
+    function downloadAsImage() {
+      const table = document.querySelector("#data-table");
+      html2canvas(table).then(canvas => {
+        const link = document.createElement("a");
+        link.download = "laporan_shift.jpeg";
+        link.href = canvas.toDataURL("image/jpeg");
+        link.click();
+      });
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
