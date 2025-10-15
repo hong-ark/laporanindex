@@ -58,7 +58,6 @@
       <table id="resultTable" class="table table-bordered table-striped">
         <thead>
           <tr>
-            <th data-key="no">No</th>
             <th data-key="nama">Nama Karyawan</th>
             <th data-key="shift">Shift</th>
             <th data-key="lastCO">LastCO</th>
@@ -235,21 +234,19 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 });
 
-function renderTable(){
-  const tbody=document.querySelector("#resultTable tbody");
-  tbody.innerHTML="";
-  tableResults.forEach(r=>{
-    tbody.innerHTML += `
-      <tr>
-        <td>${r.no}</td>
-        <td>${r.nama}</td>
-        <td>${r.shift}</td>
-        <td>${r.lastCO}</td>
-        <td>${r.indexCO}</td>
-        <td>${r.totalCO}</td>
-        <td>${r.sla}</td>
-      </tr>`;
-  });
+function renderTable(data) {
+  const tbody = document.getElementById("dataTable");
+  tbody.innerHTML = data.map((d, i) => `
+    <tr>
+      <td>${i + 1}</td> <!-- Nomor urut otomatis -->
+      <td>${d.nama}</td>
+      <td>${d.shift}</td>
+      <td>${d.lastCO}</td>
+      <td>${parseFloat(d.indexCO).toFixed(2)}</td>
+      <td>${d.totalCO}</td>
+      <td>${d.sla}</td>
+    </tr>
+  `).join("");
 }
 
 // === SORT FITUR ===
@@ -288,3 +285,4 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
