@@ -56,7 +56,7 @@
             <th id="sortLastCO">LastCO ⬍</th>
             <th id="sortIndexCO">IndexCO ⬍</th>
             <th id="sortTotalCO">TotalCO ⬍</th>
-            <th>SLA</th>
+            <th id="sortSLA">SLA ⬍</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -78,6 +78,19 @@ let sortAscNama = true;
 let sortAscIndex = false;
 let sortAscTotal = true;
 let sortAscLastCO = false;
+let sortAscSLA = false;
+
+document.getElementById("sortSLA").addEventListener("click",()=>{
+  if(!lastResults.length) return alert("Belum ada data tabel.");
+  sortAscSLA = !sortAscSLA;
+  lastResults.sort((a,b)=>{
+    const valA = a.res.slaCount || 0;
+    const valB = b.res.slaCount || 0;
+    return sortAscSLA ? valA - valB : valB - valA;
+  });
+  renderTable(lastResults);
+  document.getElementById("sortSLA").textContent = `SLA ${sortAscSLA ? "↑" : "↓"}`;
+});
 
 document.getElementById("tanggalCek").textContent =
   new Date().toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
@@ -314,6 +327,19 @@ document.getElementById("sortLastCO").addEventListener("click",()=>{
   renderTable(lastResults);
   document.getElementById("sortLastCO").textContent=`LastCO ${sortAscLastCO?"↑":"↓"}`;
 });
+let sortAscSLA = false;
+
+document.getElementById("sortSLA").addEventListener("click",()=>{
+  if(!lastResults.length) return alert("Belum ada data tabel.");
+  sortAscSLA = !sortAscSLA;
+  lastResults.sort((a,b)=>{
+    const valA = a.res.slaCount || 0;
+    const valB = b.res.slaCount || 0;
+    return sortAscSLA ? valA - valB : valB - valA;
+  });
+  renderTable(lastResults);
+  document.getElementById("sortSLA").textContent = `SLA ${sortAscSLA ? "↑" : "↓"}`;
+});
 
 // ==== Download JPG ====
 document.getElementById("downloadBtn").addEventListener("click",async()=>{
@@ -327,3 +353,4 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
