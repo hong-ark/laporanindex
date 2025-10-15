@@ -109,6 +109,12 @@ function isAcceptedStatus(norm){
          norm.includes("pending"); 
 }
 
+function ambilJamDariTanggal(s){
+  if(!s)return "-";
+  const m=s.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
+  return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-";
+}
+
 // ==== Ambil data GSheet ====
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
@@ -153,8 +159,6 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
         const waktuSlaRaw=getCol(r,['waktusla','waktu sla']);
         const statusRaw=getCol(r,['statuskomplain','status']);
         const statusSlaRaw=getCol(r,['statussla','status sla']);
-        const diambilRaw=getCol(r,['diambiloleh','diambil oleh']);
-        const dibuatRaw=getCol(r,['dibuatoleh','dibuat oleh']);
         const tglDiambilRaw=getCol(r,['tanggaldiambil','tgl diambil','tanggal diambil']);
         const slaNum=parseFloat((waktuSlaRaw||"").replace(",","."))||0;
         return{
@@ -163,7 +167,6 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
           waktuSlaDetik:slaNum*3600,
           statusNorm:normalizeStatus(statusRaw),
           statusSLA:statusSlaRaw,
-          diambilOleh:diambilRaw,
           tanggalDiambil:tglDiambilRaw
         };
       });
@@ -213,7 +216,6 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
 
   const results=sheetData.map(k=>{
     let res=rataRata_byNIK(k.nik);
-    if(!res.count)res=rataRata_byNIK(k.nama);
     return{k,res};
   });
 
@@ -223,12 +225,12 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 });
 
-// ==== Tombol Sort ====
+// ==== Sorting tombol baru (InProgress) ====
 document.getElementById("sortInProgress").addEventListener("click",()=>{
   if(!lastResults.length)return alert("Belum ada data tabel.");
   sortAscInProgress=!sortAscInProgress;
-  lastResults.sort((a,b)=> sortAscInProgress ? 
-    (a.res.inProgressCount||0)-(b.res.inProgressCount||0) : 
+  lastResults.sort((a,b)=> sortAscInProgress ?
+    (a.res.inProgressCount||0)-(b.res.inProgressCount||0) :
     (b.res.inProgressCount||0)-(a.res.inProgressCount||0)
   );
   renderTable(lastResults);
