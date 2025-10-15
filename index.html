@@ -135,26 +135,41 @@ function ambilJamDariTanggal(s){
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
   if (!shift) return alert("Masukkan shift (M, P, atau S)");
+
   document.getElementById("statusText").textContent = "Mengambil data dari Google Sheet...";
+
   try {
-    const res = await fetch(`${GAS_URL}?shift=${shift}`);
-    const data = await res.json();
-    sheetData = (data.karyawan || []).map(k => ({
-      nama: (k.nama || "").toString().trim(),
-      nik: (k.nik || "").toString().trim(),
-      shift: shift
-    }));
-    if(sheetData.length > 0){
-      document.getElementById("statusText").textContent = `✅ Data ditemukan: ${sheetData.length} orang (Shift ${shift})`;
+    let shifts = [shift];
+    if (shift === "P") shifts = ["P", "P1"];
+
+    sheetData = [];
+
+    for (const s of shifts) {
+      const res = await fetch(`${GAS_URL}?shift=${s}`);
+      const data = await res.json();
+
+      const karyawanList = (data.karyawan || []).map(k => ({
+        nama: (k.nama || "").toString().trim(),
+        nik: (k.nik || "").toString().trim(),
+        shift: s
+      }));
+
+      sheetData = sheetData.concat(karyawanList);
+    }
+
+    if (sheetData.length > 0) {
+      document.getElementById("statusText").textContent = `✅ Data ditemukan: ${sheetData.length} orang (Shift ${shifts.join(" / ")})`;
       document.getElementById("generateBtn").disabled = false;
     } else {
       document.getElementById("statusText").textContent = "⚠️ Tidak ada data karyawan ditemukan.";
       document.getElementById("generateBtn").disabled = true;
     }
+
   } catch (err) {
     document.getElementById("statusText").textContent = "Gagal memanggil API: " + err.message;
   }
 });
+
 
 // ==== Upload CSV ====
 document.getElementById("csvFile").addEventListener("change",(e)=>{
@@ -329,4 +344,5 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
