@@ -139,23 +139,35 @@ function ambilJamDariTanggal(s){
   return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-";
 }
 
-// ==== Ambil data dari GSheet ====
+// ==== Ambil data dari GSheet (Revisi P → P & P1) ====
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
-  const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
-  if (!shift) return alert("Masukkan shift (M, P, atau S)");
+  const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
+  if (!shiftInput) return alert("Masukkan shift (M, P, atau S)");
   document.getElementById("statusText").textContent = "Mengambil data dari Google Sheet...";
+
   try {
-    const res = await fetch(`${GAS_URL}?shift=${shift}`);
-    const data = await res.json();
-    sheetData = (data.karyawan || []).map(k => ({
-      nama: (k.nama || "").trim(),
-      nik: (k.nik || "").trim(),
-      shift
-    }));
+    // Jika shift P, ambil juga P1
+    let shifts = [shiftInput];
+    if (shiftInput === "P") shifts = ["P", "P1"];
+
+    sheetData = [];
+
+    for (const s of shifts) {
+      const res = await fetch(`${GAS_URL}?shift=${s}`);
+      const data = await res.json();
+      const karyawanList = (data.karyawan || []).map(k => ({
+        nama: (k.nama || "").trim(),
+        nik: (k.nik || "").trim(),
+        shift: s
+      }));
+      sheetData = sheetData.concat(karyawanList);
+    }
+
     document.getElementById("statusText").textContent =
-      sheetData.length ? `✅ Data ditemukan: ${sheetData.length} orang (Shift ${shift})`
+      sheetData.length ? `✅ Data ditemukan: ${sheetData.length} orang (Shift ${shifts.join(" / ")})`
                        : "⚠️ Tidak ada data karyawan ditemukan.";
     document.getElementById("generateBtn").disabled = !sheetData.length;
+
   } catch (err) {
     document.getElementById("statusText").textContent = "Gagal memanggil API: " + err.message;
   }
