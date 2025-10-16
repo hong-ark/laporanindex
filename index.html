@@ -78,11 +78,14 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbyoPTlFn5NSBWlDLAT5tvfu
 let sheetData = [];
 let csvData = [];
 let lastResults = [];
-let sortAscInProgress = false;
+
+// status sort default
 let sortAscNama = true;
-let sortAscIndex = false;
-let sortAscTotal = true;
+let sortAscLastCO = false;
+let sortAscIndexCO = false;
+let sortAscTotalCO = true;
 let sortAscSLA = false;
+let sortAscInProgress = false;
 
 document.getElementById("tanggalCek").textContent =
   new Date().toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
@@ -244,16 +247,35 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 });
 
-// ==== Sort kolom InProgress ====
-document.getElementById("sortInProgress").addEventListener("click",()=>{
-  if(!lastResults.length)return alert("Belum ada data tabel.");
-  sortAscInProgress=!sortAscInProgress;
-  lastResults.sort((a,b)=>{
-    const A=a.res.inProgressCount||0, B=b.res.inProgressCount||0;
-    return sortAscInProgress?A-B:B-A;
-  });
+// ==== Sort fungsi universal ====
+function sortColumn(key){
+  if(!lastResults.length) return alert("Belum ada data tabel.");
+  let asc;
+  let valFunc;
+  switch(key){
+    case "Nama": 
+      asc=sortAscNama; valFunc=r=>r.k.nama.toLowerCase(); sortAscNama=!sortAscNama; break;
+    case "LastCO": 
+      asc=sortAscLastCO; valFunc=r=>r.res.lastTime==="-"?0:parseInt(r.res.lastTime.replace(":","")); sortAscLastCO=!sortAscLastCO; break;
+    case "IndexCO": 
+      asc=sortAscIndexCO; valFunc=r=>r.res.avg!==null?r.res.avg:0; sortAscIndexCO=!sortAscIndexCO; break;
+    case "TotalCO": 
+      asc=sortAscTotalCO; valFunc=r=>r.res.count||0; sortAscTotalCO=!sortAscTotalCO; break;
+    case "SLA": 
+      asc=sortAscSLA; valFunc=r=>r.res.slaCount||0; sortAscSLA=!sortAscSLA; break;
+    case "InProgress": 
+      asc=sortAscInProgress; valFunc=r=>r.res.inProgressCount||0; sortAscInProgress=!sortAscInProgress; break;
+    default: return;
+  }
+  lastResults.sort((a,b)=>asc? (valFunc(a)-valFunc(b)) : (valFunc(b)-valFunc(a)));
   renderTable(lastResults);
-  document.getElementById("sortInProgress").textContent=`InProgress ${sortAscInProgress?"↑":"↓"}`;
+  document.getElementById(`sort${key}`).textContent=`${key} ${asc?"↑":"↓"}`;
+}
+
+// ==== Event listener sort ====
+["Nama","LastCO","IndexCO","TotalCO","SLA","InProgress"].forEach(k=>{
+  const el=document.getElementById(`sort${k}`);
+  if(el) el.addEventListener("click",()=>sortColumn(k));
 });
 
 // ==== Download JPG ====
