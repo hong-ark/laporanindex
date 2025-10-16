@@ -254,22 +254,49 @@ function sortColumn(key){
   let valFunc;
   switch(key){
     case "Nama": 
-      asc=sortAscNama; valFunc=r=>r.k.nama.toLowerCase(); sortAscNama=!sortAscNama; break;
+      asc = sortAscNama;
+      valFunc = r => (r.k.nama || "").toLowerCase();
+      sortAscNama = !sortAscNama;
+      break;
     case "LastCO": 
-      asc=sortAscLastCO; valFunc=r=>r.res.lastTime==="-"?0:parseInt(r.res.lastTime.replace(":","")); sortAscLastCO=!sortAscLastCO; break;
+      asc = sortAscLastCO; 
+      valFunc = r => r.res.lastTime==="-" ? 0 : parseInt(r.res.lastTime.replace(":","")); 
+      sortAscLastCO = !sortAscLastCO; 
+      break;
     case "IndexCO": 
-      asc=sortAscIndexCO; valFunc=r=>r.res.avg!==null?r.res.avg:0; sortAscIndexCO=!sortAscIndexCO; break;
+      asc = sortAscIndexCO; 
+      valFunc = r => r.res.avg!==null ? r.res.avg : 0; 
+      sortAscIndexCO = !sortAscIndexCO; 
+      break;
     case "TotalCO": 
-      asc=sortAscTotalCO; valFunc=r=>r.res.count||0; sortAscTotalCO=!sortAscTotalCO; break;
+      asc = sortAscTotalCO; 
+      valFunc = r => r.res.count||0; 
+      sortAscTotalCO = !sortAscTotalCO; 
+      break;
     case "SLA": 
-      asc=sortAscSLA; valFunc=r=>r.res.slaCount||0; sortAscSLA=!sortAscSLA; break;
+      asc = sortAscSLA; 
+      valFunc = r => r.res.slaCount||0; 
+      sortAscSLA = !sortAscSLA; 
+      break;
     case "InProgress": 
-      asc=sortAscInProgress; valFunc=r=>r.res.inProgressCount||0; sortAscInProgress=!sortAscInProgress; break;
+      asc = sortAscInProgress; 
+      valFunc = r => r.res.inProgressCount||0; 
+      sortAscInProgress = !sortAscInProgress; 
+      break;
     default: return;
   }
-  lastResults.sort((a,b)=>asc? (valFunc(a)-valFunc(b)) : (valFunc(b)-valFunc(a)));
+
+  if(key === "Nama"){
+    lastResults.sort((a,b)=> asc 
+      ? valFunc(a).localeCompare(valFunc(b))
+      : valFunc(b).localeCompare(valFunc(a))
+    );
+  } else {
+    lastResults.sort((a,b)=> asc ? (valFunc(a)-valFunc(b)) : (valFunc(b)-valFunc(a)));
+  }
+
   renderTable(lastResults);
-  document.getElementById(`sort${key}`).textContent=`${key} ${asc?"↑":"↓"}`;
+  document.getElementById(`sort${key}`).textContent = `${key} ${asc?"↑":"↓"}`;
 }
 
 // ==== Event listener sort ====
