@@ -214,19 +214,41 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
 // ==== Perhitungan ====
 function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik/r.waktuSlaDetik : 0; }
 
-function rataRata_byName(nama,thr=0.65){
-  const matches=[];
-  for(const r of csvData){
-    if(!isAcceptedStatus(r.statusNorm))continue;
-    if(similarity(nama,r.diambilOleh)>=thr)matches.push(r);
+function rataRata_byNIK(karyawan, thr = 0.65) {
+  const { nama, nik } = karyawan;
+  const matches = [];
+
+  for (const r of csvData) {
+    if (!isAcceptedStatus(r.statusNorm)) continue;
+
+    // Cek kecocokan berdasarkan NIK
+    const matchByNIK = nik && r.nik && nik === r.nik;
+
+    // Jika NIK tidak cocok, gunakan fallback similarity nama
+    const matchByNama = !matchByNIK && similarity(nama, r.diambilOleh) >= thr;
+
+    if (matchByNIK || matchByNama) matches.push(r);
   }
-  if(!matches.length)return{avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0};
-  const sum=matches.reduce((a,b)=>a+computeC(b),0);
-  const latest=matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
-  const slaCount=matches.filter(r=>r.statusSLA&&r.statusSLA.toLowerCase().includes("lewat")).length;
-  const inProgressCount=matches.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length;
-  return{avg:sum/matches.length,count:matches.length,lastTime:ambilJamDariTanggal(latest),slaCount,inProgressCount};
+
+  if (!matches.length)
+    return { avg: null, count: 0, lastTime: "-", slaCount: 0, inProgressCount: 0 };
+
+  const sum = matches.reduce((a, b) => a + computeC(b), 0);
+  const latest = matches.map(r => r.tanggalDiambil).filter(Boolean).sort().pop();
+  const slaCount = matches.filter(r => r.statusSLA && r.statusSLA.toLowerCase().includes("lewat")).length;
+  const inProgressCount = matches.filter(r =>
+    r.statusNorm.includes("inprogress") || r.statusNorm.includes("in progress")
+  ).length;
+
+  return {
+    avg: sum / matches.length,
+    count: matches.length,
+    lastTime: ambilJamDariTanggal(latest),
+    slaCount,
+    inProgressCount
+  };
 }
+
 
 // ==== Render tabel ====
 function renderTable(results){
@@ -253,7 +275,7 @@ function renderTable(results){
 document.getElementById("generateBtn").addEventListener("click",()=>{
   if(!sheetData.length)return alert("Ambil nama dari GSheet dulu.");
   if(!csvData.length)return alert("Upload file CSV dulu.");
-  const results=sheetData.map(k=>({k,res:rataRata_byName(k.nama)}));
+  const results = sheetData.map(k => ({ k, res: rataRata_byNIK(k) }));
   lastResults=results;
   renderTable(results);
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
@@ -329,3 +351,4 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
