@@ -237,7 +237,7 @@ function renderTable(results){
     const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
 
     // highlight jika ada CO lewat SLA
-    const highlightClass = res.slaCount > 0 ? "bg-danger-subtle" : "";
+    const highlightClass = res.slaCount > 0 ? "table-danger" : "";
 
     const tr=document.createElement("tr");
     tr.className = highlightClass;
@@ -333,5 +333,6 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
 
