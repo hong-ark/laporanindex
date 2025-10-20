@@ -214,7 +214,7 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
 // ==== Perhitungan ====
 function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik/r.waktuSlaDetik : 0; }
 
-function rataRata_byName(nama,thr=0.65){
+function rataRata_byName(nama,thr=0.85){
   const matches=[];
   for(const r of csvData){
     if(!isAcceptedStatus(r.statusNorm))continue;
@@ -329,3 +329,4 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
