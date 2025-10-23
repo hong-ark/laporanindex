@@ -7,51 +7,49 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-  
+
   <style>
-  body {
-    background: #f6f7fb;
-    padding: 20px;
-  }
+    body {
+      background: #f6f7fb;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1100px;
+      background: white;
+      border-radius: 10px;
+      padding: 25px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+    table {
+      font-size: 15px;
+    }
 
-  .container {
-    max-width: 1100px;
-    background: white;
-    border-radius: 10px;
-    padding: 25px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-  }
+    /* === Warna blok header tabel (biru lembut) === */
+    #resultTable thead, #logTable thead {
+      background-color: #e3f2fd;
+    }
 
-  table {
-    font-size: 15px;
-  }
+    th {
+      color: #000;
+      text-align: center;
+      font-weight: 700;
+      padding: 10px 8px;
+      border-bottom: 2px solid #bbdefb;
+    }
 
-  /* === Header tabel biru muda lembut === */
-  #resultTable thead, #logTable thead {
-    background-color: #e3f2fd;
-  }
+    #resultTable td, #logTable td {
+      text-align: center;
+      vertical-align: middle;
+    }
 
-  th {
-    color: #000;
-    text-align: center;
-    font-weight: 700;
-    padding: 10px 8px;
-    border-bottom: 2px solid #bbdefb;
-  }
+    .table-danger {
+      background-color: #ffeaea !important;
+    }
 
-  #resultTable td, #logTable td {
-    text-align: center;
-    vertical-align: middle;
-  }
-
-  .table-danger {
-    background-color: #ffeaea !important;
-  }
-
-  #logContainer {
-    display: none;
-    margin-top: 25px;
-  }
+    #logContainer {
+      display: none;
+      margin-top: 25px;
+    }
   </style>
 </head>
 <body>
@@ -126,60 +124,161 @@ const GAS_URL_LOG = "https://script.google.com/macros/s/AKfycbx1QvWib1tEsWf7I-X2
 
 let sheetData = [];
 let csvData = [];
-let lastResults = [];
 
-// === (semua fungsi lama tetap sama, tidak diubah) ===
-// === copy dari script kamu mulai dari document.getElementById("tanggalCek").textContent ... ===
-// === sampai akhir fungsi downloadBtn ===
+// === Tampilkan tanggal hari ini ===
+document.getElementById("tanggalCek").textContent = new Date().toLocaleDateString("id-ID", {
+  weekday: "long", year: "numeric", month: "long", day: "numeric"
+});
 
+// === Ambil Nama dari GSheet Jadwal ===
+document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
+  const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
+  const statusText = document.getElementById("statusText");
+  if (!shift) { alert("Isi dulu shift: M / P / S"); return; }
 
-// === Tambahan: View Log History ===
+  statusText.textContent = "Mengambil data jadwal dari Google Sheet...";
+  try {
+    const res = await fetch(`${GAS_URL}?shift=${shift}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    sheetData = data;
+    statusText.textContent = `✅ Data nama berhasil diambil (${sheetData.length} entri)`;
+    document.getElementById("generateBtn").disabled = false;
+  } catch (err) {
+    statusText.textContent = "❌ Gagal mengambil data: " + err.message;
+  }
+});
+
+// === Upload CSV ===
+document.getElementById("csvFile").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  Papa.parse(file, {
+    header: true, delimiter: ";",
+    complete: (results) => {
+      csvData = results.data.filter(r => Object.values(r).some(v => v !== ""));
+      document.getElementById("statusText").textContent = `✅ CSV berhasil dimuat (${csvData.length} baris).`;
+    },
+    error: (err) => alert("Gagal membaca CSV: " + err.message)
+  });
+});
+
+// === Generate Tabel + Auto Log ===
+document.getElementById("generateBtn").addEventListener("click", async () => {
+  if (!sheetData.length || !csvData.length) {
+    alert("Ambil nama dari GSheet dan upload CSV dulu.");
+    return;
+  }
+
+  const startTime = performance.now();
+  const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
+  const fileInput = document.getElementById("csvFile");
+  const fileName = fileInput.files[0] ? fileInput.files[0].name : "Tidak diketahui";
+
+  const tbody = document.querySelector("#resultTable tbody");
+  tbody.innerHTML = "";
+  let no = 1, totalCO = 0, totalSLA = 0;
+
+  sheetData.forEach(row => {
+    const nama = row.Nama || row.nama || "-";
+    const shiftK = row.Shift || row.shift || "-";
+
+    const dataNama = csvData.filter(d =>
+      d["Diambil Oleh"] && d["Diambil Oleh"].toLowerCase().includes(nama.toLowerCase())
+    );
+
+    const tCO = dataNama.length;
+    const tSLA = dataNama.filter(d => (d["Status SLA"] || "").toLowerCase().includes("lewat")).length;
+    const inProgress = dataNama.filter(d => (d["Status Komplain"] || "").toLowerCase().includes("in progress")).length;
+    const relasiResolved = dataNama.filter(d => (d["Status Komplain"] || "").toLowerCase().includes("pending")).length;
+
+    totalCO += tCO;
+    totalSLA += tSLA;
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${no++}</td>
+      <td>${nama}</td>
+      <td>${shiftK}</td>
+      <td>${dataNama.length ? dataNama[dataNama.length - 1]["Tanggal Diambil"] || "-" : "-"}</td>
+      <td>${dataNama.length || 0}</td>
+      <td>${tCO}</td>
+      <td>${tSLA}</td>
+      <td>${inProgress}</td>
+      <td>${relasiResolved}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  const endTime = performance.now();
+  const durasi = ((endTime - startTime) / 1000).toFixed(2);
+
+  // === Kirim data log ke GAS ===
+  try {
+    await fetch(GAS_URL_LOG, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        action: "addLog",
+        User: "Auto Web Log",
+        Shift: shift,
+        "Jumlah CO": totalCO,
+        SLA: totalSLA,
+        "Sumber CSV": fileName,
+        "Durasi Proses (detik)": durasi,
+        Status: "Selesai"
+      })
+    });
+    console.log("✅ Log tersimpan ke Google Sheet");
+  } catch (err) {
+    console.error("❌ Gagal menyimpan log:", err.message);
+  }
+});
+
+// === Download JPG ===
+document.getElementById("downloadBtn").addEventListener("click", async () => {
+  const tableArea = document.getElementById("resultArea");
+  const canvas = await html2canvas(tableArea);
+  const link = document.createElement("a");
+  link.download = "Laporan_IndexShift.jpg";
+  link.href = canvas.toDataURL("image/jpeg");
+  link.click();
+});
+
+// === View History (Log) ===
 document.getElementById("viewHistoryBtn").addEventListener("click", async () => {
   const logContainer = document.getElementById("logContainer");
   const logTable = document.getElementById("logTable");
-
   logContainer.style.display = "block";
   logTable.innerHTML = "<p class='text-muted'>Memuat data log...</p>";
 
   try {
     const res = await fetch(GAS_URL_LOG + "?action=getLog");
     const data = await res.json();
-
     if (!data || !data.length) {
       logTable.innerHTML = "<p class='text-danger'>Belum ada data log.</p>";
       return;
     }
 
-    let html = `
-      <table class="table table-bordered table-striped">
-        <thead>
-          <tr>
-            <th>Timestamp</th>
-            <th>User</th>
-            <th>Shift</th>
-            <th>Jumlah CO</th>
-            <th>SLA</th>
-            <th>Sumber CSV</th>
-            <th>Durasi Proses (detik)</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-    `;
+    let html = `<table class="table table-bordered table-striped">
+      <thead><tr>
+        <th>Timestamp</th><th>User</th><th>Shift</th>
+        <th>Jumlah CO</th><th>SLA</th><th>Sumber CSV</th>
+        <th>Durasi Proses (detik)</th><th>Status</th>
+      </tr></thead><tbody>`;
 
     data.slice(-10).reverse().forEach(row => {
-      html += `
-        <tr>
-          <td>${row.Timestamp || ""}</td>
-          <td>${row.User || ""}</td>
-          <td>${row.Shift || ""}</td>
-          <td>${row["Jumlah CO"] || ""}</td>
-          <td>${row.SLA || ""}</td>
-          <td>${row["Sumber CSV"] || ""}</td>
-          <td>${row["Durasi Proses (detik)"] || ""}</td>
-          <td>${row.Status || ""}</td>
-        </tr>
-      `;
+      html += `<tr>
+        <td>${row.Timestamp || ""}</td>
+        <td>${row.User || ""}</td>
+        <td>${row.Shift || ""}</td>
+        <td>${row["Jumlah CO"] || ""}</td>
+        <td>${row.SLA || ""}</td>
+        <td>${row["Sumber CSV"] || ""}</td>
+        <td>${row["Durasi Proses (detik)"] || ""}</td>
+        <td>${row.Status || ""}</td>
+      </tr>`;
     });
 
     html += "</tbody></table>";
