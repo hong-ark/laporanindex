@@ -9,17 +9,19 @@
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <style>
     body { background: #f6f7fb; padding: 20px; }
-    .container { max-width: 1100px; background: white; border-radius: 10px;
-      padding: 25px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    .container {
+      max-width: 1100px; background: white; border-radius: 10px;
+      padding: 25px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
     table { font-size: 15px; }
     #resultTable thead { background-color: #e3f2fd; }
     #resultTable th {
-      color:#000;text-align:center;font-weight:700;
-      padding:10px 8px;border-bottom:2px solid #bbdefb;
-      cursor:pointer;transition:background 0.2s ease;
+      color:#000; text-align:center; font-weight:700;
+      padding:10px 8px; border-bottom:2px solid #bbdefb;
+      cursor:pointer; transition:background 0.2s ease;
     }
     #resultTable th:hover { background-color:#bbdefb; }
-    #resultTable td { text-align:center;vertical-align:middle; }
+    #resultTable td { text-align:center; vertical-align:middle; }
     .bg-danger-subtle,.table-danger { background-color:#ffeaea!important; }
   </style>
 </head>
@@ -83,17 +85,17 @@
 const GAS_URL = "https://script.google.com/macros/s/AKfycbx1QvWib1tEsWf7I-X2yb3rhOinSuyMMVP3IzLdt-rbLsJk903JwEWwij6yw7nj-xnE/exec";
 const SHEET_URL = "https://script.google.com/macros/s/AKfycbyoPTlFn5NSBWlDLAT5tvfui9ZKe-l1-INlSmjZ9wWTD3bva3XiP1xp9R2i7K5eTPHqIg/exec";
 
-let sheetData=[],csvData=[],lastResults=[];
+let sheetData = [], csvData = [], lastResults = [];
 
-document.getElementById("tanggalCek").textContent = 
+document.getElementById("tanggalCek").textContent =
   new Date().toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});
 
-// ======== SIMPAN LOG ke GAS ========
+// ======== SIMPAN LOG ke GAS (Sheet LOG_HISTORY) ========
 async function simpanLogCO(shift, csvName, jpegBlob) {
   try {
     const base64Data = await new Promise((resolve, reject) => {
       const r = new FileReader();
-      r.onloadend = () => resolve(r.result); // kirim base64 lengkap
+      r.onloadend = () => resolve(r.result);
       r.onerror = reject;
       r.readAsDataURL(jpegBlob);
     });
@@ -108,7 +110,7 @@ async function simpanLogCO(shift, csvName, jpegBlob) {
     const data = await res.json();
     if (data.success) {
       console.log("✅ Log tersimpan:", data.url);
-      document.getElementById("statusText").textContent = "✅ Log tersimpan di Google Sheet.";
+      document.getElementById("statusText").textContent = "✅ Log tersimpan di Sheet LOG_HISTORY.";
     } else {
       document.getElementById("statusText").textContent = "⚠️ Gagal simpan log: " + data.error;
     }
@@ -117,26 +119,37 @@ async function simpanLogCO(shift, csvName, jpegBlob) {
   }
 }
 
-// ======== AMBIL DATA GSheet ========
+// ======== AMBIL DATA GSheet (seperti versi lama, aman dari .trim error) ========
 document.getElementById("ambilNamaBtn").addEventListener("click", async()=>{
   const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
   if(!shiftInput) return alert("Masukkan shift (M, P, atau S)");
   document.getElementById("statusText").textContent="Mengambil data dari Google Sheet...";
-  try{
+
+  try {
     let shifts=[shiftInput];
     if(shiftInput==="P") shifts=["P","P1"];
     sheetData=[];
     for(const s of shifts){
       const res=await fetch(`${SHEET_URL}?shift=${s}`);
       const data=await res.json();
-      const list=(data.karyawan||[]).map(k=>({nama:k.nama.trim(),nik:k.nik.trim(),shift:s}));
-      sheetData=sheetData.concat(list);
+
+      // Aman meski GAS tidak kirim nik
+      const list=(data.karyawan||[]).map(k=>({
+        nama: (k.nama || "").trim(),
+        nik: k.nik ? k.nik.trim() : "-",
+        shift: k.shift || s
+      }));
+      sheetData = sheetData.concat(list);
     }
+
     document.getElementById("statusText").textContent =
-      sheetData.length?`✅ Data ditemukan: ${sheetData.length} orang (Shift ${shifts.join(" / ")})`:"⚠️ Tidak ada data ditemukan.";
+      sheetData.length ? `✅ Data ditemukan: ${sheetData.length} orang (Shift ${shifts.join(" / ")})`
+                       : "⚠️ Tidak ada data ditemukan.";
     document.getElementById("generateBtn").disabled = !sheetData.length;
-  }catch(err){
-    document.getElementById("statusText").textContent="Gagal memanggil API: "+err.message;
+
+  } catch (err) {
+    console.error("Error ambil jadwal:", err);
+    document.getElementById("statusText").textContent = "Gagal memanggil API: " + err.message;
   }
 });
 
@@ -155,19 +168,18 @@ document.getElementById("generateBtn").addEventListener("click", async()=>{
   if(!sheetData.length) return alert("Ambil nama dari GSheet dulu.");
   if(!csvData.length) return alert("Upload file CSV dulu.");
 
-  // contoh dummy agar tampil
   const tbody=document.querySelector("#resultTable tbody");
   tbody.innerHTML="";
   sheetData.forEach((k,i)=>{
     const tr=document.createElement("tr");
     tr.innerHTML=`<td>${i+1}</td><td>${k.nama}</td><td>${k.shift}</td>
-    <td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>`;
+      <td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>`;
     tbody.appendChild(tr);
   });
 
   document.getElementById("statusText").textContent="✅ Tabel berhasil dibuat.";
 
-  // --- Simpan JPEG + log
+  // Simpan JPEG + log
   const shift = document.getElementById("shiftInput").value.trim();
   const csvName = document.getElementById("csvFile").files[0]?.name || "tanpa_nama.csv";
   const area = document.querySelector("#resultArea");
