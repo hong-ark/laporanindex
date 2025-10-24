@@ -24,6 +24,8 @@
         #resultTable th:hover { background-color:#bbdefb; }
         #resultTable td { text-align:center;vertical-align:middle; }
         .bg-danger-subtle,.table-danger { background-color:#ffeaea!important; }
+        /* Style untuk modal (History) */
+        .modal-body-scrollable { max-height: 70vh; overflow-y: auto; }
     </style>
 </head>
 <body>
@@ -47,15 +49,23 @@
         </div>
 
         <hr/>
-
-        <div class="mb-3">
-            <label for="csvFile" class="form-label">Upload file CSV dari WEB CO</label>
-            <input type="file" id="csvFile" class="form-control" accept=".csv"/>
-            <small class="text-muted">
-                Pastikan CSV punya header seperti (NIK Pengambil, Durasi Komplain, Waktu SLA, Status Komplain, Status SLA, 
-                Tanggal Diambil, Diambil Oleh, Dibuat Oleh).
-            </small>
+        
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="w-75">
+                <label for="csvFile" class="form-label">Upload file CSV dari WEB CO</label>
+                <input type="file" id="csvFile" class="form-control" accept=".csv"/>
+                <small class="text-muted">
+                    Pastikan CSV punya header yang lengkap.
+                </small>
+            </div>
+            <div class="ms-4">
+                <label class="form-label">&nbsp;</label><br />
+                <button id="historyBtn" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#historyModal">
+                    View History
+                </button>
+            </div>
         </div>
+
 
         <button id="generateBtn" class="btn btn-success mb-3" disabled>Generate Tabel</button>
         <span id="statusText" class="ms-2 text-muted"></span>
@@ -83,14 +93,43 @@
             <button id="downloadBtn" class="btn btn-outline-primary">Download JPG</button>
         </div>
     </div>
+    
+    <div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="historyModalLabel">History Generate (10 Terakhir)</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+              <div class="modal-body-scrollable">
+                <p id="historyStatus">Memuat...</p>
+                <table class="table table-sm table-striped" id="historyTable">
+                    <thead>
+                        <tr>
+                            <th>Waktu</th>
+                            <th>Shift</th>
+                            <th>File CSV</th>
+                            <th>Link Gambar</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+              </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
 <script>
 // ====================================================================
-// !!! GANTI URL INI jika skrip API Ambil Nama Anda berbeda !!!
-// Ini adalah placeholder dari skrip lama Anda.
+// GANTI URL INI jika skrip API Ambil Nama Anda berbeda
 const SHEET_URL = "https://script.google.com/macros/s/AKfycbyoPTlFn5NSBWlDLAT5tvfui9ZKe-l1-INlSmjZ9wWTD3bva3XiP1xp9R2i7K5eTPHqIg/exec"; 
 
-// !!! URL BARU DARI ANDA UNTUK SIMPAN LOG/GAMBAR !!!
+// URL BARU DARI ANDA UNTUK SIMPAN LOG/GAMBAR
 const LOG_URL   = "https://script.google.com/macros/s/AKfycbwFsyoZt20LU_OSEQ-D4FQ6XwLXqARtOz24ZItWKGE1XQvbX9BGJ0iZyFD1xr8wbGVJ_w/exec";
 // ====================================================================
 
@@ -99,12 +138,60 @@ let sheetData=[],csvData=[],lastResults=[];
 document.getElementById("tanggalCek").textContent = 
     new Date().toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});
 
-// === Simpan Log ke GAS (REVISI) ===
+// === FUNGSI View History (Memanggil doGet) ===
+async function viewHistory() {
+    const historyBody = document.querySelector("#historyTable tbody");
+    const historyStatus = document.getElementById("historyStatus");
+    historyBody.innerHTML = ''; 
+    historyStatus.textContent = 'Memuat log dari Google Sheet...';
+
+    try {
+        const res = await fetch(LOG_URL, { method: "GET" });
+        if (!res.ok) throw new Error(`Permintaan gagal dengan status ${res.status}`);
+        
+        // PENTING: Karena kita menggunakan HtmlService untuk CORS, 
+        // kita perlu membaca respons sebagai teks lalu mengurai JSON-nya.
+        const text = await res.text();
+        const data = JSON.parse(text.match(/\{.*\}/s)[0]); // Mengambil objek JSON yang terbungkus
+        
+        if (data.success && data.logs && data.logs.length > 0) {
+            historyStatus.textContent = `Ditemukan ${data.logs.length} log terakhir.`;
+            
+            data.logs.forEach(log => {
+                const row = historyBody.insertRow();
+                const d = new Date(log.timestamp);
+                
+                row.insertCell().textContent = d.toLocaleString('id-ID', {
+                    hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short'
+                });
+                row.insertCell().textContent = log.shift;
+                row.insertCell().textContent = log.csvName;
+                
+                const linkCell = row.insertCell();
+                const a = document.createElement('a');
+                a.href = log.fileLink || '#';
+                a.target = '_blank';
+                a.textContent = 'Lihat Gambar';
+                linkCell.appendChild(a);
+            });
+        } else {
+            historyStatus.textContent = data.message || "Tidak ada log yang ditemukan.";
+        }
+    } catch (err) {
+        // Tampilkan teks lengkap dari error fetch
+        historyStatus.textContent = `❌ Gagal memuat history. Cek konsol browser.`;
+        console.error("Error History:", err);
+    }
+}
+
+document.getElementById("historyBtn").addEventListener("click", viewHistory);
+
+
+// === Simpan Log ke GAS ===
 async function simpanLogCO(shift, csvName, jpegBlob) {
     try {
-        document.getElementById("statusText").textContent = "Mengirim log dan gambar ke Google Drive...";
+        document.getElementById("statusText").textContent = "Mengambil tangkapan layar...";
 
-        // Konversi Blob JPEG ke Base64 Data URL
         const base64Data = await new Promise((resolve, reject) => {
             const r = new FileReader();
             r.onloadend = () => resolve(r.result);
@@ -112,6 +199,7 @@ async function simpanLogCO(shift, csvName, jpegBlob) {
             r.readAsDataURL(jpegBlob);
         });
 
+        document.getElementById("statusText").textContent = "Mengirim log dan gambar ke Google Drive...";
         const payload = { shift, csvName, jpegBase64: base64Data };
         
         const res = await fetch(LOG_URL, {
@@ -121,15 +209,16 @@ async function simpanLogCO(shift, csvName, jpegBlob) {
         });
 
         if (!res.ok) {
-            // Jika respons bukan 200 OK
-            const text = await res.text();
-            throw new Error(`Permintaan gagal dengan status ${res.status}. Respon: ${text.substring(0, 100)}...`);
+            // Jika ada masalah CORS/Fetch, berikan detail
+            throw new Error(`Permintaan gagal dengan status ${res.status}.`);
         }
-
-        const data = await res.json();
         
+        // PENTING: Karena kita menggunakan HtmlService untuk CORS, 
+        // kita perlu membaca respons sebagai teks lalu mengurai JSON-nya.
+        const text = await res.text();
+        const data = JSON.parse(text.match(/\{.*\}/s)[0]); // Mengambil objek JSON yang terbungkus
+
         if (data.success) {
-            // Gunakan fileLink yang dikembalikan dari GAS
             document.getElementById("statusText").innerHTML = `✅ Log tersimpan di Google Sheet & Drive. <a href="${data.fileLink}" target="_blank">Lihat File JPG</a>`;
             console.log("File tersimpan:", data.fileLink);
         } else {
@@ -162,7 +251,8 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async()=>{
         sheetData=[];
         for(const s of shifts){
             const res=await fetch(`${SHEET_URL}?shift=${s}`);
-            const data=await res.json();
+            const text = await res.text(); // Baca sebagai teks
+            const data = JSON.parse(text.match(/\{.*\}/s)[0]); // Urai JSON
             const list=(data.karyawan||[]).map(k=>({nama:(k.nama||"").trim(),nik:(k.nik||"").trim(),shift:s}));
             sheetData=sheetData.concat(list);
         }
@@ -179,7 +269,7 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
         csvData=res.data;document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;}});
 });
 
-// === Hitung + tampil + kirim log (TIDAK BERUBAH, hanya memanggil fungsi simpanLogCO yang direvisi) ===
+// === Hitung + tampil + kirim log (TIDAK BERUBAH) ===
 document.getElementById("generateBtn").addEventListener("click",async()=>{
     if(!sheetData.length)return alert("Ambil nama dari GSheet dulu.");
     if(!csvData.length)return alert("Upload file CSV dulu.");
@@ -190,9 +280,6 @@ document.getElementById("generateBtn").addEventListener("click",async()=>{
     const shift=document.getElementById("shiftInput").value.trim();
     const csvName=document.getElementById("csvFile").files[0]?.name||"tanpa_nama.csv";
     const area=document.querySelector("#resultArea");
-    
-    // Perhatikan: html2canvas butuh waktu. Pindahkan status text di dalam simpanLogCO agar lebih informatif.
-    document.getElementById("statusText").textContent = "Mengambil tangkapan layar tabel...";
     
     const canvas=await html2canvas(area,{scale:2});
     canvas.toBlob(blob=>{if(blob)simpanLogCO(shift,csvName,blob);},"image/jpeg",0.9);
@@ -239,5 +326,6 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
     link.click();
 });
 </script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
