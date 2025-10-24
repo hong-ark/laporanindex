@@ -29,8 +29,8 @@
         <label class="form-label">Shift</label>
         <select id="shiftInput" class="form-control">
           <option value="">-- Pilih Shift --</option>
-          <option value="M">M (Hari H)</option>
-          <option value="M-1">M-1 (Hari H-1)</option>
+          <option value="M">M (lihat: ambil kolom H-1 — perilaku lama)</option>
+          <option value="M-1">M-1 (ambil shift M pada Hari H / kolom hari ini)</option>
           <option value="P">P</option>
           <option value="S">S</option>
         </select>
@@ -86,105 +86,102 @@
 <script>
 const GAS_URL = "https://script.google.com/macros/s/AKfycbyoPTlFn5NSBWlDLAT5tvfui9ZKe-l1-INlSmjZ9wWTD3bva3XiP1xp9R2i7K5eTPHqIg/exec";
 
-let sheetData = [];
-let csvData = [];
-let lastResults = [];
+let sheetData = [], csvData = [], lastResults = [];
 
-// Status sort default
-let sortAscNama = true;
-let sortAscLastCO = false;
-let sortAscIndexCO = false;
-let sortAscTotalCO = true;
-let sortAscSLA = false;
-let sortAscInProgress = false;
-let sortAscRelasiResolved = false;
+// default sort flags
+let sortAscNama=true, sortAscLastCO=false, sortAscIndexCO=false, sortAscTotalCO=true;
+let sortAscSLA=false, sortAscInProgress=false, sortAscRelasiResolved=false;
 
 document.getElementById("tanggalCek").textContent =
   new Date().toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
 
-// ==== Fungsi bantu ====
+function pad(n){ return String(n).padStart(2,'0'); }
+function toIsoDate(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+
+// helper text normalization & similarity (tetap seperti semula)
 function normKey(s){ return (s||"").toString().toLowerCase().replace(/[^a-z0-9]/g,''); }
 function normalizeName(s){ return (s||"").toString().toLowerCase().replace(/\s+/g,' ').replace(/[^\w\s]/g,'').trim(); }
-
 function durasiKeDetik(v){
-  if (!v) return 0;
-  const s = v.toString().trim();
-  const m1 = s.match(/(\d+)\s*d\s*(\d{1,2}):(\d{2}):(\d{2})$/i);
-  if (m1) return (+m1[1])*86400 + (+m1[2])*3600 + (+m1[3])*60 + (+m1[4]);
-  const m2 = s.match(/(\d{1,2}):(\d{2}):(\d{2})$/);
-  if (m2) return (+m2[1])*3600 + (+m2[2])*60 + (+m2[3]);
+  if(!v) return 0;
+  const s=v.toString().trim();
+  const m1=s.match(/(\d+)\s*d\s*(\d{1,2}):(\d{2}):(\d{2})$/i);
+  if(m1) return (+m1[1])*86400 + (+m1[2])*3600 + (+m1[3])*60 + (+m1[4]);
+  const m2=s.match(/(\d{1,2}):(\d{2}):(\d{2})$/);
+  if(m2) return (+m2[1])*3600 + (+m2[2])*60 + (+m2[3]);
   return 0;
 }
+function normalizeStatus(s){ if(!s && s!==0) return ""; return String(s).replace(/\u00A0/g,' ').replace(/[_\-]/g,' ').replace(/\s+/g,' ').trim().toLowerCase(); }
+function isAcceptedStatus(norm){ return norm.includes("resolved")||norm.includes("closed")||norm.includes("in progress")||norm.includes("inprogress")||norm.includes("pending"); }
+function levenshtein(a,b){ a=a||""; b=b||""; const al=a.length, bl=b.length; if(!al) return bl; if(!bl) return al; const dp=Array.from({length:al+1},()=>new Array(bl+1).fill(0)); for(let i=0;i<=al;i++) dp[i][0]=i; for(let j=0;j<=bl;j++) dp[0][j]=j; for(let i=1;i<=al;i++) for(let j=1;j<=bl;j++) dp[i][j]=Math.min(dp[i-1][j]+1, dp[i][j-1]+1, dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1)); return dp[al][bl]; }
+function similarity(a,b){ a=normalizeName(a); b=normalizeName(b); if(!a||!b) return 0; const d=levenshtein(a,b); return 1 - d/Math.max(a.length,b.length); }
+function ambilJamDariTanggal(s){ if(!s) return "-"; const m=s.match(/(\d{1,2}):(\d{2})(?::\d{2})?/); return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-"; }
 
-function normalizeStatus(s){
-  if (!s && s !== 0) return "";
-  return String(s).replace(/\u00A0/g,' ').replace(/[_\-]/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
-}
-function isAcceptedStatus(norm){ 
-  return norm.includes("resolved") || norm.includes("closed") ||
-         norm.includes("in progress") || norm.includes("inprogress") ||
-         norm.includes("pending"); 
-}
-
-function levenshtein(a,b){
-  a=a||""; b=b||"";
-  const al=a.length, bl=b.length;
-  if(!al)return bl; if(!bl)return al;
-  const dp=Array.from({length:al+1},()=>new Array(bl+1).fill(0));
-  for(let i=0;i<=al;i++)dp[i][0]=i;
-  for(let j=0;j<=bl;j++)dp[0][j]=j;
-  for(let i=1;i<=al;i++)
-    for(let j=1;j<=bl;j++)
-      dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
-  return dp[al][bl];
-}
-function similarity(a,b){
-  a=normalizeName(a); b=normalizeName(b);
-  if(!a||!b)return 0;
-  const d=levenshtein(a,b);
-  return 1 - d/Math.max(a.length,b.length);
-}
-
-function ambilJamDariTanggal(s){
-  if(!s)return "-";
-  const m=s.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
-  return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-";
-}
-
-// ==== Ambil data dari GSheet ====
+// === Ambil data dari GSheet (dengan mapping tanggal untuk M / M-1) ===
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
-  const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
-  if (!shiftInput) return alert("Pilih shift terlebih dahulu.");
+  const sel = document.getElementById("shiftInput");
+  const shiftInputRaw = (sel.value || "").trim().toUpperCase();
+  if (!shiftInputRaw) return alert("Pilih shift terlebih dahulu.");
   document.getElementById("statusText").textContent = "Mengambil data dari Google Sheet...";
 
   try {
-    let shifts = [shiftInput];
-    // Jika P, ambil P + P1
-    if (shiftInput === "P") shifts = ["P", "P1"];
-    if (shiftInput === "M-1") shifts = ["M-1"]; // otomatis GAS sudah handle mundur 1 hari
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const todayIso = toIsoDate(today);
+    const yesterdayIso = toIsoDate(yesterday);
+
+    // Build list of fetch jobs (shift + tanggal) according to mapping rules:
+    // - If user chooses "M": call GAS with shift=M and tanggal=kemarin (perilaku lama)
+    // - If user chooses "M-1": call GAS with shift=M and tanggal=hari ini (ambil kolom hari ini)
+    // - If user chooses "P": call GAS for P and P1 dengan tanggal hari ini
+    // - Otherwise (S): call GAS with that shift and tanggal hari ini
+    const fetchRequests = [];
+
+    if (shiftInputRaw === "P") {
+      fetchRequests.push({ shift: "P", tanggal: todayIso });
+      fetchRequests.push({ shift: "P1", tanggal: todayIso });
+    } else if (shiftInputRaw === "M") {
+      // Perilaku lama: M => tarik shift M dari kolom 'kemarin'
+      fetchRequests.push({ shift: "M", tanggal: yesterdayIso });
+    } else if (shiftInputRaw === "M-1") {
+      // Permintaan khususmu: M-1 => tarik shift M dari kolom 'hari ini'
+      fetchRequests.push({ shift: "M", tanggal: todayIso });
+    } else {
+      // S atau kode lain
+      fetchRequests.push({ shift: shiftInputRaw, tanggal: todayIso });
+    }
 
     sheetData = [];
-    for (const s of shifts) {
-      const res = await fetch(`${GAS_URL}?shift=${s}`);
+    for (const job of fetchRequests) {
+      const url = `${GAS_URL}?shift=${encodeURIComponent(job.shift)}&tanggal=${encodeURIComponent(job.tanggal)}`;
+      const res = await fetch(url);
       const data = await res.json();
+      // jika GAS mengembalikan error objek
+      if (data && data.error) {
+        // tampilkan di status tapi teruskan (jika ingin hentikan, bisa alert dan return)
+        console.warn("GAS error", data.error);
+        document.getElementById("statusText").textContent = `⚠ GAS: ${data.error}`;
+        continue;
+      }
       const karyawanList = (data.karyawan || []).map(k => ({
         nama: (k.nama || "").trim(),
         nik: (k.nik || "").trim(),
-        shift: data.shift // gunakan label shift dari GAS (misal "M H-1")
+        // gunakan label shift dari response jika tersedia (mis: "M H-1"), fallback ke job.shift
+        shift: data.shift || job.shift
       }));
       sheetData = sheetData.concat(karyawanList);
     }
 
     document.getElementById("statusText").textContent =
-      sheetData.length ? `✅ Data ditemukan: ${sheetData.length} orang (Shift ${shifts.join(" / ")})`
+      sheetData.length ? `✅ Data ditemukan: ${sheetData.length} orang (Shift ${shiftInputRaw})`
                        : "⚠️ Tidak ada data karyawan ditemukan.";
     document.getElementById("generateBtn").disabled = !sheetData.length;
 
   } catch (err) {
+    console.error(err);
     document.getElementById("statusText").textContent = "Gagal memanggil API: " + err.message;
   }
 });
-
 
 // ==== Upload CSV ====
 document.getElementById("csvFile").addEventListener("change",(e)=>{
@@ -224,7 +221,7 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
   });
 });
 
-// ==== Perhitungan ====
+// ==== Perhitungan & rendering (sama seperti sebelumnya) ====
 function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik/r.waktuSlaDetik : 0; }
 
 function rataRata_byName(nama,thr=0.85){
@@ -246,14 +243,12 @@ function rataRata_byName(nama,thr=0.85){
            slaCount, inProgressCount, relasiResolved };
 }
 
-// ==== Render tabel ====
 function renderTable(results){
   const tbody=document.querySelector("#resultTable tbody");
   tbody.innerHTML="";
   results.forEach((item,index)=>{
     const {k,res}=item;
     const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
-
     const highlightClass = res.slaCount > 0 ? "table-danger" : "";
     const tr=document.createElement("tr");
     tr.className = highlightClass;
@@ -271,17 +266,16 @@ function renderTable(results){
   });
 }
 
-// ==== Generate tabel utama ====
 document.getElementById("generateBtn").addEventListener("click",()=>{
-  if(!sheetData.length)return alert("Ambil nama dari GSheet dulu.");
-  if(!csvData.length)return alert("Upload file CSV dulu.");
+  if(!sheetData.length) return alert("Ambil nama dari GSheet dulu.");
+  if(!csvData.length) return alert("Upload file CSV dulu.");
   const results=sheetData.map(k=>({k,res:rataRata_byName(k.nama)}));
   lastResults=results;
   renderTable(results);
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 });
 
-// ==== Sort ====
+// ==== Sort handlers ====
 function sortColumn(key){
   if(!lastResults.length) return alert("Belum ada data tabel.");
   let asc, valFunc;
@@ -297,10 +291,7 @@ function sortColumn(key){
   }
 
   if(key === "Nama"){
-    lastResults.sort((a,b)=> asc 
-      ? valFunc(a).localeCompare(valFunc(b))
-      : valFunc(b).localeCompare(valFunc(a))
-    );
+    lastResults.sort((a,b)=> asc ? valFunc(a).localeCompare(valFunc(b)) : valFunc(b).localeCompare(valFunc(a)));
   } else {
     lastResults.sort((a,b)=> asc ? (valFunc(a)-valFunc(b)) : (valFunc(b)-valFunc(a)));
   }
@@ -326,5 +317,3 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
-
-
