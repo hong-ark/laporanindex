@@ -9,20 +9,14 @@
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <style>
     body { background: #f6f7fb; padding: 20px; }
-    .container {
-      max-width: 1100px; background: white; border-radius: 10px;
-      padding: 25px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
+    .container { max-width: 1100px; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
     table { font-size: 15px; }
     #resultTable thead { background-color: #e3f2fd; }
-    #resultTable th {
-      color:#000; text-align:center; font-weight:700;
-      padding:10px 8px; border-bottom:2px solid #bbdefb;
-      cursor:pointer; transition:background 0.2s ease;
-    }
+    #resultTable th { color:#000;text-align:center;font-weight:700;padding:10px 8px;border-bottom:2px solid #bbdefb; cursor:pointer; transition:background 0.2s ease; }
     #resultTable th:hover { background-color:#bbdefb; }
     #resultTable td { text-align:center; vertical-align:middle; }
     .bg-danger-subtle,.table-danger { background-color:#ffeaea!important; }
+    small.note { display:block; margin-top:6px; color:#555; }
   </style>
 </head>
 <body>
@@ -49,9 +43,8 @@
 
     <div class="mb-3">
       <label for="csvFile" class="form-label">Upload file CSV dari WEB CO</label>
-      <input type="file" id="csvFile" class="form-control" accept=".csv"/>
-      <small class="text-muted">Pastikan CSV punya header seperti (NIK Pengambil, Durasi Komplain, Waktu SLA, Status Komplain, Status SLA, 
-      Tanggal Diambil, Diambil Oleh, Dibuat Oleh).</small>
+      <input type="file" id="csvFile" class="form-control" accept=".csv" />
+      <small class="note">Pastikan CSV punya header: NIK Pengambil, Durasi Komplain, Waktu SLA, Status Komplain, Status SLA, Tanggal Diambil, Diambil Oleh, Dibuat Oleh.</small>
     </div>
 
     <button id="generateBtn" class="btn btn-success mb-3" disabled>Generate Tabel</button>
@@ -61,15 +54,7 @@
       <table id="resultTable" class="table table-bordered table-striped">
         <thead>
           <tr>
-            <th>No</th>
-            <th>Nama Karyawan</th>
-            <th>Shift</th>
-            <th>LastCO</th>
-            <th>IndexCO</th>
-            <th>TotalCO</th>
-            <th>SLA</th>
-            <th>InProgress</th>
-            <th>RelasiResolved</th>
+            <th>No</th><th>Nama Karyawan</th><th>Shift</th><th>LastCO</th><th>IndexCO</th><th>TotalCO</th><th>SLA</th><th>InProgress</th><th>RelasiResolved</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -82,120 +67,270 @@
   </div>
 
 <script>
+/* =========== CONFIG =========== */
 const GAS_URL = "https://script.google.com/macros/s/AKfycbx1QvWib1tEsWf7I-X2yb3rhOinSuyMMVP3IzLdt-rbLsJk903JwEWwij6yw7nj-xnE/exec";
 const SHEET_URL = "https://script.google.com/macros/s/AKfycbyoPTlFn5NSBWlDLAT5tvfui9ZKe-l1-INlSmjZ9wWTD3bva3XiP1xp9R2i7K5eTPHqIg/exec";
 
 let sheetData = [], csvData = [], lastResults = [];
 
+/* =========== UI init =========== */
 document.getElementById("tanggalCek").textContent =
-  new Date().toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});
+  new Date().toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
 
-// ======== SIMPAN LOG ke GAS (Sheet LOG_HISTORY) ========
-async function simpanLogCO(shift, csvName, jpegBlob) {
+/* =========== Utils (string normalize, levenshtein, parsing) =========== */
+function normKey(s){ return (s||"").toString().toLowerCase().replace(/[^a-z0-9]/g,''); }
+function normalizeName(s){ return (s||"").toString().toLowerCase().replace(/\s+/g,' ').replace(/[^\w\s]/g,'').trim(); }
+function normalizeStatus(s){
+  if (!s && s !== 0) return "";
+  return String(s).replace(/\u00A0/g,' ').replace(/[_\-]/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
+}
+function isAcceptedStatus(norm){
+  return norm.includes("resolved") || norm.includes("closed") ||
+         norm.includes("in progress") || norm.includes("inprogress") ||
+         norm.includes("pending");
+}
+function durasiKeDetik(v){
+  if (!v) return 0;
+  const s = v.toString().trim();
+  const m1 = s.match(/(\d+)\s*d\s*(\d{1,2}):(\d{2}):(\d{2})$/i);
+  if (m1) return (+m1[1])*86400 + (+m1[2])*3600 + (+m1[3])*60 + (+m1[4]);
+  const m2 = s.match(/(\d{1,2}):(\d{2}):(\d{2})$/);
+  if (m2) return (+m2[1])*3600 + (+m2[2])*60 + (+m2[3]);
+  return 0;
+}
+function levenshtein(a,b){
+  a=a||""; b=b||"";
+  const al=a.length, bl=b.length;
+  if(!al) return bl; if(!bl) return al;
+  const dp=Array.from({length:al+1}, ()=> new Array(bl+1).fill(0));
+  for(let i=0;i<=al;i++) dp[i][0]=i;
+  for(let j=0;j<=bl;j++) dp[0][j]=j;
+  for(let i=1;i<=al;i++) for(let j=1;j<=bl;j++)
+    dp[i][j]=Math.min(dp[i-1][j]+1, dp[i][j-1]+1, dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+  return dp[al][bl];
+}
+function similarity(a,b){
+  a=normalizeName(a); b=normalizeName(b);
+  if(!a||!b) return 0;
+  const d=levenshtein(a,b);
+  return 1 - d/Math.max(a.length,b.length);
+}
+function ambilJamDariTanggal(s){
+  if(!s) return "-";
+  const m = s.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
+  return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-";
+}
+
+/* =========== Ambil nama jadwal (kembalikan logic lama, safe trim) =========== */
+document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
+  const shiftInputEl = document.getElementById("shiftInput");
+  const statusEl = document.getElementById("statusText");
+  const shiftInput = (shiftInputEl.value || "").trim().toUpperCase();
+  if (!shiftInput) return alert("Masukkan shift (M, P, atau S)");
+  statusEl.textContent = "Mengambil data dari Google Sheet...";
+
   try {
-    const base64Data = await new Promise((resolve, reject) => {
+    let shifts = [shiftInput];
+    if (shiftInput === "P") shifts = ["P","P1"];
+
+    sheetData = [];
+    for (const s of shifts) {
+      const res = await fetch(`${SHEET_URL}?shift=${s}`);
+      if (!res.ok) throw new Error(`Gagal ambil jadwal (status ${res.status})`);
+      const data = await res.json();
+      const list = (data.karyawan || []).map(k => ({
+        nama: (k.nama || "").toString().trim(),
+        nik: k.nik ? k.nik.toString().trim() : "-",
+        shift: s
+      }));
+      sheetData = sheetData.concat(list);
+    }
+
+    statusEl.textContent = sheetData.length ? `✅ Data ditemukan: ${sheetData.length} orang (Shift ${shifts.join(" / ")})` : "⚠️ Tidak ada data ditemukan.";
+    document.getElementById("generateBtn").disabled = !sheetData.length;
+  } catch (err) {
+    console.error("Error ambil jadwal:", err);
+    statusEl.textContent = "Gagal memanggil API: " + (err.message || err);
+  }
+});
+
+/* =========== Upload CSV (parsing lebih aman, header mapping) =========== */
+document.getElementById("csvFile").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  Papa.parse(file, {
+    header: true,
+    delimiter: ";",
+    skipEmptyLines: true,
+    complete: (res) => {
+      // build normalized header map
+      const headerMap = {};
+      (res.meta.fields || []).forEach(f => headerMap[normKey(f)] = f);
+      const getCol = (row, candidates) => {
+        for (const c of candidates) {
+          const k = headerMap[c];
+          if (k && row[k] !== undefined && row[k] !== null) return row[k].toString();
+        }
+        return "";
+      };
+      csvData = (res.data || []).map(r => {
+        const nikRaw = (getCol(r, ['nikpengambil','nik']) || "").replace(/\D/g,'').trim();
+        const diambilOleh = getCol(r, ['diambiloleh','diambil oleh']) || "";
+        const durasiRaw = getCol(r, ['durasikomplain','durasi']) || "";
+        const waktuSlaRaw = getCol(r, ['waktusla','waktu sla']) || "";
+        const statusRaw = getCol(r, ['statuskomplain','status']) || "";
+        const statusSlaRaw = getCol(r, ['statussla','status sla']) || "";
+        const tglDiambilRaw = getCol(r, ['tanggaldiambil','tgl diambil','tanggal diambil']) || "";
+        const slaNum = parseFloat((waktuSlaRaw||"").replace(",",".")) || 0;
+        return {
+          nik: nikRaw,
+          diambilOleh,
+          durasiRaw,
+          durasiDetik: durasiKeDetik(durasiRaw),
+          waktuSlaDetik: slaNum*3600,
+          status: statusRaw,
+          statusNorm: normalizeStatus(statusRaw),
+          statusSLA: statusSlaRaw,
+          tanggalDiambil: tglDiambilRaw
+        };
+      });
+
+      document.getElementById("statusText").textContent = `File CSV terbaca: ${csvData.length} baris.`;
+      document.getElementById("generateBtn").disabled = !sheetData.length || !csvData.length;
+    }
+  });
+});
+
+/* =========== Perhitungan (fungsi lengkap) =========== */
+function computeC(r){ return r.waktuSlaDetik > 0 ? r.durasiDetik / r.waktuSlaDetik : 0; }
+
+function rataRata_byName(nama, thr=0.85){
+  const matches = [];
+  for (const r of csvData) {
+    if (!isAcceptedStatus(r.statusNorm)) continue;
+    if (similarity(nama, r.diambilOleh) >= thr) matches.push(r);
+  }
+  if (!matches.length) return { avg:null, count:0, lastTime:"-", slaCount:0, inProgressCount:0, relasiResolved:0 };
+  const sum = matches.reduce((a,b)=>a+computeC(b), 0);
+  const latest = matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
+  const slaCount = matches.filter(r => r.statusSLA && r.statusSLA.toLowerCase().includes("lewat")).length;
+  const inProgressCount = matches.filter(r => r.statusNorm.includes("inprogress") || r.statusNorm.includes("in progress")).length;
+  const relasiResolved = matches.filter(r => r.statusNorm.includes("pending")).length;
+  return { avg: sum/matches.length, count: matches.length, lastTime: ambilJamDariTanggal(latest), slaCount, inProgressCount, relasiResolved };
+}
+
+function renderTable(results){
+  const tbody = document.querySelector("#resultTable tbody");
+  tbody.innerHTML = "";
+  results.forEach((item, index) => {
+    const { k, res } = item;
+    const avg = res.avg !== null ? (Math.round(res.avg*100)/100).toFixed(2) : "-";
+    const tr = document.createElement("tr");
+    tr.className = res.slaCount > 0 ? "table-danger" : "";
+    tr.innerHTML = `<td>${index+1}</td>
+      <td>${k.nama}</td>
+      <td>${k.shift}</td>
+      <td>${res.lastTime}</td>
+      <td>${avg}</td>
+      <td>${res.count||0}</td>
+      <td>${res.slaCount||0}</td>
+      <td>${res.inProgressCount||0}</td>
+      <td>${res.relasiResolved||0}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+/* =========== Simpan log ke GAS (dengan retry 1x, dan ukuran JPEG dikurangi) =========== */
+async function simpanLogCO(shift, csvName, jpegBlob) {
+  const statusEl = document.getElementById("statusText");
+  try {
+    // konversi ke base64 dataURL (full, karena GAS code mem-split by comma[1])
+    const dataUrl = await new Promise((resolve, reject) => {
       const r = new FileReader();
       r.onloadend = () => resolve(r.result);
       r.onerror = reject;
       r.readAsDataURL(jpegBlob);
     });
 
-    const payload = { shift, csvName, jpegBase64: base64Data };
-    const res = await fetch(GAS_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    // kirim payload (base64 lengkap termasuk prefix "data:image/jpeg;base64,...")
+    const payload = { shift, csvName, jpegBase64: dataUrl };
+    // request
+    const doPost = async () => {
+      const res = await fetch(GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    };
 
-    const data = await res.json();
-    if (data.success) {
-      console.log("✅ Log tersimpan:", data.url);
-      document.getElementById("statusText").textContent = "✅ Log tersimpan di Sheet LOG_HISTORY.";
-    } else {
-      document.getElementById("statusText").textContent = "⚠️ Gagal simpan log: " + data.error;
+    // coba kirim, 1 retry bila gagal
+    let result;
+    try {
+      result = await doPost();
+    } catch (err) {
+      console.warn("Retry setelah kegagalan pertama:", err);
+      // coba lagi
+      result = await doPost();
     }
+
+    if (result && result.success) {
+      console.log("Log tersimpan:", result.url || result.jpegUrl || "(no-url)");
+      statusEl.textContent = "✅ Log tersimpan di Sheet LOG.";
+    } else {
+      const msg = (result && (result.error||result.message)) || "Unknown error";
+      statusEl.textContent = "⚠️ Gagal simpan log: " + msg;
+      console.warn("GAS response error:", result);
+    }
+
   } catch (err) {
-    document.getElementById("statusText").textContent = "❌ Gagal kirim log ke GAS: " + err.message;
+    // sering muncul "Failed to fetch" bila GAS tidak di-deploy dengan akses publik.
+    console.error("Gagal kirim log ke GAS:", err);
+    statusEl.textContent = "❌ Gagal kirim log ke GAS: " + err.message;
+    // bantu diagnosis singkat:
+    if (err.message && err.message.toLowerCase().includes("failed to fetch")) {
+      statusEl.textContent += " — cek deployment GAS (harus 'Anyone, even anonymous') atau koneksi jaringan.";
+    }
   }
 }
 
-// ======== AMBIL DATA GSheet (seperti versi lama, aman dari .trim error) ========
-document.getElementById("ambilNamaBtn").addEventListener("click", async()=>{
-  const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
-  if(!shiftInput) return alert("Masukkan shift (M, P, atau S)");
-  document.getElementById("statusText").textContent="Mengambil data dari Google Sheet...";
+/* =========== Generate utama (perhitungan lalu simpan log image) =========== */
+document.getElementById("generateBtn").addEventListener("click", async () => {
+  if (!sheetData.length) return alert("Ambil nama dari GSheet dulu.");
+  if (!csvData.length) return alert("Upload file CSV dulu.");
 
+  // hitung
+  const results = sheetData.map(k => ({ k, res: rataRata_byName(k.nama) }));
+  lastResults = results;
+  renderTable(results);
+  document.getElementById("statusText").textContent = "✅ Perhitungan selesai.";
+
+  // buat image (kecilkan quality/scale untuk mengecilkan payload)
   try {
-    let shifts=[shiftInput];
-    if(shiftInput==="P") shifts=["P","P1"];
-    sheetData=[];
-    for(const s of shifts){
-      const res=await fetch(`${SHEET_URL}?shift=${s}`);
-      const data=await res.json();
-
-      // Aman meski GAS tidak kirim nik
-      const list=(data.karyawan||[]).map(k=>({
-        nama: (k.nama || "").trim(),
-        nik: k.nik ? k.nik.trim() : "-",
-        shift: k.shift || s
-      }));
-      sheetData = sheetData.concat(list);
-    }
-
-    document.getElementById("statusText").textContent =
-      sheetData.length ? `✅ Data ditemukan: ${sheetData.length} orang (Shift ${shifts.join(" / ")})`
-                       : "⚠️ Tidak ada data ditemukan.";
-    document.getElementById("generateBtn").disabled = !sheetData.length;
-
+    const shift = (document.getElementById("shiftInput").value || "").trim();
+    const csvName = document.getElementById("csvFile").files[0]?.name || "tanpa_nama.csv";
+    const area = document.querySelector("#resultArea");
+    // scale 1.5 dan quality 0.7 untuk mengurangi ukuran base64
+    const canvas = await html2canvas(area, { scale: 1.5 });
+    canvas.toBlob((blob) => {
+      if (blob) {
+        simpanLogCO(shift, csvName, blob);
+      }
+    }, "image/jpeg", 0.7);
   } catch (err) {
-    console.error("Error ambil jadwal:", err);
-    document.getElementById("statusText").textContent = "Gagal memanggil API: " + err.message;
+    console.error("Gagal membuat/unggah JPEG:", err);
+    document.getElementById("statusText").textContent = "⚠️ Gagal membuat/unggah JPEG: " + err.message;
   }
 });
 
-// ======== UPLOAD CSV ========
-document.getElementById("csvFile").addEventListener("change",(e)=>{
-  const file=e.target.files[0];
-  if(!file)return;
-  Papa.parse(file,{header:true,delimiter:";",skipEmptyLines:true,complete:(res)=>{
-    csvData=res.data;
-    document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
-  }});
-});
-
-// ======== GENERATE TABEL ========
-document.getElementById("generateBtn").addEventListener("click", async()=>{
-  if(!sheetData.length) return alert("Ambil nama dari GSheet dulu.");
-  if(!csvData.length) return alert("Upload file CSV dulu.");
-
-  const tbody=document.querySelector("#resultTable tbody");
-  tbody.innerHTML="";
-  sheetData.forEach((k,i)=>{
-    const tr=document.createElement("tr");
-    tr.innerHTML=`<td>${i+1}</td><td>${k.nama}</td><td>${k.shift}</td>
-      <td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>`;
-    tbody.appendChild(tr);
-  });
-
-  document.getElementById("statusText").textContent="✅ Tabel berhasil dibuat.";
-
-  // Simpan JPEG + log
-  const shift = document.getElementById("shiftInput").value.trim();
-  const csvName = document.getElementById("csvFile").files[0]?.name || "tanpa_nama.csv";
+/* =========== Download manual ========= */
+document.getElementById("downloadBtn").addEventListener("click", async () => {
   const area = document.querySelector("#resultArea");
-  const canvas = await html2canvas(area, {scale:2});
-  canvas.toBlob(blob=>{
-    if(blob) simpanLogCO(shift, csvName, blob);
-  }, "image/jpeg", 0.9);
-});
-
-// ======== DOWNLOAD JPG MANUAL ========
-document.getElementById("downloadBtn").addEventListener("click",async()=>{
-  const area=document.querySelector("#resultArea");
-  const canvas=await html2canvas(area,{scale:2});
-  const link=document.createElement("a");
-  link.download="Laporan_Index_Shift.jpg";
-  link.href=canvas.toDataURL("image/jpeg");
+  const canvas = await html2canvas(area, { scale: 2 });
+  const link = document.createElement("a");
+  link.download = "Laporan_Index_Shift.jpg";
+  link.href = canvas.toDataURL("image/jpeg");
   link.click();
 });
 </script>
