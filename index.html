@@ -9,53 +9,15 @@
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   
   <style>
-  body {
-    background: #f6f7fb;
-    padding: 20px;
-  }
-
-  .container {
-    max-width: 1100px;
-    background: white;
-    border-radius: 10px;
-    padding: 25px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-  }
-
-  table {
-    font-size: 15px;
-  }
-
-  /* === Header tabel biru muda lembut, teks hitam bold === */
-  #resultTable thead {
-    background-color: #e3f2fd; /* biru muda soft */
-  }
-
-  #resultTable th {
-    color: #000; /* teks hitam */
-    text-align: center;
-    font-weight: 700; /* tebal */
-    padding: 10px 8px;
-    border-bottom: 2px solid #bbdefb;
-    cursor: pointer;
-    transition: background 0.2s ease;
-  }
-
-  #resultTable th:hover {
-    background-color: #bbdefb; /* efek hover sedikit lebih biru */
-  }
-
-  #resultTable td {
-    text-align: center;
-    vertical-align: middle;
-  }
-
-  /* Warna highlight untuk baris lewat SLA */
-  .bg-danger-subtle, .table-danger {
-    background-color: #ffeaea !important;
-  }
-</style>
-
+  body { background: #f6f7fb; padding: 20px; }
+  .container { max-width: 1100px; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+  table { font-size: 15px; }
+  #resultTable thead { background-color: #e3f2fd; }
+  #resultTable th { color: #000; text-align:center; font-weight:700; padding:10px 8px; border-bottom:2px solid #bbdefb; cursor:pointer; transition: background 0.2s ease; }
+  #resultTable th:hover { background-color: #bbdefb; }
+  #resultTable td { text-align:center; vertical-align: middle; }
+  .table-danger { background-color: #ffeaea !important; }
+  </style>
 </head>
 <body>
   <div class="container">
@@ -65,7 +27,13 @@
     <div class="mb-3 row">
       <div class="col-md-2">
         <label class="form-label">Shift</label>
-        <input type="text" id="shiftInput" class="form-control" maxlength="2" placeholder="M / P / S" />
+        <select id="shiftInput" class="form-control">
+          <option value="">-- Pilih Shift --</option>
+          <option value="M">M (Hari H)</option>
+          <option value="M-1">M-1 (Hari H-1)</option>
+          <option value="P">P</option>
+          <option value="S">S</option>
+        </select>
       </div>
       <div class="col-md-4">
         <label class="form-label">&nbsp;</label><br />
@@ -186,12 +154,14 @@ function ambilJamDariTanggal(s){
 // ==== Ambil data dari GSheet ====
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
-  if (!shiftInput) return alert("Masukkan shift (M, P, atau S)");
+  if (!shiftInput) return alert("Pilih shift terlebih dahulu.");
   document.getElementById("statusText").textContent = "Mengambil data dari Google Sheet...";
 
   try {
     let shifts = [shiftInput];
+    // Jika P, ambil P + P1
     if (shiftInput === "P") shifts = ["P", "P1"];
+    if (shiftInput === "M-1") shifts = ["M-1"]; // otomatis GAS sudah handle mundur 1 hari
 
     sheetData = [];
     for (const s of shifts) {
@@ -200,7 +170,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
       const karyawanList = (data.karyawan || []).map(k => ({
         nama: (k.nama || "").trim(),
         nik: (k.nik || "").trim(),
-        shift: s
+        shift: data.shift // gunakan label shift dari GAS (misal "M H-1")
       }));
       sheetData = sheetData.concat(karyawanList);
     }
@@ -214,6 +184,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     document.getElementById("statusText").textContent = "Gagal memanggil API: " + err.message;
   }
 });
+
 
 // ==== Upload CSV ====
 document.getElementById("csvFile").addEventListener("change",(e)=>{
@@ -355,4 +326,5 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
