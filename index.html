@@ -62,17 +62,17 @@
     <h4><b>Laporan Index Shift</b></h4>
     <p>Input shift → Ambil nama dari GSheet → Upload CSV dari WEB CO → Generate Tabel.</p>
 
-  <div class="mb-3 row">
-      <div class="col-md-2">
-        <label class="form-label">Shift</label>
-        <!-- Dropdown Shift -->
-        <select id="shiftInput" class="form-select">
-          <option value="">Pilih Shift</option>
-          <option value="M">M (Malam)</option>
-          <option value="S">S (Siang)</option>
-          <option value="P">P (Pagi)</option>
-        </select>
-      </div>
+ <div class="mb-3 row">
+      <div class="col-md-2">
+        <label class="form-label">Shift</label>
+                <select id="shiftInput" class="form-select">
+          <option value="">Pilih Shift</option>
+          <option value="M_LAPORAN">M (H-1)</option> 
+          <option value="M_HARI_H">M (H)</option> 
+          <option value="S">S (Siang)</option>
+          <option value="P">P (Pagi)</option>
+        </select>
+      </div>
       <div class="col-md-4">
         <label class="form-label">&nbsp;</label><br />
         <button id="ambilNamaBtn" class="btn btn-primary">Ambil Nama dari GSheet Jadwal</button>
@@ -183,41 +183,60 @@ function similarity(a,b){
 }
 
 function ambilJamDariTanggal(s){
-  if(!s)return "-";
-  const m=s.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
-  return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-";
+  if(!s)return "-";
+  const m=s.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
+  return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-";
 }
 
-// ==== Ambil data dari GSheet ====
+// ==== Ambil data dari GSheet (REVISI) ====
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
-  const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
-  if (!shiftInput) return alert("Masukkan shift (M, P, atau S)");
-  document.getElementById("statusText").textContent = "Mengambil data dari Google Sheet...";
+  const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
+  if (!shiftInput) return alert("Masukkan shift (M, P, S, M_LAPORAN, atau M_HARI_H)");
+  document.getElementById("statusText").textContent = "Mengambil data dari Google Sheet...";
 
-  try {
-    let shifts = [shiftInput];
-    if (shiftInput === "P") shifts = ["P", "P1"];
-
-    sheetData = [];
-    for (const s of shifts) {
-      const res = await fetch(`${GAS_URL}?shift=${s}`);
-      const data = await res.json();
-      const karyawanList = (data.karyawan || []).map(k => ({
-        nama: (k.nama || "").trim(),
-        nik: (k.nik || "").trim(),
-        shift: s
-      }));
-      sheetData = sheetData.concat(karyawanList);
+  try {
+    let shifts = [shiftInput];
+    // Logika Pengecualian Shift
+    if (shiftInput === "P") {
+      shifts = ["P", "P1"];
+    } else if (shiftInput === "M") {
+       // Mengatasi M lama, alihkan ke M_LAPORAN
+       shifts = ["M_LAPORAN"];
     }
 
-    document.getElementById("statusText").textContent =
-      sheetData.length ? `✅ Data ditemukan: ${sheetData.length} orang (Shift ${shifts.join(" / ")})`
-                       : "⚠️ Tidak ada data karyawan ditemukan.";
-    document.getElementById("generateBtn").disabled = !sheetData.length;
+    // Dapatkan tanggal hari ini dalam format YYYY-MM-DD
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const tanggalHariIni = `${yyyy}-${mm}-${dd}`;
 
-  } catch (err) {
-    document.getElementById("statusText").textContent = "Gagal memanggil API: " + err.message;
-  }
+    sheetData = [];
+    for (const s of shifts) {
+      // KUNCI REVISI: Kirim parameter tanggal dan shift yang benar
+      const res = await fetch(`${GAS_URL}?shift=${s}&tanggal=${tanggalHariIni}`);
+      const data = await res.json();
+      
+      // Ambil shiftLabel dari respon GAS untuk ditampilkan
+      const shiftLabel = data.shift || s; 
+      
+      const karyawanList = (data.karyawan || []).map(k => ({
+        nama: (k.nama || "").trim(),
+        nik: (k.nik || "").trim(),
+        // Gunakan shift yang dikirim dari GAS (sudah ada H-1/HARI H)
+        shift: k.shift || shiftLabel 
+      }));
+      sheetData = sheetData.concat(karyawanList);
+    }
+
+    document.getElementById("statusText").textContent =
+      sheetData.length ? `✅ Data ditemukan: ${sheetData.length} orang (Shift ${shiftInput} dari GSheet)`
+                       : "⚠️ Tidak ada data karyawan ditemukan.";
+    document.getElementById("generateBtn").disabled = !sheetData.length;
+
+  } catch (err) {
+    document.getElementById("statusText").textContent = "Gagal memanggil API: " + err.message;
+  }
 });
 
 // ==== Upload CSV ====
@@ -360,4 +379,5 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
