@@ -50,20 +50,22 @@
     vertical-align: middle;
   }
 
+  /* Warna highlight untuk baris lewat SLA */
   .bg-danger-subtle, .table-danger {
     background-color: #ffeaea !important;
   }
-  </style>
-</head>
+</style>
 
+</head>
 <body>
   <div class="container">
     <h4><b>Laporan Index Shift</b></h4>
     <p>Input shift → Ambil nama dari GSheet → Upload CSV dari WEB CO → Generate Tabel.</p>
 
-    <div class="mb-3 row">
+  <div class="mb-3 row">
       <div class="col-md-2">
         <label class="form-label">Shift</label>
+        <!-- Dropdown Shift -->
         <select id="shiftInput" class="form-select">
           <option value="">Pilih Shift</option>
           <option value="M">M (Malam)</option>
@@ -119,12 +121,13 @@
   </div>
 
 <script>
-const GAS_URL = "https://script.google.com/macros/s/AKfycbyQtiuz7f5Qn3Bzp0DV3OC8y9Z2ixE7od2lN3LmMulyrm2LCJYXc7kUNyo29BV8RWMgBQ/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbyoPTlFn5NSBWlDLAT5tvfui9ZKe-l1-INlSmjZ9wWTD3bva3XiP1xp9R2i7K5eTPHqIg/exec";
 
 let sheetData = [];
 let csvData = [];
 let lastResults = [];
 
+// Status sort default
 let sortAscNama = true;
 let sortAscLastCO = false;
 let sortAscIndexCO = false;
@@ -136,6 +139,7 @@ let sortAscRelasiResolved = false;
 document.getElementById("tanggalCek").textContent =
   new Date().toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
 
+// ==== Fungsi bantu ====
 function normKey(s){ return (s||"").toString().toLowerCase().replace(/[^a-z0-9]/g,''); }
 function normalizeName(s){ return (s||"").toString().toLowerCase().replace(/\s+/g,' ').replace(/[^\w\s]/g,'').trim(); }
 
@@ -194,39 +198,25 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     let shifts = [shiftInput];
     if (shiftInput === "P") shifts = ["P", "P1"];
 
-    const today = new Date();
-    const tanggal = today.toISOString().split("T")[0];
-
     sheetData = [];
     for (const s of shifts) {
-      const url = `${GAS_URL}?shift=${encodeURIComponent(s)}&tanggal=${encodeURIComponent(tanggal)}`;
-      const res = await fetch(url);
+      const res = await fetch(`${GAS_URL}?shift=${s}`);
       const data = await res.json();
-
-      if (data.error) throw new Error(data.error);
-
       const karyawanList = (data.karyawan || []).map(k => ({
-        nama: String(k.nama || "").trim(),
-        nik: String(k.nik || "").trim(),
+        nama: (k.nama || "").trim(),
+        nik: (k.nik || "").trim(),
         shift: s
       }));
-
       sheetData = sheetData.concat(karyawanList);
     }
 
-    // 🔥 Filter unik berdasarkan NIK
-    sheetData = sheetData.filter(
-      (obj, index, self) =>
-        index === self.findIndex((t) => t.nik === obj.nik)
-    );
-
-    document.getElementById("statusText").textContent = `✅ ${sheetData.length} nama berhasil diambil dari GSheet.`;
-    document.getElementById("generateBtn").disabled = false;
+    document.getElementById("statusText").textContent =
+      sheetData.length ? `✅ Data ditemukan: ${sheetData.length} orang (Shift ${shifts.join(" / ")})`
+                       : "⚠️ Tidak ada data karyawan ditemukan.";
+    document.getElementById("generateBtn").disabled = !sheetData.length;
 
   } catch (err) {
-    console.error(err);
-    alert("❌ Gagal memanggil API: " + err.message);
-    document.getElementById("statusText").textContent = "❌ Gagal mengambil data dari GSheet.";
+    document.getElementById("statusText").textContent = "Gagal memanggil API: " + err.message;
   }
 });
 
@@ -297,6 +287,7 @@ function renderTable(results){
   results.forEach((item,index)=>{
     const {k,res}=item;
     const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
+
     const highlightClass = res.slaCount > 0 ? "table-danger" : "";
     const tr=document.createElement("tr");
     tr.className = highlightClass;
@@ -314,7 +305,7 @@ function renderTable(results){
   });
 }
 
-// ==== Generate tabel ====
+// ==== Generate tabel utama ====
 document.getElementById("generateBtn").addEventListener("click",()=>{
   if(!sheetData.length)return alert("Ambil nama dari GSheet dulu.");
   if(!csvData.length)return alert("Upload file CSV dulu.");
@@ -324,7 +315,7 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 });
 
-// ==== Sorting ====
+// ==== Sort ====
 function sortColumn(key){
   if(!lastResults.length) return alert("Belum ada data tabel.");
   let asc, valFunc;
@@ -369,4 +360,3 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
-
