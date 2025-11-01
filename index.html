@@ -188,7 +188,7 @@ function ambilJamDariTanggal(s){
   return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-";
 }
 
-// ==== Ambil data dari GSheet ====
+<!-- ==== Ambil data dari GSheet ==== -->
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
   if (!shiftInput) return alert("Masukkan shift (M, P, atau S)");
@@ -198,10 +198,18 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     let shifts = [shiftInput];
     if (shiftInput === "P") shifts = ["P", "P1"];
 
+    // Ambil tanggal hari ini (format yyyy-MM-dd)
+    const today = new Date();
+    const tanggal = today.toISOString().split("T")[0];
+
     sheetData = [];
     for (const s of shifts) {
-      const res = await fetch(`${GAS_URL}?shift=${s}`);
+      const url = `${GAS_URL}?shift=${encodeURIComponent(s)}&tanggal=${encodeURIComponent(tanggal)}`;
+      const res = await fetch(url);
       const data = await res.json();
+
+      if (data.error) throw new Error(data.error);
+
       const karyawanList = (data.karyawan || []).map(k => ({
         nama: (k.nama || "").trim(),
         nik: (k.nik || "").trim(),
@@ -211,14 +219,16 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     }
 
     document.getElementById("statusText").textContent =
-      sheetData.length ? `✅ Data ditemukan: ${sheetData.length} orang (Shift ${shifts.join(" / ")})`
-                       : "⚠️ Tidak ada data karyawan ditemukan.";
+      sheetData.length
+        ? `✅ Data ditemukan: ${sheetData.length} orang (Shift ${shifts.join(" / ")})`
+        : "⚠️ Tidak ada data karyawan ditemukan.";
     document.getElementById("generateBtn").disabled = !sheetData.length;
 
   } catch (err) {
-    document.getElementById("statusText").textContent = "Gagal memanggil API: " + err.message;
+    document.getElementById("statusText").textContent = "❌ Gagal memanggil API: " + err.message;
   }
 });
+
 
 // ==== Upload CSV ====
 document.getElementById("csvFile").addEventListener("change",(e)=>{
@@ -360,5 +370,6 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
 
