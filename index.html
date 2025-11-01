@@ -203,7 +203,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     const tanggal = today.toISOString().split("T")[0];
 
     sheetData = [];
-   for (const s of shifts) {
+  for (const s of shifts) {
   const url = `${GAS_URL}?shift=${encodeURIComponent(s)}&tanggal=${encodeURIComponent(tanggal)}`;
   const res = await fetch(url);
   const data = await res.json();
@@ -215,20 +215,16 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     nik: String(k.nik || "").trim(),
     shift: s
   }));
+
   sheetData = sheetData.concat(karyawanList);
 }
 
+// 🔥 Filter unik berdasarkan NIK (hindari data dobel)
+sheetData = sheetData.filter(
+  (obj, index, self) =>
+    index === self.findIndex((t) => t.nik === obj.nik)
+);
 
-    document.getElementById("statusText").textContent =
-      sheetData.length
-        ? `✅ Data ditemukan: ${sheetData.length} orang (Shift ${shifts.join(" / ")})`
-        : "⚠️ Tidak ada data karyawan ditemukan.";
-    document.getElementById("generateBtn").disabled = !sheetData.length;
-
-  } catch (err) {
-    document.getElementById("statusText").textContent = "❌ Gagal memanggil API: " + err.message;
-  }
-});
 
 
 // ==== Upload CSV ====
@@ -371,6 +367,7 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
 
 
