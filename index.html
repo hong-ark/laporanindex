@@ -198,24 +198,21 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     const tanggal = today.toISOString().split("T")[0];
 
     sheetData = [];
-const nikSet = new Set(); // untuk mencegah duplikat NIK
+    for (const s of shifts) {
+      const url = `${GAS_URL}?shift=${encodeURIComponent(s)}&tanggal=${encodeURIComponent(tanggal)}`;
+      const res = await fetch(url);
+      const data = await res.json();
 
-for (const s of shifts) {
-  const res = await fetch(`${GAS_URL}?shift=${s}`);
-  const data = await res.json();
+      if (data.error) throw new Error(data.error);
 
-  for (const k of (data.karyawan || [])) {
-    const nik = (k.nik || "").trim();
-    if (nik && !nikSet.has(nik)) { // hanya masukkan kalau belum pernah ada
-      sheetData.push({
-        nama: (k.nama || "").trim(),
-        nik,
+      const karyawanList = (data.karyawan || []).map(k => ({
+        nama: String(k.nama || "").trim(),
+        nik: String(k.nik || "").trim(),
         shift: s
-      });
-      nikSet.add(nik);
+      }));
+
+      sheetData = sheetData.concat(karyawanList);
     }
-  }
-}
 
     // 🔥 Filter unik berdasarkan NIK
     sheetData = sheetData.filter(
@@ -372,5 +369,3 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
-
-
