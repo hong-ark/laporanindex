@@ -142,35 +142,24 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   document.getElementById("statusText").textContent = "Mengambil data dari Google Sheet...";
 
   try {
-    let shifts = [shiftInput];
-    if (shiftInput === "P") shifts = ["P", "P1"];
-
     const today = new Date();
     const tanggal = today.toISOString().split("T")[0];
 
-    sheetData = [];
+    const url = `${GAS_URL}?shift=${encodeURIComponent(shiftInput)}&tanggal=${encodeURIComponent(tanggal)}`;
+    const res = await fetch(url);
+    const data = await res.json();
 
-    for (const s of shifts) {
-      const url = `${GAS_URL}?shift=${encodeURIComponent(s)}&tanggal=${encodeURIComponent(tanggal)}`;
-      const res = await fetch(url);
-      const data = await res.json();
+    if (data.error) throw new Error(data.error);
 
-      if (data.error) throw new Error(data.error);
+    sheetData = (data.karyawan || []).map(k => ({
+      nama: String(k.nama || "").trim(),
+      nik: String(k.nik || "").trim(),
+      shift: k.shift || shiftInput   // gunakan shift asli dari GAS
+    }));
 
-      // Ambil shift dari API (pastikan GAS mengembalikan k.shift)
-      const karyawanList = (data.karyawan || []).map(k => ({
-        nama: String(k.nama || "").trim(),
-        nik: String(k.nik || "").trim(),
-        shift: k.shift || s   // gunakan shift dari API jika ada
-      }));
-
-      sheetData = sheetData.concat(karyawanList);
-    }
-
-    // Filter unik berdasarkan NIK + Shift
+    // Filter unik berdasarkan NIK
     sheetData = sheetData.filter(
-      (obj, index, self) =>
-        index === self.findIndex((t) => t.nik === obj.nik && t.shift === obj.shift)
+      (obj, index, self) => index === self.findIndex((t) => t.nik === obj.nik)
     );
 
     document.getElementById("statusText").textContent = `✅ ${sheetData.length} nama berhasil diambil dari GSheet.`;
@@ -182,7 +171,6 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     document.getElementById("statusText").textContent = "❌ Gagal mengambil data dari GSheet.";
   }
 });
-
 // ==== Upload CSV ====
 document.getElementById("csvFile").addEventListener("change",(e)=>{
   const file=e.target.files[0];
@@ -282,3 +270,4 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
