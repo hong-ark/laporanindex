@@ -214,11 +214,12 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
       sheetData = sheetData.concat(karyawanList);
     }
 
-    // 🔥 Filter unik berdasarkan NIK
-    sheetData = sheetData.filter(
-      (obj, index, self) =>
-        index === self.findIndex((t) => t.nik === obj.nik)
-    );
+       // Filter unik berdasarkan kombinasi NIK + SHIFT agar P dan P1 tetap tampil
+sheetData = sheetData.filter(
+  (obj, index, self) =>
+    index === self.findIndex((t) => t.nik === obj.nik && t.shift === obj.shift)
+);
+
 
     document.getElementById("statusText").textContent = `✅ ${sheetData.length} nama berhasil diambil dari GSheet.`;
     document.getElementById("generateBtn").disabled = false;
@@ -369,3 +370,4 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
