@@ -184,7 +184,7 @@ function ambilJamDariTanggal(s){
   return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-";
 }
 
-// ==== Ambil data dari GSheet ====
+// ==== Ambil data dari GSheet (fix P/P1) ====
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
   if (!shiftInput) return alert("Masukkan shift (M, P, atau S)");
@@ -198,6 +198,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     const tanggal = today.toISOString().split("T")[0];
 
     sheetData = [];
+
     for (const s of shifts) {
       const url = `${GAS_URL}?shift=${encodeURIComponent(s)}&tanggal=${encodeURIComponent(tanggal)}`;
       const res = await fetch(url);
@@ -205,19 +206,20 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
 
       if (data.error) throw new Error(data.error);
 
+      // Ambil shift asli dari API jika tersedia, jangan pakai s secara langsung
       const karyawanList = (data.karyawan || []).map(k => ({
         nama: String(k.nama || "").trim(),
         nik: String(k.nik || "").trim(),
-        shift: s
+        shift: k.shift || s   // gunakan shift dari GSheet, kalau kosong pakai s
       }));
 
       sheetData = sheetData.concat(karyawanList);
     }
 
-    // 🔥 Filter unik berdasarkan NIK
+    // Filter unik berdasarkan NIK + Shift, supaya P dan P1 tidak hilang
     sheetData = sheetData.filter(
       (obj, index, self) =>
-        index === self.findIndex((t) => t.nik === obj.nik)
+        index === self.findIndex((t) => t.nik === obj.nik && t.shift === obj.shift)
     );
 
     document.getElementById("statusText").textContent = `✅ ${sheetData.length} nama berhasil diambil dari GSheet.`;
@@ -229,7 +231,6 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     document.getElementById("statusText").textContent = "❌ Gagal mengambil data dari GSheet.";
   }
 });
-
 // ==== Upload CSV ====
 document.getElementById("csvFile").addEventListener("change",(e)=>{
   const file=e.target.files[0];
@@ -369,3 +370,4 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
