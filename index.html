@@ -198,21 +198,24 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     const tanggal = today.toISOString().split("T")[0];
 
     sheetData = [];
-    for (const s of shifts) {
-      const url = `${GAS_URL}?shift=${encodeURIComponent(s)}&tanggal=${encodeURIComponent(tanggal)}`;
-      const res = await fetch(url);
-      const data = await res.json();
+const nikSet = new Set(); // untuk mencegah duplikat NIK
 
-      if (data.error) throw new Error(data.error);
+for (const s of shifts) {
+  const res = await fetch(`${GAS_URL}?shift=${s}`);
+  const data = await res.json();
 
-      const karyawanList = (data.karyawan || []).map(k => ({
-  nama: String(k.nama || "").trim(),
-  nik: String(k.nik || "").trim(),
-  shift: k.shift || s  // prioritaskan shift asli dari data API
-}));
-
-      sheetData = sheetData.concat(karyawanList);
+  for (const k of (data.karyawan || [])) {
+    const nik = (k.nik || "").trim();
+    if (nik && !nikSet.has(nik)) { // hanya masukkan kalau belum pernah ada
+      sheetData.push({
+        nama: (k.nama || "").trim(),
+        nik,
+        shift: s
+      });
+      nikSet.add(nik);
     }
+  }
+}
 
     // 🔥 Filter unik berdasarkan NIK
     sheetData = sheetData.filter(
@@ -369,4 +372,5 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
