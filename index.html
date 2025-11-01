@@ -216,17 +216,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
 
     // 🔥 Filter unik berdasarkan NIK
     // 🔥 Filter unik berdasarkan NIK — prioritaskan P1 jika duplikat
-const uniqueMap = new Map();
-for (const k of sheetData) {
-  const existing = uniqueMap.get(k.nik);
-  if (!existing) {
-    uniqueMap.set(k.nik, k);
-  } else {
-    // Jika sudah ada tapi yang baru shift-nya P1, timpa
-    if (k.shift === "P1") uniqueMap.set(k.nik, k);
-  }
-}
-sheetData = Array.from(uniqueMap.values());
+
     document.getElementById("statusText").textContent = `✅ ${sheetData.length} nama berhasil diambil dari GSheet.`;
     document.getElementById("generateBtn").disabled = false;
 
@@ -376,4 +366,5 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
