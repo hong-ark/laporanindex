@@ -89,53 +89,53 @@ let csvData = [];
 let lastResults = [];
 
 document.getElementById("tanggalCek").textContent =
-  new Date().toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
+  new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
 
-function normKey(s){ return (s||"").toString().toLowerCase().replace(/[^a-z0-9]/g,''); }
-function normalizeName(s){ return (s||"").toString().toLowerCase().replace(/\s+/g,' ').replace(/[^\w\s]/g,'').trim(); }
-function durasiKeDetik(v){
+function normKey(s) { return (s || "").toString().toLowerCase().replace(/[^a-z0-9]/g, ''); }
+function normalizeName(s) { return (s || "").toString().toLowerCase().replace(/\s+/g, ' ').replace(/[^\w\s]/g, '').trim(); }
+function durasiKeDetik(v) {
   if (!v) return 0;
   const s = v.toString().trim();
   const m1 = s.match(/(\d+)\s*d\s*(\d{1,2}):(\d{2}):(\d{2})$/i);
-  if (m1) return (+m1[1])*86400 + (+m1[2])*3600 + (+m1[3])*60 + (+m1[4]);
+  if (m1) return (+m1[1]) * 86400 + (+m1[2]) * 3600 + (+m1[3]) * 60 + (+m1[4]);
   const m2 = s.match(/(\d{1,2}):(\d{2}):(\d{2})$/);
-  if (m2) return (+m2[1])*3600 + (+m2[2])*60 + (+m2[3]);
+  if (m2) return (+m2[1]) * 3600 + (+m2[2]) * 60 + (+m2[3]);
   return 0;
 }
-function normalizeStatus(s){
+function normalizeStatus(s) {
   if (!s && s !== 0) return "";
-  return String(s).replace(/\u00A0/g,' ').replace(/[_\-]/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
+  return String(s).replace(/\u00A0/g, ' ').replace(/[_\-]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
 }
-function isAcceptedStatus(norm){ 
+function isAcceptedStatus(norm) {
   return norm.includes("resolved") || norm.includes("closed") ||
-         norm.includes("in progress") || norm.includes("inprogress") ||
-         norm.includes("pending"); 
+    norm.includes("in progress") || norm.includes("inprogress") ||
+    norm.includes("pending");
 }
-function levenshtein(a,b){
-  a=a||""; b=b||"";
-  const al=a.length, bl=b.length;
-  if(!al)return bl; if(!bl)return al;
-  const dp=Array.from({length:al+1},()=>new Array(bl+1).fill(0));
-  for(let i=0;i<=al;i++)dp[i][0]=i;
-  for(let j=0;j<=bl;j++)dp[0][j]=j;
-  for(let i=1;i<=al;i++)
-    for(let j=1;j<=bl;j++)
-      dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+function levenshtein(a, b) {
+  a = a || ""; b = b || "";
+  const al = a.length, bl = b.length;
+  if (!al) return bl; if (!bl) return al;
+  const dp = Array.from({ length: al + 1 }, () => new Array(bl + 1).fill(0));
+  for (let i = 0; i <= al; i++) dp[i][0] = i;
+  for (let j = 0; j <= bl; j++) dp[0][j] = j;
+  for (let i = 1; i <= al; i++)
+    for (let j = 1; j <= bl; j++)
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
   return dp[al][bl];
 }
-function similarity(a,b){
-  a=normalizeName(a); b=normalizeName(b);
-  if(!a||!b)return 0;
-  const d=levenshtein(a,b);
-  return 1 - d/Math.max(a.length,b.length);
+function similarity(a, b) {
+  a = normalizeName(a); b = normalizeName(b);
+  if (!a || !b) return 0;
+  const d = levenshtein(a, b);
+  return 1 - d / Math.max(a.length, b.length);
 }
-function ambilJamDariTanggal(s){
-  if(!s)return "-";
-  const m=s.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
-  return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-";
+function ambilJamDariTanggal(s) {
+  if (!s) return "-";
+  const m = s.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
+  return m ? `${m[1].padStart(2, '0')}:${m[2]}` : "-";
 }
 
-// ==== Ambil data dari GSheet (fix P/P1) ====
+// ==== Ambil data dari GSheet ====
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
   if (!shiftInput) return alert("Masukkan shift (M, P, atau S)");
@@ -144,20 +144,19 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   try {
     const today = new Date();
     const tanggal = today.toISOString().split("T")[0];
-
     const url = `${GAS_URL}?shift=${encodeURIComponent(shiftInput)}&tanggal=${encodeURIComponent(tanggal)}`;
     const res = await fetch(url);
     const data = await res.json();
-
     if (data.error) throw new Error(data.error);
 
+    // ✅ Pastikan shift tampil benar (P1, P2, P, M1, dst)
     sheetData = (data.karyawan || []).map(k => ({
       nama: String(k.nama || "").trim(),
       nik: String(k.nik || "").trim(),
-      shift: k.shift || shiftInput   // gunakan shift asli dari GAS
+      shift: (k.shift && k.shift.trim()) || shiftInput
     }));
 
-    // Filter unik berdasarkan NIK
+    // Hapus duplikat berdasarkan NIK
     sheetData = sheetData.filter(
       (obj, index, self) => index === self.findIndex((t) => t.nik === obj.nik)
     );
@@ -171,103 +170,117 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     document.getElementById("statusText").textContent = "❌ Gagal mengambil data dari GSheet.";
   }
 });
+
 // ==== Upload CSV ====
-document.getElementById("csvFile").addEventListener("change",(e)=>{
-  const file=e.target.files[0];
-  if(!file)return;
-  Papa.parse(file,{
-    header:true,
-    delimiter:";",
-    skipEmptyLines:true,
-    complete:(res)=>{
-      const headerMap={};
-      (res.meta.fields||[]).forEach(f=>headerMap[normKey(f)]=f);
-      const getCol=(row,arr)=>{ for(const c of arr){ const k=headerMap[c]; if(k&&row[k]) return row[k].toString(); } return ""; };
-      csvData=res.data.map(r=>{
-        const nikRaw=(getCol(r,['nikpengambil','nik'])).replace(/\D/g,'').trim();
-        const diambilOleh=getCol(r,['diambiloleh','diambil oleh']);
-        const durasiRaw=getCol(r,['durasikomplain','durasi']);
-        const waktuSlaRaw=getCol(r,['waktusla','waktu sla']);
-        const statusRaw=getCol(r,['statuskomplain','status']);
-        const statusSlaRaw=getCol(r,['statussla','status sla']);
-        const tglDiambilRaw=getCol(r,['tanggaldiambil','tgl diambil','tanggal diambil']);
-        const slaNum=parseFloat((waktuSlaRaw||"").replace(",","."))||0;
-        return{
-          nik:nikRaw,
+document.getElementById("csvFile").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  Papa.parse(file, {
+    header: true,
+    delimiter: ";",
+    skipEmptyLines: true,
+    complete: (res) => {
+      const headerMap = {};
+      (res.meta.fields || []).forEach(f => headerMap[normKey(f)] = f);
+      const getCol = (row, arr) => { for (const c of arr) { const k = headerMap[c]; if (k && row[k]) return row[k].toString(); } return ""; };
+      csvData = res.data.map(r => {
+        const nikRaw = (getCol(r, ['nikpengambil', 'nik'])).replace(/\D/g, '').trim();
+        const diambilOleh = getCol(r, ['diambiloleh', 'diambil oleh']);
+        const durasiRaw = getCol(r, ['durasikomplain', 'durasi']);
+        const waktuSlaRaw = getCol(r, ['waktusla', 'waktu sla']);
+        const statusRaw = getCol(r, ['statuskomplain', 'status']);
+        const statusSlaRaw = getCol(r, ['statussla', 'status sla']);
+        const tglDiambilRaw = getCol(r, ['tanggaldiambil', 'tgl diambil', 'tanggal diambil']);
+        const slaNum = parseFloat((waktuSlaRaw || "").replace(",", ".")) || 0;
+        return {
+          nik: nikRaw,
           diambilOleh,
           durasiRaw,
-          durasiDetik:durasiKeDetik(durasiRaw),
-          waktuSlaDetik:slaNum*3600,
-          status:statusRaw,
-          statusNorm:normalizeStatus(statusRaw),
-          statusSLA:statusSlaRaw,
-          tanggalDiambil:tglDiambilRaw
+          durasiDetik: durasiKeDetik(durasiRaw),
+          waktuSlaDetik: slaNum * 3600,
+          status: statusRaw,
+          statusNorm: normalizeStatus(statusRaw),
+          statusSLA: statusSlaRaw,
+          tanggalDiambil: tglDiambilRaw
         };
       });
-      document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
+      document.getElementById("statusText").textContent = `File CSV terbaca: ${csvData.length} baris.`;
     }
   });
 });
 
-// ==== Perhitungan & Render Tabel ====
-function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik/r.waktuSlaDetik : 0; }
-function rataRata_byName(nama,thr=0.85){
-  const matches=[];
-  for(const r of csvData){
-    if(!isAcceptedStatus(r.statusNorm))continue;
-    if(similarity(nama,r.diambilOleh)>=thr)matches.push(r);
+// ==== Perhitungan & Render ====
+function computeC(r) { return r.waktuSlaDetik > 0 ? r.durasiDetik / r.waktuSlaDetik : 0; }
+
+function rataRata_byName(nama, thr = 0.85) {
+  const matches = [];
+  for (const r of csvData) {
+    if (!isAcceptedStatus(r.statusNorm)) continue;
+    if (similarity(nama, r.diambilOleh) >= thr) matches.push(r);
   }
-  if(!matches.length)
-    return { avg:null, count:0, lastTime:"-", slaCount:0, inProgressCount:0, relasiResolved:0 };
-  const sum = matches.reduce((a,b)=>a+computeC(b),0);
-  const latest = matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
-  const slaCount = matches.filter(r=>r.statusSLA && r.statusSLA.toLowerCase().includes("lewat")).length;
-  const inProgressCount = matches.filter(r=>r.statusNorm.includes("inprogress") || r.statusNorm.includes("in progress")).length;
-  const relasiResolved = matches.filter(r=>r.statusNorm.includes("pending")).length;
-  return { avg:sum/matches.length, count:matches.length, lastTime:ambilJamDariTanggal(latest),
-           slaCount, inProgressCount, relasiResolved };
+  if (!matches.length)
+    return { avg: null, count: 0, lastTime: "-", slaCount: 0, inProgressCount: 0, relasiResolved: 0 };
+
+  const sum = matches.reduce((a, b) => a + computeC(b), 0);
+  const latest = matches.map(r => r.tanggalDiambil).filter(Boolean).sort().pop();
+  const slaCount = matches.filter(r => r.statusSLA && r.statusSLA.toLowerCase().includes("lewat")).length;
+  const inProgressCount = matches.filter(r => r.statusNorm.includes("inprogress") || r.statusNorm.includes("in progress")).length;
+  const relasiResolved = matches.filter(r => r.statusNorm.includes("pending")).length;
+
+  return {
+    avg: sum / matches.length,
+    count: matches.length,
+    lastTime: ambilJamDariTanggal(latest),
+    slaCount,
+    inProgressCount,
+    relasiResolved
+  };
 }
-function renderTable(results){
-  const tbody=document.querySelector("#resultTable tbody");
-  tbody.innerHTML="";
-  results.forEach((item,index)=>{
-    const {k,res}=item;
-    const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
+
+function renderTable(results) {
+  const tbody = document.querySelector("#resultTable tbody");
+  tbody.innerHTML = "";
+  results.forEach((item, index) => {
+    const { k, res } = item;
+    const avg = res.avg !== null ? (Math.round(res.avg * 100) / 100).toFixed(2) : "-";
     const highlightClass = res.slaCount > 0 ? "table-danger" : "";
-    const tr=document.createElement("tr");
+    const tr = document.createElement("tr");
     tr.className = highlightClass;
-    tr.innerHTML=`
-      <td>${index+1}</td>
+    tr.innerHTML = `
+      <td>${index + 1}</td>
       <td>${k.nama}</td>
-      <td>${k.shift}</td>
+      <td>${k.shift || "-"}</td>
       <td>${res.lastTime}</td>
       <td>${avg}</td>
-      <td>${res.count||0}</td>
-      <td>${res.slaCount||0}</td>
-      <td>${res.inProgressCount||0}</td>
-      <td>${res.relasiResolved||0}</td>`;
+      <td>${res.count || 0}</td>
+      <td>${res.slaCount || 0}</td>
+      <td>${res.inProgressCount || 0}</td>
+      <td>${res.relasiResolved || 0}</td>`;
     tbody.appendChild(tr);
   });
 }
-document.getElementById("generateBtn").addEventListener("click",()=>{
-  if(!sheetData.length)return alert("Ambil nama dari GSheet dulu.");
-  if(!csvData.length)return alert("Upload file CSV dulu.");
-  const results=sheetData.map(k=>({k,res:rataRata_byName(k.nama)}));
-  lastResults=results;
+
+document.getElementById("generateBtn").addEventListener("click", () => {
+  if (!sheetData.length) return alert("Ambil nama dari GSheet dulu.");
+  if (!csvData.length) return alert("Upload file CSV dulu.");
+  const results = sheetData.map(k => ({ k, res: rataRata_byName(k.nama) }));
+  lastResults = results;
   renderTable(results);
-  document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
+  document.getElementById("statusText").textContent = "✅ Perhitungan selesai.";
 });
 
 // ==== Download JPG ====
-document.getElementById("downloadBtn").addEventListener("click",async()=>{
-  const area=document.querySelector("#resultArea");
-  const canvas=await html2canvas(area,{scale:2});
-  const link=document.createElement("a");
-  link.download="Laporan_Index_Shift.jpg";
-  link.href=canvas.toDataURL("image/jpeg");
+document.getElementById("downloadBtn").addEventListener("click", async () => {
+  const area = document.querySelector("#resultArea");
+  const canvas = await html2canvas(area, { scale: 2 });
+  const link = document.createElement("a");
+  link.download = "Laporan_Index_Shift.jpg";
+  link.href = canvas.toDataURL("image/jpeg");
   link.click();
 });
 </script>
+
 </body>
 </html>
+
 
