@@ -191,28 +191,40 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   document.getElementById("statusText").textContent = "Mengambil data dari Google Sheet...";
 
   try {
-    let shifts = [shiftInput];
-    if (shiftInput === "P") shifts = ["P", "P1"];
+   sheetData = [];
+let shifts = [shiftInput];
+if (shiftInput === "P") shifts = ["P", "P1"];
 
-    const today = new Date();
-    const tanggal = today.toISOString().split("T")[0];
+const today = new Date();
+const tanggal = today.toISOString().split("T")[0];
 
-    sheetData = [];
-    for (const s of shifts) {
-      const url = `${GAS_URL}?shift=${encodeURIComponent(s)}&tanggal=${encodeURIComponent(tanggal)}`;
-      const res = await fetch(url);
-      const data = await res.json();
+for (const s of shifts) {
+  const url = `${GAS_URL}?shift=${encodeURIComponent(s)}&tanggal=${encodeURIComponent(tanggal)}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
 
-      if (data.error) throw new Error(data.error);
+  // kalau data P sudah mengandung P1, lewati loop kedua agar tidak dobel
+  if (s === "P1" && sheetData.some(k => k.shift === "P1")) continue;
 
-      const karyawanList = (data.karyawan || []).map(k => ({
-        nama: String(k.nama || "").trim(),
-        nik: String(k.nik || "").trim(),
-        shift: s
-      }));
+  const karyawanList = (data.karyawan || []).map(k => ({
+    nama: String(k.nama || "").trim(),
+    nik: String(k.nik || "").trim(),
+    shift: s
+  }));
 
-      sheetData = sheetData.concat(karyawanList);
-    }
+  sheetData = sheetData.concat(karyawanList);
+}
+
+// filter unik NIK+SHIFT agar tidak double
+sheetData = sheetData.filter(
+  (obj, index, self) =>
+    index === self.findIndex((t) => t.nik === obj.nik && t.shift === obj.shift)
+);
+
+// urutkan agar P tampil dulu, lalu P1
+sheetData.sort((a, b) => a.shift.localeCompare(b.shift));
+
 
        // Filter unik berdasarkan kombinasi NIK + SHIFT agar P dan P1 tetap tampil
 sheetData = sheetData.filter(
@@ -370,4 +382,5 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
