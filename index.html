@@ -203,20 +203,21 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     const tanggal = today.toISOString().split("T")[0];
 
     sheetData = [];
-    for (const s of shifts) {
-      const url = `${GAS_URL}?shift=${encodeURIComponent(s)}&tanggal=${encodeURIComponent(tanggal)}`;
-      const res = await fetch(url);
-      const data = await res.json();
+   for (const s of shifts) {
+  const url = `${GAS_URL}?shift=${encodeURIComponent(s)}&tanggal=${encodeURIComponent(tanggal)}`;
+  const res = await fetch(url);
+  const data = await res.json();
 
-      if (data.error) throw new Error(data.error);
+  if (data.error) throw new Error(data.error);
 
-      const karyawanList = (data.karyawan || []).map(k => ({
-        nama: (k.nama || "").trim(),
-        nik: (k.nik || "").trim(),
-        shift: s
-      }));
-      sheetData = sheetData.concat(karyawanList);
-    }
+  const karyawanList = (data.karyawan || []).map(k => ({
+    nama: String(k.nama || "").trim(),
+    nik: String(k.nik || "").trim(),
+    shift: s
+  }));
+  sheetData = sheetData.concat(karyawanList);
+}
+
 
     document.getElementById("statusText").textContent =
       sheetData.length
@@ -370,6 +371,7 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
 
 
