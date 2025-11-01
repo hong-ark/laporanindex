@@ -117,24 +117,6 @@
       <button id="downloadBtn" class="btn btn-outline-primary">Download JPG</button>
     </div>
   </div>
-  
-// 🔥 Gabungkan data P dan P1 dalam satu baris per NIK
-const mergedMap = new Map();
-
-for (const k of sheetData) {
-  const key = k.nik;
-  if (!mergedMap.has(key)) {
-    mergedMap.set(key, { ...k, shift: k.shift });
-  } else {
-    const existing = mergedMap.get(key);
-    // Jika shift belum termasuk, tambahkan
-    if (!existing.shift.includes(k.shift)) {
-      existing.shift += `, ${k.shift}`;
-    }
-  }
-}
-
-sheetData = Array.from(mergedMap.values());
 
 <script>
 const GAS_URL = "https://script.google.com/macros/s/AKfycbyQtiuz7f5Qn3Bzp0DV3OC8y9Z2ixE7od2lN3LmMulyrm2LCJYXc7kUNyo29BV8RWMgBQ/exec";
@@ -233,7 +215,10 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     }
 
     // 🔥 Filter unik berdasarkan NIK
-    // 🔥 Filter unik berdasarkan NIK — prioritaskan P1 jika duplikat
+    sheetData = sheetData.filter(
+      (obj, index, self) =>
+        index === self.findIndex((t) => t.nik === obj.nik)
+    );
 
     document.getElementById("statusText").textContent = `✅ ${sheetData.length} nama berhasil diambil dari GSheet.`;
     document.getElementById("generateBtn").disabled = false;
@@ -384,6 +369,3 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
-
-
-
