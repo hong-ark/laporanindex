@@ -4,226 +4,132 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Laporan Index Shift (Index terakhir CO)</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-  body {
-    background: #f6f7fb;
-    padding: 20px;
-  }
-
-  .container {
-    max-width: 1100px;
-    background: white;
-    border-radius: 10px;
-    padding: 25px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-  }
-
-  #resultTable thead {
-    background-color: #e3f2fd;
-  }
-
-  #resultTable th {
-    text-align: center;
-    font-weight: 700;
-    cursor: pointer;
-    border-bottom: 2px solid #bbdefb;
-  }
-
-  #resultTable th:hover {
-    background-color: #bbdefb;
-  }
-
-  #resultTable td {
-    text-align: center;
-    vertical-align: middle;
-  }
-
-  .table-danger {
-    background-color: #ffeaea !important;
-  }
+    body { background: #f8f9fa; }
+    h2 { margin-bottom: 20px; }
+    table th, table td { vertical-align: middle; }
+    #statusText { font-size: 0.9rem; color: #555; }
   </style>
 </head>
+<body class="container py-4">
 
-<body>
-  <div class="container">
-    <h4><b>Laporan Index Shift</b></h4>
-    <p>Input shift → Ambil nama dari GSheet → Upload CSV → Generate tabel.</p>
+  <h2 class="text-center mb-4">Laporan Index Shift (Index terakhir CO)</h2>
 
-    <div class="row mb-3">
+  <!-- Form input -->
+  <div class="card p-3 mb-4">
+    <div class="row g-2 align-items-center">
       <div class="col-md-3">
-        <label class="form-label">Shift</label>
+        <label for="shiftInput" class="form-label fw-bold">Pilih Shift</label>
         <select id="shiftInput" class="form-select">
-          <option value="">Pilih Shift</option>
-          <option value="P">P (Pagi)</option>
-          <option value="S">S (Siang)</option>
-          <option value="M">M (Malam)</option>
-          <option value="MH1">M H-1 (Malam H-1)</option>
+          <option value="">-- Pilih Shift --</option>
+          <option value="M">M</option>
+          <option value="S">S</option>
+          <option value="P">P</option>
+          <option value="P1">P1</option>
+          <option value="MH1">MH1 (Shift Malam H-1)</option>
         </select>
       </div>
-      <div class="col-md-4 align-self-end">
+      <div class="col-md-3">
         <button id="ambilNamaBtn" class="btn btn-primary w-100">Ambil Nama dari GSheet</button>
       </div>
-      <div class="col-md-5 text-end">
-        <label class="form-label">Tanggal yang dicek:</label>
-        <p id="tanggalCek"></p>
+      <div class="col-md-3">
+        <button id="generateBtn" class="btn btn-success w-100" disabled>Generate Tabel</button>
       </div>
-    </div>
-
-    <hr />
-
-    <div class="mb-3">
-      <label for="csvFile" class="form-label">Upload file CSV dari WEB CO</label>
-      <input type="file" id="csvFile" class="form-control" accept=".csv" />
-      <small class="text-muted">Pastikan CSV berisi kolom NIK Pengambil, Durasi Komplain, Status Komplain, dll.</small>
-    </div>
-
-    <button id="generateBtn" class="btn btn-success mb-3" disabled>Generate Tabel</button>
-    <span id="statusText" class="ms-2 text-muted"></span>
-
-    <div id="resultArea" class="mt-4">
-      <table id="resultTable" class="table table-bordered table-striped">
-        <thead>
-          <tr>
-            <th>No</th>
-            <th id="sortNama">Nama Karyawan</th>
-            <th>Shift</th>
-            <th id="sortLastCO">LastCO</th>
-            <th id="sortIndexCO">IndexCO</th>
-            <th id="sortTotalCO">TotalCO</th>
-            <th id="sortSLA">SLA</th>
-            <th id="sortInProgress">InProgress</th>
-            <th id="sortRelasiResolved">RelasiResolved</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-
-    <div class="text-end mt-3">
-      <button id="downloadBtn" class="btn btn-outline-primary">Download JPG</button>
+      <div class="col-md-3">
+        <div id="statusText" class="text-muted">Menunggu aksi...</div>
+      </div>
     </div>
   </div>
 
-<script>
-const GAS_URL = "https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFMrU-NNqxMW2ZtSCRIpESCpC4Nz7VzdKRmt-Zx1rJXjnRd-g/exec";
+  <div class="mb-3">
+    <strong>Tanggal yang dicek:</strong> <span id="tanggalCek">-</span>
+  </div>
 
-let sheetData = [];
-let csvData = [];
-let lastResults = [];
+  <!-- Tabel hasil -->
+  <table class="table table-bordered table-striped" id="dataTable">
+    <thead class="table-dark">
+      <tr>
+        <th>No</th>
+        <th>Nama Karyawan - Shift</th>
+        <th>Index Terakhir (CO)</th>
+        <th>Keterangan</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 
-// ===== Ambil nama dari GSheet =====
-document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
-  const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
-  if (!shift) return alert("Pilih shift terlebih dahulu!");
+  <script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFMrU-NNqxMW2ZtSCRIpESCpC4Nz7VzdKRmt-Zx1rJXjnRd-g/exec";
+    let sheetData = [];
 
-  document.getElementById("statusText").textContent = "Mengambil data dari Google Sheet...";
+    // ===== Ambil nama dari GSheet =====
+    document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
+      const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
+      if (!shift) return alert("Pilih shift terlebih dahulu!");
 
-  try {
-    const now = new Date();
-    let tanggalLabel;
+      document.getElementById("statusText").textContent = "Mengambil data dari Google Sheet...";
 
-    if (shift === "MH1") {
-      // Ambil tanggal kemarin (H-1)
-      const y = new Date();
-      y.setDate(now.getDate() - 1);
-      tanggalLabel = new Date(y).toLocaleDateString("id-ID", {
-        day: "numeric", month: "long", year: "numeric"
+      try {
+        const now = new Date();
+        let tanggalLabel;
+
+        if (shift === "MH1") {
+          // Ambil tanggal kemarin (H-1)
+          const y = new Date();
+          y.setDate(now.getDate() - 1);
+          tanggalLabel = new Date(y).toLocaleDateString("id-ID", {
+            day: "numeric", month: "long", year: "numeric"
+          });
+        } else {
+          tanggalLabel = new Date(now).toLocaleDateString("id-ID", {
+            day: "numeric", month: "long", year: "numeric"
+          });
+        }
+
+        // kirim hanya shift saja (tanpa parameter tanggal)
+        const url = `${GAS_URL}?shift=${encodeURIComponent(shift)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (!data.ok) throw new Error(data.error || "Gagal mengambil data");
+
+        sheetData = data.karyawan || [];
+        document.getElementById("tanggalCek").textContent = tanggalLabel;
+        document.getElementById("statusText").textContent = `✅ ${sheetData.length} nama berhasil diambil (Shift ${shift}).`;
+        document.getElementById("generateBtn").disabled = false;
+
+      } catch (err) {
+        console.error(err);
+        alert("Gagal mengambil data: " + err.message);
+        document.getElementById("statusText").textContent = "❌ Gagal mengambil data dari GSheet.";
+      }
+    });
+
+    // ===== Generate tabel hasil =====
+    document.getElementById("generateBtn").addEventListener("click", () => {
+      const tbody = document.querySelector("#dataTable tbody");
+      tbody.innerHTML = "";
+
+      if (!sheetData.length) {
+        alert("Belum ada data yang diambil dari GSheet!");
+        return;
+      }
+
+      sheetData.forEach((row, i) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${i + 1}</td>
+          <td>${row.nama} - ${row.shift}</td>
+          <td contenteditable="true" class="text-center"></td>
+          <td contenteditable="true" class="text-center"></td>
+        `;
+        tbody.appendChild(tr);
       });
-    } else {
-      tanggalLabel = new Date(now).toLocaleDateString("id-ID", {
-        day: "numeric", month: "long", year: "numeric"
-      });
-    }
 
-    // kirim hanya shift saja (tanpa parameter tanggal)
-    const url = `${GAS_URL}?shift=${encodeURIComponent(shift)}`;
-    const res = await fetch(url);
-    const data = await res.json();
+      document.getElementById("statusText").textContent = "✅ Tabel berhasil digenerate.";
+    });
+  </script>
 
-    if (!data.ok) throw new Error(data.error || "Gagal mengambil data");
-
-    sheetData = data.karyawan || [];
-    document.getElementById("tanggalCek").textContent = tanggalLabel;
-    document.getElementById("statusText").textContent = `✅ ${sheetData.length} nama berhasil diambil (Shift ${shift}).`;
-    document.getElementById("generateBtn").disabled = false;
-
-  } catch (err) {
-    console.error(err);
-    alert("Gagal mengambil data: " + err.message);
-    document.getElementById("statusText").textContent = "❌ Gagal mengambil data dari GSheet.";
-  }
-});
-
-
-// ===== Upload CSV =====
-document.getElementById("csvFile").addEventListener("change", (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  Papa.parse(file, {
-    header: true,
-    delimiter: ";",
-    skipEmptyLines: true,
-    complete: (res) => {
-      csvData = res.data;
-      document.getElementById("statusText").textContent = `File CSV terbaca: ${csvData.length} baris.`;
-    }
-  });
-});
-
-// ===== Perhitungan sederhana (tidak diubah) =====
-function durasiKeDetik(str) {
-  if (!str) return 0;
-  const m = str.match(/(\d+)\s*d\s*(\d{1,2}):(\d{2}):(\d{2})/);
-  if (m) return +m[1]*86400 + +m[2]*3600 + +m[3]*60 + +m[4];
-  const m2 = str.match(/(\d{1,2}):(\d{2}):(\d{2})/);
-  if (m2) return +m2[1]*3600 + +m2[2]*60 + +m2[3];
-  return 0;
-}
-
-function ambilJam(tgl) {
-  const m = tgl?.match(/(\d{2}):(\d{2})/);
-  return m ? `${m[1]}:${m[2]}` : "-";
-}
-
-// ===== Generate tabel =====
-document.getElementById("generateBtn").addEventListener("click", () => {
-  if (!sheetData.length || !csvData.length) return alert("Pastikan nama GSheet & CSV sudah diambil!");
-
-  const tbody = document.querySelector("#resultTable tbody");
-  tbody.innerHTML = "";
-
-  sheetData.forEach((p, i) => {
-    const baris = document.createElement("tr");
-    baris.innerHTML = `
-      <td>${i+1}</td>
-      <td>${p.nama}</td>
-      <td>${p.shift}</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>`;
-    tbody.appendChild(baris);
-  });
-
-  document.getElementById("statusText").textContent = "✅ Tabel berhasil digenerate.";
-});
-
-// ===== Download JPG =====
-document.getElementById("downloadBtn").addEventListener("click", () => {
-  html2canvas(document.getElementById("resultArea")).then(canvas => {
-    const link = document.createElement("a");
-    link.download = "laporan-shift.jpg";
-    link.href = canvas.toDataURL("image/jpeg");
-    link.click();
-  });
-});
-</script>
 </body>
 </html>
-
