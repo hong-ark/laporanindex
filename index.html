@@ -137,9 +137,7 @@ function ambilJamDariTanggal(s){
   return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-";
 }
 
-// ========================
-// ✅ AMBIL NAMA DARI GSHEET
-// ========================
+// ===== AMBIL NAMA DARI GSHEET (perbaikan MH1) =====
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
 
   const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
@@ -147,50 +145,48 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
 
   document.getElementById("statusText").textContent = "Mengambil data dari GSheet...";
 
-  // === LOGIKA MH1 ===
-  let tanggal;
-  const today = new Date();
-  if (shiftInput === "MH1") {
-    const y = new Date();
-    y.setDate(today.getDate() - 1);
-    tanggal = y.toISOString().split("T")[0];  // kirim ke GAS
-    document.getElementById("tanggalCek").textContent =
-      y.toLocaleDateString("id-ID", {day:"numeric", month:"long", year:"numeric"});
-  } else {
-    tanggal = today.toISOString().split("T")[0];
-    document.getElementById("tanggalCek").textContent =
-      today.toLocaleDateString("id-ID", {day:"numeric", month:"long", year:"numeric"});
-  }
-
   try {
+    // tampilkan tanggal yang dicek (lokal)
+    const now = new Date();
+    let tanggalLabel;
+    if (shiftInput === "MH1") {
+      const y = new Date(now);
+      y.setDate(now.getDate() - 1);
+      tanggalLabel = y.toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
+    } else {
+      tanggalLabel = now.toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
+    }
+    document.getElementById("tanggalCek").textContent = tanggalLabel;
+
+    // Kirim HANYA shift ke GAS — biar GAS yang urus logika tanggal/H-1
     let shifts = [shiftInput];
     if (shiftInput === "P") shifts = ["P", "P1"];
 
     sheetData = [];
-
     for (const s of shifts) {
-      const url = `${GAS_URL}?shift=${encodeURIComponent(s)}&tanggal=${encodeURIComponent(tanggal)}`;
+      const url = `${GAS_URL}?shift=${encodeURIComponent(s)}`; // <- tanpa &tanggal=
       const res = await fetch(url);
       const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Gagal mengambil data dari GAS");
 
       const list = (data.karyawan || []).map(k => ({
         nama: (k.nama || "").trim(),
-        nik : (k.nik || "").trim(),
+        nik: (k.nik || "").trim(),
         shift: (k.shift || "").trim()
       }));
       sheetData = sheetData.concat(list);
     }
 
-    // Hapus duplikat berdasarkan nama
+    // hapus duplikat nama
     sheetData = sheetData.filter((obj, idx, arr) => idx === arr.findIndex(t => t.nama === obj.nama));
 
     document.getElementById("generateBtn").disabled = false;
-    document.getElementById("statusText").textContent =
-      `✅ ${sheetData.length} nama berhasil diambil.`;
+    document.getElementById("statusText").textContent = `✅ ${sheetData.length} nama berhasil diambil (Shift ${shiftInput}).`;
 
-  } catch (e) {
-    alert("Gagal mengambil data: " + e.message);
-    console.error(e);
+  } catch (err) {
+    console.error(err);
+    alert("Gagal mengambil data: " + err.message);
+    document.getElementById("statusText").textContent = "❌ Gagal mengambil data dari GSheet.";
   }
 });
 
@@ -332,3 +328,4 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
