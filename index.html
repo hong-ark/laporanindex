@@ -331,6 +331,7 @@ function renderTable(results){
 }
 
 // ==== Generate tabel ====
+
 document.getElementById("generateBtn").addEventListener("click",()=>{
   if(!sheetData.length)return alert("Ambil nama dari GSheet dulu.");
   if(!csvData.length)return alert("Upload file CSV dulu.");
@@ -340,7 +341,7 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 });
 
-// ==== Sorting ====
+// ==== Sort ====
 function sortColumn(key){
   if(!lastResults.length) return alert("Belum ada data tabel.");
   let asc, valFunc;
@@ -373,6 +374,7 @@ function sortColumn(key){
   if(el) el.addEventListener("click",()=>sortColumn(k));
 });
 
+
 // ==== Download JPG ====
 document.getElementById("downloadBtn").addEventListener("click",async()=>{
   const area=document.querySelector("#resultArea");
@@ -385,6 +387,7 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
 
 
