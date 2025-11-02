@@ -123,29 +123,32 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   document.getElementById("statusText").textContent = "Mengambil data dari Google Sheet...";
 
   try {
-    let tanggal;
     const now = new Date();
+    let tanggalLabel;
 
     if (shift === "MH1") {
-      // Tanggal kemarin (lokal Asia/Jakarta)
+      // Ambil tanggal kemarin (H-1)
       const y = new Date();
       y.setDate(now.getDate() - 1);
-      tanggal = `${y.getFullYear()}-${String(y.getMonth()+1).padStart(2,'0')}-${String(y.getDate()).padStart(2,'0')}`;
+      tanggalLabel = new Date(y).toLocaleDateString("id-ID", {
+        day: "numeric", month: "long", year: "numeric"
+      });
     } else {
-      tanggal = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+      tanggalLabel = new Date(now).toLocaleDateString("id-ID", {
+        day: "numeric", month: "long", year: "numeric"
+      });
     }
 
-    const url = `${GAS_URL}?shift=${encodeURIComponent(shift)}&tanggal=${encodeURIComponent(tanggal)}`;
+    // kirim hanya shift saja (tanpa parameter tanggal)
+    const url = `${GAS_URL}?shift=${encodeURIComponent(shift)}`;
     const res = await fetch(url);
     const data = await res.json();
 
     if (!data.ok) throw new Error(data.error || "Gagal mengambil data");
 
     sheetData = data.karyawan || [];
-    document.getElementById("tanggalCek").textContent = new Date(tanggal).toLocaleDateString("id-ID", {
-      day: "numeric", month: "long", year: "numeric"
-    });
-    document.getElementById("statusText").textContent = `✅ ${sheetData.length} nama berhasil diambil.`;
+    document.getElementById("tanggalCek").textContent = tanggalLabel;
+    document.getElementById("statusText").textContent = `✅ ${sheetData.length} nama berhasil diambil (Shift ${shift}).`;
     document.getElementById("generateBtn").disabled = false;
 
   } catch (err) {
@@ -154,6 +157,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     document.getElementById("statusText").textContent = "❌ Gagal mengambil data dari GSheet.";
   }
 });
+
 
 // ===== Upload CSV =====
 document.getElementById("csvFile").addEventListener("change", (e) => {
@@ -222,3 +226,4 @@ document.getElementById("downloadBtn").addEventListener("click", () => {
 </script>
 </body>
 </html>
+
