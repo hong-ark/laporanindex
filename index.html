@@ -65,11 +65,13 @@
       <div class="col-md-2">
         <label class="form-label">Shift</label>
         <select id="shiftInput" class="form-select">
-          <option value="">Pilih Shift</option>
-          <option value="M">M (Malam)</option>
-          <option value="S">S (Siang)</option>
-          <option value="P">P (Pagi)</option>
-        </select>
+  <option value="">Pilih Shift</option>
+  <option value="M">M (Malam)</option>
+  <option value="MH1">M H-1 (Malam Hari Kemarin)</option>
+  <option value="S">S (Siang)</option>
+  <option value="P">P (Pagi)</option>
+</select>
+
       </div>
       <div class="col-md-4">
         <label class="form-label">&nbsp;</label><br />
@@ -194,8 +196,21 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     let shifts = [shiftInput];
     if (shiftInput === "P") shifts = ["P", "P1"];
 
-    const today = new Date();
-    const tanggal = today.toISOString().split("T")[0];
+   let tanggal;
+const today = new Date();
+
+if (shiftInput === "MH1") {
+  // Ambil tanggal kemarin untuk Shift Malam H-1
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  tanggal = yesterday.toISOString().split("T")[0];
+  console.log("Shift M H-1 → ambil tanggal:", tanggal);
+} else {
+  // Default: ambil tanggal hari ini
+  tanggal = today.toISOString().split("T")[0];
+  console.log("Shift:", shiftInput, "→ ambil tanggal:", tanggal);
+}
+
 
     sheetData = [];
     for (const s of shifts) {
@@ -370,6 +385,7 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
 
 
