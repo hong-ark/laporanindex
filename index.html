@@ -205,11 +205,11 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
 
       if (data.error) throw new Error(data.error);
 
-      const karyawanList = (data.karyawan || []).map(k => ({
-        nama: String(k.nama || "").trim(),
-        nik: String(k.nik || "").trim(),
-        shift: s
-      }));
+   const karyawanList = (data.karyawan || []).map(k => ({
+  nama: String(k.nama || "").trim(),
+  nik: String(k.nik || "").trim(),
+  shift: String(k.shift || "").trim()
+}));
 
       sheetData = sheetData.concat(karyawanList);
     }
@@ -369,6 +369,7 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
 
 
