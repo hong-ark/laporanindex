@@ -22,33 +22,33 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
 
-    /* === HEADER TABEL === */
-    #resultTable thead {
-      background-color: #1976d2 !important; /* Biru */
-      color: white !important;              /* Font putih */
-    }
+   /* === HEADER TABEL === */
+#resultTable.table thead tr th {
+  background-color: #1976d2 !important; /* Biru solid */
+  color: white !important;               /* Font putih */
+  text-align: center;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 10px;
+  user-select: none;
+  vertical-align: middle;
+  border-color: #1565c0 !important;      /* Batas antar header lebih lembut */
+}
 
-    #resultTable th {
-      text-align: center;
-      font-weight: 700;
-      cursor: pointer;
-      padding: 10px;
-      user-select: none;
-    }
+#resultTable.table thead tr th:hover {
+  background-color: #1565c0 !important;  /* Biru lebih gelap saat hover */
+}
 
-    #resultTable th:hover {
-      background: #1565c0 !important; /* Biru sedikit lebih gelap saat hover */
-    }
+#resultTable td {
+  text-align: center;
+  vertical-align: middle;
+  font-size: 0.95rem;
+}
 
-    #resultTable td {
-      text-align: center;
-      vertical-align: middle;
-      font-size: 0.95rem;
-    }
+.table-danger {
+  background-color: #ffeaea !important;
+}
 
-    .table-danger {
-      background-color: #ffeaea !important;
-    }
   </style>
 </head>
 
@@ -384,4 +384,5 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
 
