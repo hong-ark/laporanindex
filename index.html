@@ -207,34 +207,44 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
     complete:(res)=>{
       const headerMap={};
       (res.meta.fields||[]).forEach(f=>headerMap[normKey(f)]=f);
+
+      // cari kolom berdasarkan pola nama
       const getCol=(row,arr)=>{
-        for(const c of arr){ const k=headerMap[c]; if(k && row[k]) return row[k].toString(); }
+        for(const c of arr){
+          for(const key in headerMap){
+            if(key.includes(c)){
+              const realKey = headerMap[key];
+              if(row[realKey]) return row[realKey].toString();
+            }
+          }
+        }
         return "";
       };
-      csvData = res.data.map(r=>{
-  const nikRaw = (getCol(r,['nikpengambil','nik'])).replace(/\D/g,'').trim();
-  const diambilOleh = getCol(r,['diambiloleh','diambil oleh']);
-  const durasiRaw = getCol(r,['durasikomplain','durasi']);
-  const waktuSlaRaw = getCol(r,['waktusla','waktu sla']);
-  const statusRaw = getCol(r,['statuskomplain','status']);
-  const statusSlaRaw = getCol(r,['statussla','status sla']);
-  const tglDiambilRaw = getCol(r,['tanggaldiambil','tgl diambil','tanggal diambil']);
-  const lokasiAsalRaw = getCol(r, ['lokasiasal','lokasi asal']);  // ✅ tambahan
 
-  const slaNum = parseFloat((waktuSlaRaw||"").replace(",","."))||0;
-  return {
-    nik: nikRaw,
-    diambilOleh,
-    durasiRaw,
-    durasiDetik: durasiKeDetik(durasiRaw),
-    waktuSlaDetik: slaNum*3600,
-    status: statusRaw,
-    statusNorm: normalizeStatus(statusRaw),
-    statusSLA: statusSlaRaw,
-    tanggalDiambil: tglDiambilRaw,
-    lokasiAsal: (lokasiAsalRaw || "").trim()  // ✅ simpan
-  };
-});
+      csvData = res.data.map(r=>{
+        const nikRaw = (getCol(r,['nikpengambil','nik'])).replace(/\D/g,'').trim();
+        const diambilOleh = getCol(r,['diambiloleh','diambil oleh']);
+        const durasiRaw = getCol(r,['durasikomplain','durasi']);
+        const waktuSlaRaw = getCol(r,['waktusla','waktu sla']);
+        const statusRaw = getCol(r,['statuskomplain','status']);
+        const statusSlaRaw = getCol(r,['statussla','status sla']);
+        const tglDiambilRaw = getCol(r,['tanggaldiambil','tgl diambil','tanggal diambil']);
+        const tipeLokasiRaw = getCol(r,['tipelokasiasal','tipe lokasi asal']); // ✅ kolom baru
+
+        const slaNum = parseFloat((waktuSlaRaw||"").replace(",","."))||0;
+        return {
+          nik: nikRaw,
+          diambilOleh,
+          durasiRaw,
+          durasiDetik: durasiKeDetik(durasiRaw),
+          waktuSlaDetik: slaNum*3600,
+          status: statusRaw,
+          statusNorm: normalizeStatus(statusRaw),
+          statusSLA: statusSlaRaw,
+          tanggalDiambil: tglDiambilRaw,
+          tipeLokasi: (tipeLokasiRaw || "").trim()
+        };
+      });
       document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
     }
   });
@@ -244,16 +254,17 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
 function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik/r.waktuSlaDetik : 0; }
 function rataRata_byName(nama,thr=0.85){
   const matches=[];
- for(const r of csvData){
-  if(!isAcceptedStatus(r.statusNorm)) continue;
+  for(const r of csvData){
+    if(!isAcceptedStatus(r.statusNorm)) continue;
 
-  // ✅ skip jika lokasi asal diawali huruf G atau g
-  if (r.lokasiAsal && r.lokasiAsal.trim().toUpperCase().startsWith("G")) continue;
+    // ❌ Abaikan jika tipe lokasi asal = Branch
+    if (r.tipeLokasi && r.tipeLokasi.trim().toLowerCase() === "branch") continue;
 
-  if(similarity(nama,r.diambilOleh) >= thr) matches.push(r);
-}
+    if(similarity(nama,r.diambilOleh) >= thr) matches.push(r);
+  }
   if(!matches.length)
     return{avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0,relasiResolved:0};
+
   const sum=matches.reduce((a,b)=>a+computeC(b),0);
   const latest=matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
   return{
@@ -299,7 +310,7 @@ function renderTable(results){
   });
 }
 
-// === SORT HEADER (fungsi dari script lama) ===
+// === SORT HEADER ===
 function sortColumn(key){
   if(!lastResults.length)return alert("Belum ada data tabel.");
   let asc;
@@ -339,5 +350,3 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
-
-
