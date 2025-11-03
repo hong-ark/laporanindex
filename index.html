@@ -29,7 +29,7 @@
       <select id="shiftInput" class="form-select">
         <option value="">Pilih Shift</option>
         <option value="M">M (Malam)</option>
-        <option value="MH1">M H-1 (Malam H-1)</option>
+        <option value="MH1">M H-1 (Malam Kemarin)</option>
         <option value="S">S (Siang)</option>
         <option value="P">P (Pagi)</option>
       </select>
@@ -87,19 +87,19 @@ let sheetData = [];
 let csvData = [];
 let lastResults = [];
 
-// === AUTO TANGGAL DI LABEL ===
+// === AUTO TANGGAL ===
 document.getElementById("tanggalCek").textContent =
   new Date().toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
 
-// === Fungsi bantu (sama seperti script lama) ===
+// === Fungsi bantu (penghitungan tetap sama) ===
 function normKey(s){ return (s||"").toString().toLowerCase().replace(/[^a-z0-9]/g,''); }
 function normalizeName(s){ return (s||"").toString().toLowerCase().replace(/\s+/g,' ').replace(/[^\w\s]/g,'').trim(); }
 function durasiKeDetik(v){
   if (!v) return 0;
   const s = v.toString().trim();
-  const m1 = s.match(/(\d+) d (\d{1,2}):(\d{2}):(\d{2})/i);
+  const m1 = s.match(/(\\d+) d (\\d{1,2}):(\\d{2}):(\\d{2})/i);
   if (m1) return (+m1[1])*86400 + (+m1[2])*3600 + (+m1[3])*60 + (+m1[4]);
-  const m2 = s.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+  const m2 = s.match(/(\\d{1,2}):(\\d{2}):(\\d{2})/);
   if (m2) return (+m2[1])*3600 + (+m2[2])*60 + (+m2[3]);
   return 0;
 }
@@ -133,20 +133,17 @@ function similarity(a,b){
 }
 function ambilJamDariTanggal(s){
   if(!s) return "-";
-  const m=s.match(/(\d{1,2}):(\d{2})/);
+  const m=s.match(/(\\d{1,2}):(\\d{2})/);
   return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-";
 }
 
-// ===== AMBIL NAMA DARI GSHEET (perbaikan MH1) =====
+// === Ambil Nama dari GSheet (dengan MH1) ===
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
-
   const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
   if (!shiftInput) return alert("Pilih shift dulu!");
 
   document.getElementById("statusText").textContent = "Mengambil data dari GSheet...";
-
   try {
-    // tampilkan tanggal yang dicek (lokal)
     const now = new Date();
     let tanggalLabel;
     if (shiftInput === "MH1") {
@@ -158,13 +155,12 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     }
     document.getElementById("tanggalCek").textContent = tanggalLabel;
 
-    // Kirim HANYA shift ke GAS — biar GAS yang urus logika tanggal/H-1
     let shifts = [shiftInput];
     if (shiftInput === "P") shifts = ["P", "P1"];
 
     sheetData = [];
     for (const s of shifts) {
-      const url = `${GAS_URL}?shift=${encodeURIComponent(s)}`; // <- tanpa &tanggal=
+      const url = `${GAS_URL}?shift=${encodeURIComponent(s)}`;
       const res = await fetch(url);
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Gagal mengambil data dari GAS");
@@ -177,12 +173,10 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
       sheetData = sheetData.concat(list);
     }
 
-    // hapus duplikat nama
     sheetData = sheetData.filter((obj, idx, arr) => idx === arr.findIndex(t => t.nama === obj.nama));
 
     document.getElementById("generateBtn").disabled = false;
     document.getElementById("statusText").textContent = `✅ ${sheetData.length} nama berhasil diambil (Shift ${shiftInput}).`;
-
   } catch (err) {
     console.error(err);
     alert("Gagal mengambil data: " + err.message);
@@ -190,14 +184,10 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   }
 });
 
-
-// ========================
-// ✅ LOAD CSV
-// ========================
+// === Upload CSV ===
 document.getElementById("csvFile").addEventListener("change",(e)=>{
   const file=e.target.files[0];
   if(!file)return;
-
   Papa.parse(file,{
     header:true,
     delimiter:";",
@@ -212,14 +202,13 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
       };
 
       csvData=res.data.map(r=>{
-        const nikRaw=(getCol(r,['nikpengambil','nik'])).replace(/\D/g,'').trim();
+        const nikRaw=(getCol(r,['nikpengambil','nik'])).replace(/\\D/g,'').trim();
         const diambilOleh=getCol(r,['diambiloleh','diambil oleh']);
         const durasiRaw=getCol(r,['durasikomplain','durasi']);
         const waktuSlaRaw=getCol(r,['waktusla','waktu sla']);
         const statusRaw=getCol(r,['statuskomplain','status']);
         const statusSlaRaw=getCol(r,['statussla','status sla']);
         const tglDiambilRaw=getCol(r,['tanggaldiambil','tgl diambil','tanggal diambil']);
-
         const slaNum=parseFloat((waktuSlaRaw||"").replace(",","."))||0;
 
         return{
@@ -234,33 +223,23 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
           tanggalDiambil:tglDiambilRaw
         };
       });
-
-      document.getElementById("statusText").textContent =
-        `File CSV terbaca: ${csvData.length} baris.`;
+      document.getElementById("statusText").textContent = `File CSV terbaca: ${csvData.length} baris.`;
     }
   });
 });
 
-// ========================
-// ✅ PENGHITUNGAN (UTUH)
-// ========================
-function computeC(r){
-  return r.waktuSlaDetik>0 ? r.durasiDetik/r.waktuSlaDetik : 0;
-}
-
+// === Penghitungan ===
+function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik/r.waktuSlaDetik : 0; }
 function rataRata_byName(nama, thr=0.85){
   const matches=[];
   for(const r of csvData){
     if(!isAcceptedStatus(r.statusNorm)) continue;
     if(similarity(nama, r.diambilOleh) >= thr) matches.push(r);
   }
-
   if(!matches.length)
     return { avg:null, count:0, lastTime:"-", slaCount:0, inProgressCount:0, relasiResolved:0 };
-
   const sum = matches.reduce((a,b)=>a+computeC(b),0);
   const latest = matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
-
   return {
     avg: sum/matches.length,
     count: matches.length,
@@ -271,33 +250,24 @@ function rataRata_byName(nama, thr=0.85){
   };
 }
 
-// ========================
-// ✅ GENERATE TABEL
-// ========================
+// === Generate & Render Tabel ===
 document.getElementById("generateBtn").addEventListener("click",()=>{
   if(!sheetData.length) return alert("Ambil nama terlebih dahulu");
   if(!csvData.length) return alert("Upload CSV dulu");
-
   const results=sheetData.map(k=>({k,res:rataRata_byName(k.nama)}));
   lastResults=results;
   renderTable(results);
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 });
 
-// ========================
-// ✅ RENDER TABEL
-// ========================
 function renderTable(results){
   const tbody=document.querySelector("#resultTable tbody");
   tbody.innerHTML="";
-
   results.forEach((item,index)=>{
     const {k,res}=item;
     const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
-
     const tr=document.createElement("tr");
     if(res.slaCount>0) tr.className="table-danger";
-
     tr.innerHTML=`
       <td>${index+1}</td>
       <td>${k.nama}</td>
@@ -309,14 +279,34 @@ function renderTable(results){
       <td>${res.inProgressCount||0}</td>
       <td>${res.relasiResolved||0}</td>
     `;
-
     tbody.appendChild(tr);
   });
 }
 
-// ========================
-// ✅ Download JPG
-// ========================
+// === Autosort Header ===
+const sortDirections = {};
+document.querySelectorAll("#resultTable th[id^='sort']").forEach(th=>{
+  th.addEventListener("click",()=>{
+    const col = th.cellIndex;
+    const key = th.id;
+    sortDirections[key] = !sortDirections[key];
+    const asc = sortDirections[key];
+    const rows = Array.from(document.querySelector("#resultTable tbody").rows);
+    rows.sort((a,b)=>{
+      const A = a.cells[col].innerText;
+      const B = b.cells[col].innerText;
+      const numA = parseFloat(A.replace(",",".")) || 0;
+      const numB = parseFloat(B.replace(",",".")) || 0;
+      if(!isNaN(numA) && !isNaN(numB)) return asc ? numA-numB : numB-numA;
+      return asc ? A.localeCompare(B) : B.localeCompare(A);
+    });
+    const tbody = document.querySelector("#resultTable tbody");
+    tbody.innerHTML = "";
+    rows.forEach(r=>tbody.appendChild(r));
+  });
+});
+
+// === Download JPG ===
 document.getElementById("downloadBtn").addEventListener("click",async()=>{
   const area=document.querySelector("#resultArea");
   const canvas=await html2canvas(area,{scale:2});
@@ -328,5 +318,3 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
-
-
