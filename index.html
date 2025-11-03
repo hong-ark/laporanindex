@@ -9,77 +9,111 @@
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
   <style>
-    body { background: #f6f7fb; padding: 20px; }
-    .container { max-width: 1100px; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
-    #resultTable thead { background-color: #e3f2fd; }
-    #resultTable th { text-align: center; font-weight: 700; cursor: pointer; }
-    #resultTable th:hover { background: #e8e8e8; }
-    #resultTable td { text-align: center; }
-    .table-danger { background-color: #ffeaea !important; }
+    body {
+      background: #f6f7fb;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1100px;
+      background: white;
+      border-radius: 10px;
+      padding: 25px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    /* === HEADER TABEL === */
+    #resultTable thead {
+      background-color: #1976d2 !important; /* Biru */
+      color: white !important;              /* Font putih */
+    }
+
+    #resultTable th {
+      text-align: center;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 10px;
+      user-select: none;
+    }
+
+    #resultTable th:hover {
+      background: #1565c0 !important; /* Biru sedikit lebih gelap saat hover */
+    }
+
+    #resultTable td {
+      text-align: center;
+      vertical-align: middle;
+      font-size: 0.95rem;
+    }
+
+    .table-danger {
+      background-color: #ffeaea !important;
+    }
   </style>
 </head>
 
 <body>
-<div class="container">
-  <h4><b>Laporan Index Shift</b></h4>
-  <p>Input shift → Ambil nama dari GSheet → Upload CSV → Generate Tabel</p>
+  <div class="container">
+    <h4><b>Laporan Index Shift</b></h4>
+    <p>Input shift → Ambil nama dari GSheet → Upload CSV → Generate Tabel</p>
 
-  <div class="mb-3 row">
-    <div class="col-md-2">
-      <label class="form-label">Shift</label>
-      <select id="shiftInput" class="form-select">
-        <option value="">Pilih Shift</option>
-        <option value="M">M (Malam)</option>
-        <option value="MH1">M H-1 (Malam H-1)</option>
-        <option value="S">S (Siang)</option>
-        <option value="P">P (Pagi)</option>
-      </select>
+    <div class="mb-3 row">
+      <div class="col-md-2">
+        <label class="form-label">Shift</label>
+        <select id="shiftInput" class="form-select">
+          <option value="">Pilih Shift</option>
+          <option value="M">M (Malam)</option>
+          <option value="MH1">M H-1 (Malam H-1)</option>
+          <option value="S">S (Siang)</option>
+          <option value="P">P (Pagi)</option>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">&nbsp;</label><br />
+        <button id="ambilNamaBtn" class="btn btn-primary">Ambil Nama dari GSheet</button>
+      </div>
+
+      <div class="col-md-6 text-end">
+        <label class="form-label">Tanggal dicek:</label>
+        <p id="tanggalCek"></p>
+      </div>
     </div>
 
-    <div class="col-md-4">
-      <label class="form-label">&nbsp;</label><br />
-      <button id="ambilNamaBtn" class="btn btn-primary">Ambil Nama dari GSheet</button>
+    <hr>
+
+    <div class="mb-3">
+      <label class="form-label">Upload CSV</label>
+      <input type="file" id="csvFile" class="form-control" accept=".csv" />
     </div>
 
-    <div class="col-md-6 text-end">
-      <label class="form-label">Tanggal dicek:</label>
-      <p id="tanggalCek"></p>
+    <button id="generateBtn" class="btn btn-success mb-3" disabled>Generate Tabel</button>
+    <span id="statusText" class="ms-2 text-muted"></span>
+
+    <div id="resultArea" class="mt-4">
+      <table id="resultTable" class="table table-bordered table-striped">
+        <thead>
+          <tr>
+            <th>No</th>
+            <th id="sortNama">Nama Karyawan</th>
+            <th>Shift</th>
+            <th id="sortLastCO">LastCO</th>
+            <th id="sortIndexCO">IndexCO</th>
+            <th id="sortTotalCO">TotalCO</th>
+            <th id="sortSLA">SLA</th>
+            <th id="sortInProgress">InProgress</th>
+            <th id="sortRelasiResolved">RelasiResolved</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="text-end mt-3">
+      <button id="downloadBtn" class="btn btn-outline-primary">Download JPG</button>
     </div>
   </div>
 
-  <hr>
-
-  <div class="mb-3">
-    <label class="form-label">Upload CSV</label>
-    <input type="file" id="csvFile" class="form-control" accept=".csv" />
-  </div>
-
-  <button id="generateBtn" class="btn btn-success mb-3" disabled>Generate Tabel</button>
-  <span id="statusText" class="ms-2 text-muted"></span>
-
-  <div id="resultArea" class="mt-4">
-    <table id="resultTable" class="table table-bordered table-striped">
-      <thead>
-        <tr>
-          <th>No</th>
-          <th id="sortNama">Nama Karyawan</th>
-          <th>Shift</th>
-          <th id="sortLastCO">LastCO</th>
-          <th id="sortIndexCO">IndexCO</th>
-          <th id="sortTotalCO">TotalCO</th>
-          <th id="sortSLA">SLA</th>
-          <th id="sortInProgress">InProgress</th>
-          <th id="sortRelasiResolved">RelasiResolved</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
-
-  <div class="text-end mt-3">
-    <button id="downloadBtn" class="btn btn-outline-primary">Download JPG</button>
-  </div>
-</div>
 
 <script>
 const GAS_URL = "https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFMrU-NNqxMW2ZtSCRIpESCpC4Nz7VzdKRmt-Zx1rJXjnRd-g/exec";
@@ -350,3 +384,4 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
