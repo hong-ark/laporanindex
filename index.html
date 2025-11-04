@@ -1,60 +1,57 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Laporan Index CO Shift</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<style>
-body { background: #f9f9f9; }
-.container { max-width: 1200px; margin-top: 20px; }
-#judulLaporan { font-weight: bold; margin: 15px 0; text-align: left; font-size: 1.2rem; }
-footer { text-align: center; margin-top: 20px; font-size: 0.9rem; color: #777; }
-table th { cursor: pointer; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Laporan Index CO Shift</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    body { background: #f8f9fa; }
+    .table thead th { cursor: pointer; background: #0d6efd; color: white; }
+    footer { text-align: center; font-size: 14px; color: gray; margin-top: 20px; }
+  </style>
 </head>
-<body>
-<div class="container">
-  <h3 class="text-center mb-3">Laporan Index CO</h3>
+<body class="container py-4">
 
-  <div class="row mb-3">
+  <h2 class="mb-3 text-primary fw-bold">Laporan Index CO</h2>
+  
+  <div class="row g-3 mb-4">
     <div class="col-md-3">
-      <label>Shift</label>
       <select id="shiftInput" class="form-select">
-        <option value="P">P</option>
-        <option value="S">S</option>
-        <option value="M">M</option>
+        <option value="">Pilih Shift</option>
+        <option value="P">Shift Pagi (P + P1)</option>
+        <option value="S">Shift Siang</option>
+        <option value="M">Shift Malam</option>
       </select>
     </div>
     <div class="col-md-3">
-      <label>Upload CSV</label>
-      <input type="file" id="csvFile" class="form-control" accept=".csv" />
+      <button id="ambilBtn" class="btn btn-success w-100">Ambil Nama dari GSheet</button>
     </div>
-    <div class="col-md-3 d-flex align-items-end">
+    <div class="col-md-3">
+      <input type="file" id="csvInput" accept=".csv" class="form-control" />
+    </div>
+    <div class="col-md-3">
       <button id="generateBtn" class="btn btn-primary w-100">Generate Tabel</button>
-    </div>
-    <div class="col-md-3 d-flex align-items-end">
-      <button id="downloadBtn" class="btn btn-success w-100">Download JPG</button>
     </div>
   </div>
 
-  <div id="statusText" class="text-muted small mb-2">Belum ada file CSV dibaca.</div>
+  <div id="statusText" class="mb-3 text-secondary small"></div>
 
-  <div id="judulLaporan">Laporan Index CO</div>
+  <div id="judulLaporan" class="fw-bold fs-5 text-start mb-3"></div>
 
-  <div id="resultArea" class="table-responsive">
-    <table id="resultTable" class="table table-striped table-bordered align-middle">
-      <thead class="table-dark">
+  <div class="table-responsive" id="resultArea">
+    <table id="resultTable" class="table table-bordered align-middle">
+      <thead>
         <tr>
           <th>No</th>
           <th>Nama</th>
           <th>Shift</th>
-          <th>Jam CO Terakhir</th>
+          <th>Last CO</th>
           <th>Index CO</th>
           <th>Total CO</th>
-          <th>SLA Terpenuhi</th>
+          <th>SLA</th>
           <th>In Progress</th>
           <th>Resolved</th>
         </tr>
@@ -63,158 +60,120 @@ table th { cursor: pointer; }
     </table>
   </div>
 
+  <button id="downloadBtn" class="btn btn-outline-secondary mt-3">Download JPG</button>
+
   <footer>© 2025 EDP Fai</footer>
-</div>
 
-<script>
-const GAS_URL = "https://script.google.com/macros/s/AKfycbyoPTlFn5NSBWlDLAT5tvfui9ZKe-l1-INlSmjZ9wWTD3bva3XiP1xp9R2i7K5eTPHqIg/exec";
+  <script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxcIxYF68Q-mVMIC2ecrNFrgB0gD2gOnHVgV4HEIIP3HZ2LveG2Koqe0qD5gugMLb9d/exec";
+    let sheetData = [];
+    let csvData = [];
 
-let csvData = [];
-let sheetData = [];
+    // === Ambil data dari GSheet ===
+    document.getElementById("ambilBtn").addEventListener("click", async () => {
+      const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
+      if (!shiftInput) return alert("Pilih shift terlebih dahulu.");
 
-function similarity(a,b){
-  if(!a || !b) return 0;
-  a=a.toLowerCase(); b=b.toLowerCase();
-  let matches=0;
-  for(let ch of a) if(b.includes(ch)) matches++;
-  return matches/Math.max(a.length,b.length);
-}
+      document.getElementById("statusText").textContent = "Mengambil data dari Google Sheet...";
+      let shifts = [];
 
-function durasiKeDetik(d){
-  if(!d) return 0;
-  const parts=d.split(":").map(Number);
-  if(parts.length===3) return parts[0]*3600+parts[1]*60+parts[2];
-  if(parts.length===2) return parts[0]*60+parts[1];
-  return 0;
-}
+      // Shift P ambil P + P1
+      if (shiftInput === "P") {
+        shifts = ["P", "P1"];
+      } else {
+        shifts = [shiftInput];
+      }
 
-function ambilJamDariTanggal(str){
-  if(!str) return "-";
-  const t = str.match(/\d{1,2}[:.]\d{2}/);
-  return t ? t[0].replace(".",":") : "-";
-}
+      sheetData = [];
+      for (const s of shifts) {
+        const res = await fetch(`${GAS_URL}?shift=${s}`);
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "Gagal ambil data");
+        sheetData = sheetData.concat(data.karyawan || []);
+      }
 
-function normalizeStatus(s){
-  if(!s) return "";
-  s=s.toLowerCase();
-  if(s.includes("progress")) return "inprogress";
-  if(s.includes("resolved")) return "resolved";
-  if(s.includes("close")) return "closed";
-  return s;
-}
+      // Hilangkan duplikat nama
+      sheetData = sheetData.filter((v, i, a) =>
+        a.findIndex(t => t.nama.trim().toLowerCase() === v.nama.trim().toLowerCase()) === i
+      );
 
-function isAcceptedStatus(s){ return ["inprogress","resolved","closed"].includes(s); }
+      document.getElementById("statusText").textContent =
+        `Data berhasil diambil: ${sheetData.length} personil (${shifts.join(", ")}).`;
 
-// === BACA CSV ===
-document.getElementById("csvFile").addEventListener("change",(e)=>{
-  const file=e.target.files[0];
-  if(!file) return;
-  Papa.parse(file,{
-    header:true,
-    complete:(res)=>{
-      csvData = res.data.map(r=>{
-        return {
-          nik: (r.nik||"").replace(/\D/g,''),
-          diambilOleh: r.diambiloleh || r["diambil oleh"] || "",
-          durasiRaw: r.durasi || r.durasikomplain || "",
-          durasiDetik: durasiKeDetik(r.durasi || r.durasikomplain),
-          waktuSlaDetik: parseFloat((r.waktusla||"0").replace(",","."))*3600 || 0,
-          status: r.status || r.statuskomplain || "",
-          statusNorm: normalizeStatus(r.status || r.statuskomplain),
-          statusSLA: r.statussla || r["status sla"] || "",
-          tanggalDiambil: r.tanggaldiambil || r["tgl diambil"] || ""
-        };
-      });
-      document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
-    }
-  });
-});
+      // Tampilkan tanggal otomatis
+      const today = new Date();
+      const tgl = today.toLocaleDateString("id-ID", { day: 'numeric', month: 'long', year: 'numeric' });
+      const shiftText = shiftInput === "P" ? "Shift 1" :
+                        shiftInput === "S" ? "Shift 2" :
+                        shiftInput === "M" ? "Shift 3" : shiftInput;
+      document.getElementById("judulLaporan").textContent =
+        `Laporan Index CO ${shiftText} — Tanggal ${tgl}`;
+    });
 
-// === GENERATE TABLE ===
-document.getElementById("generateBtn").addEventListener("click",async()=>{
-  const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
-  if(!csvData.length){ alert("Upload file CSV terlebih dahulu."); return; }
-
-  let shifts = [];
-  if(shiftInput === "P") shifts = ["P","P1"];
-  else shifts = [shiftInput];
-
-  sheetData = [];
-  for(const s of shifts){
-    const res = await fetch(`${GAS_URL}?shift=${s}`);
-    const data = await res.json();
-    if(!data.ok) throw new Error(data.error || "Gagal ambil data");
-    sheetData = sheetData.concat(data.karyawan || []);
-  }
-
-  // Hapus duplikat berdasarkan nama (gabungan P dan P1)
-  sheetData = sheetData.filter((v,i,a)=>
-    a.findIndex(t=>t.nama.trim().toLowerCase()===v.nama.trim().toLowerCase())===i
-  );
-
-  const tbody=document.querySelector("#resultTable tbody");
-  tbody.innerHTML="";
-
-  sheetData.forEach((row,i)=>{
-    const nama=row.nama;
-    const nik=row.nik;
-    const shift=row.shift;
-    const kandidat=csvData.filter(c=>similarity(c.diambilOleh,nama)>0.7 || (c.nik && c.nik===nik));
-
-    let lastCO="-", indexCO=0, totalCO=0, sla=0, inProgress=0, relasiResolved=0;
-    if(kandidat.length){
-      kandidat.sort((a,b)=>b.durasiDetik-a.durasiDetik);
-      const last=kandidat[0];
-      lastCO=ambilJamDariTanggal(last.tanggalDiambil);
-      totalCO=kandidat.length;
-      kandidat.forEach(k=>{
-        if(isAcceptedStatus(k.statusNorm)){
-          if(k.statusNorm.includes("inprogress")) inProgress++;
-          if(k.statusNorm.includes("resolved")||k.statusNorm.includes("closed")) relasiResolved++;
+    // === Upload CSV ===
+    document.getElementById("csvInput").addEventListener("change", e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: res => {
+          csvData = res.data.map(r => ({
+            nama: (r["Diambil Oleh"] || r["diambil oleh"] || "").trim(),
+            nik: (r["NIK Pengambil"] || r["nik pengambil"] || "").trim(),
+            status: (r["Status Komplain"] || "").trim(),
+            sla: (r["Status SLA"] || "").trim(),
+            waktu: (r["Tanggal Diambil"] || "").trim()
+          }));
+          document.getElementById("statusText").textContent =
+            `File CSV terbaca: ${csvData.length} baris.`;
         }
-        if(k.statusSLA?.toLowerCase().includes("terpenuhi")) sla++;
       });
-      indexCO = totalCO ? (relasiResolved/totalCO).toFixed(2) : 0;
-    }
+    });
 
-    const tr=document.createElement("tr");
-    tr.innerHTML=`
-      <td>${i+1}</td>
-      <td>${nama}</td>
-      <td>${shift}</td>
-      <td>${lastCO}</td>
-      <td>${indexCO}</td>
-      <td>${totalCO}</td>
-      <td>${sla}</td>
-      <td>${inProgress}</td>
-      <td>${relasiResolved}</td>
-    `;
-    if(indexCO < 0.3) tr.classList.add("table-danger");
-    tbody.appendChild(tr);
-  });
+    // === Generate Tabel ===
+    document.getElementById("generateBtn").addEventListener("click", () => {
+      if (!sheetData.length || !csvData.length)
+        return alert("Pastikan data GSheet dan CSV sudah dimuat.");
 
-  // === Judul Otomatis ===
-  const shiftText = shiftInput === "P" ? "Shift 1" :
-                    shiftInput === "S" ? "Shift 2" :
-                    shiftInput === "M" ? "Shift 3" : shiftInput;
+      const tbody = document.querySelector("#resultTable tbody");
+      tbody.innerHTML = "";
 
-  const tanggalSekarang = new Date().toLocaleDateString("id-ID", {
-    day: "numeric", month: "long", year: "numeric"
-  });
+      sheetData.forEach((row, i) => {
+        const nama = row.nama;
+        const shift = row.shift;
+        const match = csvData.filter(c => c.nama.toLowerCase().includes(nama.toLowerCase()));
 
-  document.getElementById("judulLaporan").textContent =
-    `Laporan Index CO ${shiftText} — Tanggal ${tanggalSekarang}`;
-});
+        const total = match.length;
+        const resolved = match.filter(c => c.status.toLowerCase().includes("resolved")).length;
+        const inProgress = match.filter(c => c.status.toLowerCase().includes("progress")).length;
+        const sla = match.filter(c => c.sla.toLowerCase().includes("terpenuhi")).length;
 
-// === DOWNLOAD JPG ===
-document.getElementById("downloadBtn").addEventListener("click",async()=>{
-  const area=document.querySelector("#resultArea");
-  const canvas=await html2canvas(area,{scale:2});
-  const link=document.createElement("a");
-  link.download="Laporan_Index_Shift.jpg";
-  link.href=canvas.toDataURL("image/jpeg");
-  link.click();
-});
-</script>
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${i + 1}</td>
+          <td>${nama}</td>
+          <td>${shift}</td>
+          <td>${match[0]?.waktu || "-"}</td>
+          <td>${total ? (resolved / total).toFixed(2) : 0}</td>
+          <td>${total}</td>
+          <td>${sla}</td>
+          <td>${inProgress}</td>
+          <td>${resolved}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    });
+
+    // === Download JPG ===
+    document.getElementById("downloadBtn").addEventListener("click", async () => {
+      const area = document.querySelector("#resultArea");
+      const canvas = await html2canvas(area, { scale: 2 });
+      const link = document.createElement("a");
+      link.download = "Laporan_Index_Shift.jpg";
+      link.href = canvas.toDataURL("image/jpeg");
+      link.click();
+    });
+  </script>
 </body>
 </html>
