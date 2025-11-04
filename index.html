@@ -8,15 +8,26 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <style>
-    body { background: #f8f9fa; }
-    .table thead th { cursor: pointer; background: #0d6efd; color: white; }
-    footer { text-align: center; font-size: 14px; color: gray; margin-top: 20px; }
+    body {
+      background-color: #f8f9fa;
+    }
+    .table thead th {
+      cursor: pointer;
+      background-color: #0d6efd;
+      color: white;
+    }
+    footer {
+      text-align: center;
+      margin-top: 25px;
+      font-size: 14px;
+      color: #6c757d;
+    }
   </style>
 </head>
 <body class="container py-4">
 
-  <h2 class="mb-3 text-primary fw-bold">Laporan Index CO</h2>
-  
+  <h2 class="text-primary fw-bold mb-4">Laporan Index CO</h2>
+
   <div class="row g-3 mb-4">
     <div class="col-md-3">
       <select id="shiftInput" class="form-select">
@@ -37,10 +48,12 @@
     </div>
   </div>
 
-  <div id="statusText" class="mb-3 text-secondary small"></div>
+  <div id="statusText" class="text-secondary small mb-3"></div>
 
+  <!-- Judul laporan otomatis -->
   <div id="judulLaporan" class="fw-bold fs-5 text-start mb-3"></div>
 
+  <!-- Area tabel -->
   <div class="table-responsive" id="resultArea">
     <table id="resultTable" class="table table-bordered align-middle">
       <thead>
@@ -72,12 +85,15 @@
     // === Ambil data dari GSheet ===
     document.getElementById("ambilBtn").addEventListener("click", async () => {
       const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
-      if (!shiftInput) return alert("Pilih shift terlebih dahulu.");
+      if (!shiftInput) {
+        alert("Pilih shift terlebih dahulu.");
+        return;
+      }
 
       document.getElementById("statusText").textContent = "Mengambil data dari Google Sheet...";
       let shifts = [];
 
-      // Shift P ambil P + P1
+      // Shift P = gabung P + P1
       if (shiftInput === "P") {
         shifts = ["P", "P1"];
       } else {
@@ -86,13 +102,18 @@
 
       sheetData = [];
       for (const s of shifts) {
-        const res = await fetch(`${GAS_URL}?shift=${s}`);
-        const data = await res.json();
-        if (!data.ok) throw new Error(data.error || "Gagal ambil data");
-        sheetData = sheetData.concat(data.karyawan || []);
+        try {
+          const res = await fetch(`${GAS_URL}?shift=${s}`);
+          const data = await res.json();
+          if (data.ok) {
+            sheetData = sheetData.concat(data.karyawan || []);
+          }
+        } catch (err) {
+          console.error("Error:", err);
+        }
       }
 
-      // Hilangkan duplikat nama
+      // Hapus duplikasi berdasarkan nama
       sheetData = sheetData.filter((v, i, a) =>
         a.findIndex(t => t.nama.trim().toLowerCase() === v.nama.trim().toLowerCase()) === i
       );
@@ -100,14 +121,19 @@
       document.getElementById("statusText").textContent =
         `Data berhasil diambil: ${sheetData.length} personil (${shifts.join(", ")}).`;
 
-      // Tampilkan tanggal otomatis
+      // Set judul laporan otomatis
       const today = new Date();
-      const tgl = today.toLocaleDateString("id-ID", { day: 'numeric', month: 'long', year: 'numeric' });
-      const shiftText = shiftInput === "P" ? "Shift 1" :
-                        shiftInput === "S" ? "Shift 2" :
-                        shiftInput === "M" ? "Shift 3" : shiftInput;
+      const tgl = today.toLocaleDateString("id-ID", {
+        day: 'numeric', month: 'long', year: 'numeric'
+      });
+
+      const shiftLabel =
+        shiftInput === "P" ? "Shift 1" :
+        shiftInput === "S" ? "Shift 2" :
+        shiftInput === "M" ? "Shift 3" : "";
+
       document.getElementById("judulLaporan").textContent =
-        `Laporan Index CO ${shiftText} — Tanggal ${tgl}`;
+        `Laporan Index CO ${shiftLabel} — Tanggal ${tgl}`;
     });
 
     // === Upload CSV ===
@@ -133,8 +159,10 @@
 
     // === Generate Tabel ===
     document.getElementById("generateBtn").addEventListener("click", () => {
-      if (!sheetData.length || !csvData.length)
-        return alert("Pastikan data GSheet dan CSV sudah dimuat.");
+      if (!sheetData.length || !csvData.length) {
+        alert("Pastikan data GSheet dan CSV sudah dimuat terlebih dahulu.");
+        return;
+      }
 
       const tbody = document.querySelector("#resultTable tbody");
       tbody.innerHTML = "";
@@ -170,7 +198,7 @@
       const area = document.querySelector("#resultArea");
       const canvas = await html2canvas(area, { scale: 2 });
       const link = document.createElement("a");
-      link.download = "Laporan_Index_Shift.jpg";
+      link.download = "Laporan_Index_CO_Shift.jpg";
       link.href = canvas.toDataURL("image/jpeg");
       link.click();
     });
