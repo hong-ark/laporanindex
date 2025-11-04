@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Laporan Index Shift (Index terakhir CO)</title>
+  <title>Laporan Index CO</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -22,7 +22,6 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
 
-    /* === HEADER TABEL === */
     #resultTable.table thead tr th {
       background-color: #1976d2 !important;
       color: white !important;
@@ -49,28 +48,24 @@
       background-color: #ffeaea !important;
     }
 
-    /* Tambahan judul dinamis */
     #judulLaporan {
-      font-size: 1.1rem;
-      font-weight: 600;
+      font-weight: 700;
       text-align: left;
       margin-bottom: 10px;
-      color: #333;
     }
 
-    /* Footer copyright */
-    .footer {
-      text-align: center;
-      font-size: 0.85rem;
+    footer {
+      text-align: right;
       color: #888;
-      margin-top: 30px;
+      margin-top: 15px;
+      font-size: 0.9rem;
     }
   </style>
 </head>
 
 <body>
   <div class="container">
-    <h4><b>Laporan Index Shift</b></h4>
+    <h4><b>Laporan Index CO</b></h4>
     <p>Input shift → Ambil nama dari GSheet → Upload CSV → Generate Tabel</p>
 
     <div class="mb-3 row">
@@ -78,10 +73,10 @@
         <label class="form-label">Shift</label>
         <select id="shiftInput" class="form-select">
           <option value="">Pilih Shift</option>
-          <option value="M">M (Malam)</option>
-          <option value="MH1">M H-1 (Malam H-1)</option>
-          <option value="S">S (Siang)</option>
-          <option value="P">P (Pagi)</option>
+          <option value="P">P (Shift 1)</option>
+          <option value="S">S (Shift 2)</option>
+          <option value="M">M (Shift 3)</option>
+          <option value="MH1">M H-1 (Shift 3 - Hari Sebelumnya)</option>
         </select>
       </div>
 
@@ -106,10 +101,8 @@
     <button id="generateBtn" class="btn btn-success mb-3" disabled>Generate Tabel</button>
     <span id="statusText" class="ms-2 text-muted"></span>
 
-    <!-- Judul dinamis di atas tabel -->
-    <div id="judulLaporan"></div>
-
     <div id="resultArea" class="mt-4">
+      <h5 id="judulLaporan"></h5>
       <table id="resultTable" class="table table-bordered table-striped">
         <thead>
           <tr>
@@ -126,13 +119,12 @@
         </thead>
         <tbody></tbody>
       </table>
+      <footer>© 2025 EDP Fai</footer>
     </div>
 
     <div class="text-end mt-3">
       <button id="downloadBtn" class="btn btn-outline-primary">Download JPG</button>
     </div>
-
-    <div class="footer">© 2025 EDP Fai</div>
   </div>
 
 <script>
@@ -141,15 +133,6 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFM
 let sheetData = [];
 let csvData = [];
 let lastResults = [];
-
-// === Status Sort ===
-let sortAscNama = true;
-let sortAscLastCO = false;
-let sortAscIndexCO = false;
-let sortAscTotalCO = true;
-let sortAscSLA = false;
-let sortAscInProgress = false;
-let sortAscRelasiResolved = false;
 
 // === AUTO TANGGAL ===
 document.getElementById("tanggalCek").textContent =
@@ -201,13 +184,12 @@ function ambilJamDariTanggal(s){
   return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-";
 }
 
-// === AMBIL DATA GSheet (termasuk MH1) ===
+// === AMBIL DATA GSheet ===
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
   if (!shiftInput) return alert("Pilih shift dulu!");
 
   document.getElementById("statusText").textContent = "Mengambil data dari GSheet...";
-
   try {
     const now = new Date();
     let tanggalLabel;
@@ -218,7 +200,13 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     } else {
       tanggalLabel = now.toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
     }
+
+    const shiftLabel = shiftInput === "P" ? "Shift 1"
+                      : shiftInput === "S" ? "Shift 2"
+                      : "Shift 3";
+
     document.getElementById("tanggalCek").textContent = tanggalLabel;
+    document.getElementById("judulLaporan").textContent = `Laporan Index CO ${shiftLabel} — Tanggal ${tanggalLabel}`;
 
     let shifts = [shiftInput];
     if (shiftInput === "P") shifts = ["P", "P1"];
@@ -239,14 +227,11 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     }
 
     sheetData = sheetData.filter((obj, idx, arr) => idx === arr.findIndex(t => t.nama === obj.nama));
-
     document.getElementById("generateBtn").disabled = false;
-    document.getElementById("statusText").textContent = `✅ ${sheetData.length} nama berhasil diambil (Shift ${shiftInput}).`;
-
+    document.getElementById("statusText").textContent = `✅ ${sheetData.length} nama berhasil diambil (${shiftLabel}).`;
   } catch (err) {
-    console.error(err);
     alert("Gagal mengambil data: " + err.message);
-    document.getElementById("statusText").textContent = "❌ Gagal mengambil data dari GSheet.";
+    document.getElementById("statusText").textContent = "❌ Gagal ambil data GSheet.";
   }
 });
 
@@ -261,6 +246,7 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
     complete:(res)=>{
       const headerMap={};
       (res.meta.fields||[]).forEach(f=>headerMap[normKey(f)]=f);
+
       const getCol=(row,arr)=>{
         for(const c of arr){
           for(const key in headerMap){
@@ -281,8 +267,9 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
         const statusRaw = getCol(r,['statuskomplain','status']);
         const statusSlaRaw = getCol(r,['statussla','status sla']);
         const tglDiambilRaw = getCol(r,['tanggaldiambil','tgl diambil','tanggal diambil']);
-        const slaNum = parseFloat((waktuSlaRaw||"").replace(",","."))||0;
+        const tipeLokasiRaw = getCol(r,['tipelokasiasal','tipe lokasi asal']);
 
+        const slaNum = parseFloat((waktuSlaRaw||"").replace(",","."))||0;
         return {
           nik: nikRaw,
           diambilOleh,
@@ -292,7 +279,8 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
           status: statusRaw,
           statusNorm: normalizeStatus(statusRaw),
           statusSLA: statusSlaRaw,
-          tanggalDiambil: tglDiambilRaw
+          tanggalDiambil: tglDiambilRaw,
+          tipeLokasi: (tipeLokasiRaw || "").trim()
         };
       });
       document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
@@ -300,70 +288,69 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
   });
 });
 
-// === GENERATE TABLE ===
-document.getElementById("generateBtn").addEventListener("click",()=>{
-  if(!sheetData.length || !csvData.length){
-    alert("Pastikan data GSheet dan CSV sudah dimuat.");
-    return;
+// === FUNGSI PERHITUNGAN ===
+function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik/r.waktuSlaDetik : 0; }
+function rataRata_byName(nama,thr=0.85){
+  const matches=[];
+  for(const r of csvData){
+    if(!isAcceptedStatus(r.statusNorm)) continue;
+    if (r.tipeLokasi && r.tipeLokasi.trim().toLowerCase() === "branch") continue;
+    if(similarity(nama,r.diambilOleh) >= thr) matches.push(r);
   }
+  if(!matches.length)
+    return{avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0,relasiResolved:0};
 
+  const sum=matches.reduce((a,b)=>a+computeC(b),0);
+  const latest=matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
+  return{
+    avg:sum/matches.length,
+    count:matches.length,
+    lastTime:ambilJamDariTanggal(latest),
+    slaCount:matches.filter(r=>r.statusSLA&&r.statusSLA.toLowerCase().includes("lewat")).length,
+    inProgressCount:matches.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length,
+    relasiResolved:matches.filter(r=>r.statusNorm.includes("pending")).length
+  };
+}
+
+// === GENERATE TABEL ===
+document.getElementById("generateBtn").addEventListener("click",()=>{
+  if(!sheetData.length)return alert("Ambil nama dulu!");
+  if(!csvData.length)return alert("Upload CSV dulu!");
+  const results=sheetData.map(k=>({k,res:rataRata_byName(k.nama)}));
+  lastResults=results;
+  renderTable(results);
+  document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
+});
+
+// === RENDER TABEL ===
+function renderTable(results){
   const tbody=document.querySelector("#resultTable tbody");
   tbody.innerHTML="";
-
-  sheetData.forEach((row,i)=>{
-    const nama=row.nama;
-    const nik=row.nik;
-    const shift=row.shift;
-    const kandidat=csvData.filter(c=>similarity(c.diambilOleh,nama)>0.7 || (c.nik && c.nik===nik));
-
-    let lastCO="-", indexCO=0, totalCO=0, sla=0, inProgress=0, relasiResolved=0;
-    if(kandidat.length){
-      kandidat.sort((a,b)=>b.durasiDetik-a.durasiDetik);
-      const last=kandidat[0];
-      lastCO=ambilJamDariTanggal(last.tanggalDiambil);
-      totalCO=kandidat.length;
-      kandidat.forEach(k=>{
-        if(isAcceptedStatus(k.statusNorm)){
-          if(k.statusNorm.includes("inprogress")) inProgress++;
-          if(k.statusNorm.includes("resolved")||k.statusNorm.includes("closed")) relasiResolved++;
-        }
-        if(k.statusSLA?.toLowerCase().includes("terpenuhi")) sla++;
-      });
-      indexCO = totalCO ? (relasiResolved/totalCO).toFixed(2) : 0;
-    }
-
+  results.forEach((item,index)=>{
+    const {k,res}=item;
+    const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
     const tr=document.createElement("tr");
+    if(res.slaCount>0)tr.className="table-danger";
     tr.innerHTML=`
-      <td>${i+1}</td>
-      <td>${nama}</td>
-      <td>${shift}</td>
-      <td>${lastCO}</td>
-      <td>${indexCO}</td>
-      <td>${totalCO}</td>
-      <td>${sla}</td>
-      <td>${inProgress}</td>
-      <td>${relasiResolved}</td>
-    `;
-    if(indexCO < 0.3) tr.classList.add("table-danger");
+      <td>${index+1}</td>
+      <td>${k.nama}</td>
+      <td>${k.shift}</td>
+      <td>${res.lastTime}</td>
+      <td>${avg}</td>
+      <td>${res.count||0}</td>
+      <td>${res.slaCount||0}</td>
+      <td>${res.inProgressCount||0}</td>
+      <td>${res.relasiResolved||0}</td>`;
     tbody.appendChild(tr);
   });
-
-  // === Judul Otomatis ===
-  const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
-  const shiftText = shiftInput === "P" ? "Shift 1" :
-                    shiftInput === "S" ? "Shift 2" :
-                    shiftInput === "M" || shiftInput === "MH1" ? "Shift 3" : shiftInput;
-  const tanggalLabel = document.getElementById("tanggalCek").textContent;
-  document.getElementById("judulLaporan").textContent =
-    `Laporan Index CO ${shiftText} — Tanggal ${tanggalLabel}`;
-});
+}
 
 // === DOWNLOAD JPG ===
 document.getElementById("downloadBtn").addEventListener("click",async()=>{
   const area=document.querySelector("#resultArea");
   const canvas=await html2canvas(area,{scale:2});
   const link=document.createElement("a");
-  link.download="Laporan_Index_Shift.jpg";
+  link.download="Laporan_Index_CO.jpg";
   link.href=canvas.toDataURL("image/jpeg");
   link.click();
 });
