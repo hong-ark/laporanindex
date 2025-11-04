@@ -13,6 +13,7 @@
       background: #f6f7fb;
       padding: 20px;
     }
+
     .container {
       max-width: 1100px;
       background: white;
@@ -21,7 +22,7 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
 
-    /* HEADER TABLE */
+    /* === HEADER TABEL === */
     #resultTable.table thead tr th {
       background-color: #1976d2 !important;
       color: white !important;
@@ -33,23 +34,36 @@
       vertical-align: middle;
       border-color: #1565c0 !important;
     }
+
     #resultTable.table thead tr th:hover {
       background-color: #1565c0 !important;
     }
+
     #resultTable td {
       text-align: center;
       vertical-align: middle;
       font-size: 0.95rem;
     }
+
     .table-danger {
       background-color: #ffeaea !important;
     }
 
-    footer {
-      margin-top: 40px;
+    /* Tambahan judul dinamis */
+    #judulLaporan {
+      font-size: 1.1rem;
+      font-weight: 600;
+      text-align: left;
+      margin-bottom: 10px;
+      color: #333;
+    }
+
+    /* Footer copyright */
+    .footer {
       text-align: center;
-      font-size: 0.9rem;
-      color: #6c757d;
+      font-size: 0.85rem;
+      color: #888;
+      margin-top: 30px;
     }
   </style>
 </head>
@@ -92,10 +106,10 @@
     <button id="generateBtn" class="btn btn-success mb-3" disabled>Generate Tabel</button>
     <span id="statusText" class="ms-2 text-muted"></span>
 
-    <!-- JUDUL OTOMATIS -->
-    <div id="judulLaporan" class="mt-4 mb-2 text-start fw-bold"></div>
+    <!-- Judul dinamis di atas tabel -->
+    <div id="judulLaporan"></div>
 
-    <div id="resultArea" class="mt-3">
+    <div id="resultArea" class="mt-4">
       <table id="resultTable" class="table table-bordered table-striped">
         <thead>
           <tr>
@@ -118,9 +132,7 @@
       <button id="downloadBtn" class="btn btn-outline-primary">Download JPG</button>
     </div>
 
-    <footer>
-      © 2025 EDP Fai
-    </footer>
+    <div class="footer">© 2025 EDP Fai</div>
   </div>
 
 <script>
@@ -130,7 +142,7 @@ let sheetData = [];
 let csvData = [];
 let lastResults = [];
 
-// === STATUS SORT ===
+// === Status Sort ===
 let sortAscNama = true;
 let sortAscLastCO = false;
 let sortAscIndexCO = false;
@@ -189,10 +201,11 @@ function ambilJamDariTanggal(s){
   return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-";
 }
 
-// === AMBIL DATA GSheet ===
+// === AMBIL DATA GSheet (termasuk MH1) ===
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
   if (!shiftInput) return alert("Pilih shift dulu!");
+
   document.getElementById("statusText").textContent = "Mengambil data dari GSheet...";
 
   try {
@@ -216,6 +229,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
       const res = await fetch(url);
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Gagal ambil data GSheet");
+
       const list = (data.karyawan || []).map(k => ({
         nama: (k.nama || "").trim(),
         nik: (k.nik || "").trim(),
@@ -223,16 +237,11 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
       }));
       sheetData = sheetData.concat(list);
     }
+
     sheetData = sheetData.filter((obj, idx, arr) => idx === arr.findIndex(t => t.nama === obj.nama));
+
     document.getElementById("generateBtn").disabled = false;
     document.getElementById("statusText").textContent = `✅ ${sheetData.length} nama berhasil diambil (Shift ${shiftInput}).`;
-
-    // === Judul Otomatis ===
-    const shiftText = shiftInput === "P" ? "Shift 1" :
-                      shiftInput === "S" ? "Shift 2" :
-                      shiftInput === "M" || shiftInput === "MH1" ? "Shift 3" : shiftInput;
-    document.getElementById("judulLaporan").innerHTML =
-      `Laporan Index CO ${shiftText} — Tanggal ${tanggalLabel}`;
 
   } catch (err) {
     console.error(err);
@@ -241,7 +250,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   }
 });
 
-// === CSV, SORT, DAN DOWNLOAD ===
+// === LOAD CSV ===
 document.getElementById("csvFile").addEventListener("change",(e)=>{
   const file=e.target.files[0];
   if(!file)return;
@@ -263,6 +272,7 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
         }
         return "";
       };
+
       csvData = res.data.map(r=>{
         const nikRaw = (getCol(r,['nikpengambil','nik'])).replace(/\D/g,'').trim();
         const diambilOleh = getCol(r,['diambiloleh','diambil oleh']);
@@ -271,8 +281,8 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
         const statusRaw = getCol(r,['statuskomplain','status']);
         const statusSlaRaw = getCol(r,['statussla','status sla']);
         const tglDiambilRaw = getCol(r,['tanggaldiambil','tgl diambil','tanggal diambil']);
-        const tipeLokasiRaw = getCol(r,['tipelokasiasal','tipe lokasi asal']);
         const slaNum = parseFloat((waktuSlaRaw||"").replace(",","."))||0;
+
         return {
           nik: nikRaw,
           diambilOleh,
@@ -282,8 +292,7 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
           status: statusRaw,
           statusNorm: normalizeStatus(statusRaw),
           statusSLA: statusSlaRaw,
-          tanggalDiambil: tglDiambilRaw,
-          tipeLokasi: (tipeLokasiRaw || "").trim()
+          tanggalDiambil: tglDiambilRaw
         };
       });
       document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
@@ -291,6 +300,65 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
   });
 });
 
+// === GENERATE TABLE ===
+document.getElementById("generateBtn").addEventListener("click",()=>{
+  if(!sheetData.length || !csvData.length){
+    alert("Pastikan data GSheet dan CSV sudah dimuat.");
+    return;
+  }
+
+  const tbody=document.querySelector("#resultTable tbody");
+  tbody.innerHTML="";
+
+  sheetData.forEach((row,i)=>{
+    const nama=row.nama;
+    const nik=row.nik;
+    const shift=row.shift;
+    const kandidat=csvData.filter(c=>similarity(c.diambilOleh,nama)>0.7 || (c.nik && c.nik===nik));
+
+    let lastCO="-", indexCO=0, totalCO=0, sla=0, inProgress=0, relasiResolved=0;
+    if(kandidat.length){
+      kandidat.sort((a,b)=>b.durasiDetik-a.durasiDetik);
+      const last=kandidat[0];
+      lastCO=ambilJamDariTanggal(last.tanggalDiambil);
+      totalCO=kandidat.length;
+      kandidat.forEach(k=>{
+        if(isAcceptedStatus(k.statusNorm)){
+          if(k.statusNorm.includes("inprogress")) inProgress++;
+          if(k.statusNorm.includes("resolved")||k.statusNorm.includes("closed")) relasiResolved++;
+        }
+        if(k.statusSLA?.toLowerCase().includes("terpenuhi")) sla++;
+      });
+      indexCO = totalCO ? (relasiResolved/totalCO).toFixed(2) : 0;
+    }
+
+    const tr=document.createElement("tr");
+    tr.innerHTML=`
+      <td>${i+1}</td>
+      <td>${nama}</td>
+      <td>${shift}</td>
+      <td>${lastCO}</td>
+      <td>${indexCO}</td>
+      <td>${totalCO}</td>
+      <td>${sla}</td>
+      <td>${inProgress}</td>
+      <td>${relasiResolved}</td>
+    `;
+    if(indexCO < 0.3) tr.classList.add("table-danger");
+    tbody.appendChild(tr);
+  });
+
+  // === Judul Otomatis ===
+  const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
+  const shiftText = shiftInput === "P" ? "Shift 1" :
+                    shiftInput === "S" ? "Shift 2" :
+                    shiftInput === "M" || shiftInput === "MH1" ? "Shift 3" : shiftInput;
+  const tanggalLabel = document.getElementById("tanggalCek").textContent;
+  document.getElementById("judulLaporan").textContent =
+    `Laporan Index CO ${shiftText} — Tanggal ${tanggalLabel}`;
+});
+
+// === DOWNLOAD JPG ===
 document.getElementById("downloadBtn").addEventListener("click",async()=>{
   const area=document.querySelector("#resultArea");
   const canvas=await html2canvas(area,{scale:2});
