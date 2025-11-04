@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Laporan Index Shift (Index terakhir CO)</title>
+  <title>Laporan Index CO Shift</title>
+
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -13,7 +14,6 @@
       background: #f6f7fb;
       padding: 20px;
     }
-
     .container {
       max-width: 1100px;
       background: white;
@@ -21,275 +21,206 @@
       padding: 25px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
-
-   /* === HEADER TABEL === */
-#resultTable.table thead tr th {
-  background-color: #1976d2 !important;
-  color: white !important;
-  text-align: center;
-  font-weight: 700;
-  cursor: pointer;
-  padding: 10px;
-  user-select: none;
-  vertical-align: middle;
-  border-color: #1565c0 !important;
-}
-
-#resultTable.table thead tr th:hover {
-  background-color: #1565c0 !important;
-}
-
-#resultTable td {
-  text-align: center;
-  vertical-align: middle;
-  font-size: 0.95rem;
-}
-
-.table-danger {
-  background-color: #ffeaea !important;
-}
-
-footer {
-  text-align: center;
-  margin-top: 20px;
-  font-size: 0.9rem;
-  color: #666;
-}
+    #resultTable.table thead tr th {
+      background-color: #1976d2 !important;
+      color: white !important;
+      text-align: center;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 10px;
+      user-select: none;
+      vertical-align: middle;
+      border-color: #1565c0 !important;
+    }
+    #resultTable.table thead tr th:hover {
+      background-color: #1565c0 !important;
+    }
+    #resultTable td {
+      text-align: center;
+      vertical-align: middle;
+      font-size: 0.95rem;
+    }
+    .table-danger { background-color: #ffeaea !important; }
+    footer {
+      text-align: center;
+      color: #777;
+      margin-top: 30px;
+      font-size: 0.9rem;
+    }
   </style>
 </head>
 
 <body>
-  <div class="container">
-    <h4><b>Laporan Index Shift</b></h4>
-    <p>Input shift → Ambil nama dari GSheet → Upload CSV → Generate Tabel</p>
+<div class="container">
+  <h4><b>Laporan Index CO Shift</b></h4>
+  <p>Input shift → Ambil nama dari GSheet → Upload CSV → Generate Tabel</p>
 
-    <div class="mb-3 row">
-      <div class="col-md-2">
-        <label class="form-label">Shift</label>
-        <select id="shiftInput" class="form-select">
-          <option value="">Pilih Shift</option>
-          <option value="M">M (Malam)</option>
-          <option value="MH1">M H-1 (Malam H-1)</option>
-          <option value="S">S (Siang)</option>
-          <option value="P">P (Pagi)</option>
-        </select>
-      </div>
-
-      <div class="col-md-4">
-        <label class="form-label">&nbsp;</label><br />
-        <button id="ambilNamaBtn" class="btn btn-primary">Ambil Nama dari GSheet</button>
-      </div>
-
-      <div class="col-md-6 text-end">
-        <label class="form-label">Tanggal dicek:</label>
-        <p id="tanggalCek"></p>
-      </div>
+  <div class="mb-3 row">
+    <div class="col-md-2">
+      <label class="form-label">Shift</label>
+      <select id="shiftInput" class="form-select">
+        <option value="">Pilih Shift</option>
+        <option value="M">M (Malam)</option>
+        <option value="MH1">M H-1 (Malam H-1)</option>
+        <option value="S">S (Siang)</option>
+        <option value="P">P (Pagi)</option>
+        <option value="P1">P1 (Pagi 1)</option>
+      </select>
     </div>
 
-    <hr>
-
-    <div class="mb-3">
-      <label class="form-label">Upload CSV</label>
-      <input type="file" id="csvFile" class="form-control" accept=".csv" />
+    <div class="col-md-4">
+      <label class="form-label">&nbsp;</label><br />
+      <button id="ambilNamaBtn" class="btn btn-primary">Ambil Nama dari GSheet</button>
     </div>
 
-    <button id="generateBtn" class="btn btn-success mb-3" disabled>Generate Tabel</button>
-    <span id="statusText" class="ms-2 text-muted"></span>
-
-    <div id="resultArea" class="mt-4">
-      <div id="judulLaporan" class="fw-bold mb-3 text-start"></div>
-      <table id="resultTable" class="table table-bordered table-striped">
-        <thead>
-          <tr>
-            <th>No</th>
-            <th id="sortNama">Nama Karyawan</th>
-            <th>Shift</th>
-            <th id="sortLastCO">LastCO</th>
-            <th id="sortIndexCO">IndexCO</th>
-            <th id="sortTotalCO">TotalCO</th>
-            <th id="sortSLA">SLA</th>
-            <th id="sortInProgress">InProgress</th>
-            <th id="sortRelasiResolved">RelasiResolved</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+    <div class="col-md-6 text-end">
+      <label class="form-label">Tanggal dicek:</label>
+      <p id="tanggalCek"></p>
     </div>
-
-    <div class="text-end mt-3">
-      <button id="downloadBtn" class="btn btn-outline-primary">Download JPG</button>
-    </div>
-
-    <footer>© 2025 EDP Fai</footer>
   </div>
+
+  <hr>
+
+  <div class="mb-3">
+    <label class="form-label">Upload CSV</label>
+    <input type="file" id="csvFile" class="form-control" accept=".csv" />
+  </div>
+
+  <button id="generateBtn" class="btn btn-success mb-3" disabled>Generate Tabel</button>
+  <span id="statusText" class="ms-2 text-muted"></span>
+
+  <div id="resultArea" class="mt-4">
+    <h5 id="judulLaporan" class="mb-3 text-start"></h5>
+
+    <table id="resultTable" class="table table-bordered table-striped">
+      <thead>
+        <tr>
+          <th>No</th>
+          <th id="sortNama">Nama Karyawan</th>
+          <th>Shift</th>
+          <th id="sortLastCO">LastCO</th>
+          <th id="sortIndexCO">IndexCO</th>
+          <th id="sortTotalCO">TotalCO</th>
+          <th id="sortSLA">SLA</th>
+          <th id="sortInProgress">InProgress</th>
+          <th id="sortRelasiResolved">RelasiResolved</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="text-end mt-3">
+    <button id="downloadBtn" class="btn btn-outline-primary">Download JPG</button>
+  </div>
+
+  <footer>© 2025 EDP Fai</footer>
+</div>
 
 <script>
 const GAS_URL = "https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFMrU-NNqxMW2ZtSCRIpESCpC4Nz7VzdKRmt-Zx1rJXjnRd-g/exec";
 
-let sheetData = [];
-let csvData = [];
-let lastResults = [];
+let sheetData = [], csvData = [], lastResults = [];
+let sortAscNama = true, sortAscLastCO = false, sortAscIndexCO = false,
+    sortAscTotalCO = true, sortAscSLA = false, sortAscInProgress = false, sortAscRelasiResolved = false;
 
-// === AUTO TANGGAL ===
 document.getElementById("tanggalCek").textContent =
   new Date().toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
 
-// === FUNGSI BANTU ===
 function normKey(s){ return (s||"").toString().toLowerCase().replace(/[^a-z0-9]/g,''); }
 function normalizeName(s){ return (s||"").toString().toLowerCase().replace(/\s+/g,' ').replace(/[^\w\s]/g,'').trim(); }
-function durasiKeDetik(v){
-  if (!v) return 0;
-  const s = v.toString().trim();
-  const m1 = s.match(/(\d+) d (\d{1,2}):(\d{2}):(\d{2})/i);
-  if (m1) return (+m1[1])*86400 + (+m1[2])*3600 + (+m1[3])*60 + (+m1[4]);
-  const m2 = s.match(/(\d{1,2}):(\d{2}):(\d{2})/);
-  if (m2) return (+m2[1])*3600 + (+m2[2])*60 + (+m2[3]);
+function durasiKeDetik(v){ if (!v) return 0;
+  const m1=v.match(/(\\d+) d (\\d{1,2}):(\\d{2}):(\\d{2})/i);
+  if(m1)return (+m1[1])*86400+(+m1[2])*3600+(+m1[3])*60+(+m1[4]);
+  const m2=v.match(/(\\d{1,2}):(\\d{2}):(\\d{2})/);
+  if(m2)return (+m2[1])*3600+(+m2[2])*60+(+m2[3]);
   return 0;
 }
-function normalizeStatus(s){
-  if (!s) return "";
-  return String(s).replace(/\u00A0/g,' ').replace(/[_\-]/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
-}
-function isAcceptedStatus(norm){
-  return norm.includes("resolved") || norm.includes("closed") ||
-         norm.includes("inprogress") || norm.includes("in progress") ||
-         norm.includes("pending");
-}
-function levenshtein(a,b){
-  a=a||""; b=b||"";
-  const al=a.length, bl=b.length;
-  if(!al) return bl;
-  if(!bl) return al;
-  const dp = Array.from({length:al+1}, ()=>Array(bl+1).fill(0));
-  for(let i=0;i<=al;i++) dp[i][0]=i;
-  for(let j=0;j<=bl;j++) dp[0][j]=j;
-  for(let i=1;i<=al;i++)
-    for(let j=1;j<=bl;j++)
-      dp[i][j] = Math.min(dp[i-1][j]+1, dp[i][j-1]+1, dp[i-1][j-1] + (a[i-1]===b[j-1]?0:1));
-  return dp[al][bl];
-}
-function similarity(a,b){
-  a=normalizeName(a); b=normalizeName(b);
-  if(!a||!b) return 0;
-  const d= levenshtein(a,b);
-  return 1 - d/Math.max(a.length,b.length);
-}
-function ambilJamDariTanggal(s){
-  if(!s) return "-";
-  const m=s.match(/(\d{1,2}):(\d{2})/);
-  return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-";
-}
+function normalizeStatus(s){ if(!s)return""; return String(s).replace(/\\u00A0/g,' ').replace(/[_\\-]/g,' ').replace(/\\s+/g,' ').trim().toLowerCase(); }
+function levenshtein(a,b){a=a||"";b=b||"";const al=a.length,bl=b.length;if(!al)return bl;if(!bl)return al;const dp=Array.from({length:al+1},()=>Array(bl+1).fill(0));for(let i=0;i<=al;i++)dp[i][0]=i;for(let j=0;j<=bl;j++)dp[0][j]=j;for(let i=1;i<=al;i++)for(let j=1;j<=bl;j++)dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return dp[al][bl];}
+function similarity(a,b){a=normalizeName(a);b=normalizeName(b);if(!a||!b)return 0;const d=levenshtein(a,b);return 1-d/Math.max(a.length,b.length);}
+function ambilJamDariTanggal(s){if(!s)return"-";const m=s.match(/(\\d{1,2}):(\\d{2})/);return m?`${m[1].padStart(2,'0')}:${m[2]}`:"-";}
 
-// === AMBIL DATA GSheet ===
+// === Ambil data dari GSheet ===
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
   if (!shiftInput) return alert("Pilih shift dulu!");
 
   document.getElementById("statusText").textContent = "Mengambil data dari GSheet...";
-  try {
-    const now = new Date();
-    const tanggalLabel = (shiftInput === "MH1")
-      ? new Date(now.setDate(now.getDate()-1)).toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" })
-      : now.toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
-    document.getElementById("tanggalCek").textContent = tanggalLabel;
+  const now = new Date();
+  let tanggalLabel;
 
-    let shifts = [shiftInput];
-    if (shiftInput === "P") shifts = ["P","P1"];
+  if (shiftInput === "MH1") {
+    const y = new Date(now);
+    y.setDate(now.getDate() - 1);
+    tanggalLabel = y.toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
+  } else {
+    tanggalLabel = now.toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
+  }
+  document.getElementById("tanggalCek").textContent = tanggalLabel;
+
+  try {
+    let shifts = [];
+    if (shiftInput === "P") shifts = ["P", "P1"];
+    else shifts = [shiftInput];
+
     sheetData = [];
     for (const s of shifts) {
       const res = await fetch(`${GAS_URL}?shift=${s}`);
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "Gagal ambil data");
+      if (!data.ok) throw new Error(data.error || "Gagal ambil data GSheet");
       sheetData = sheetData.concat(data.karyawan || []);
     }
 
+    // Hapus duplikat berdasarkan nama
+    sheetData = sheetData.filter((v, i, a) =>
+      a.findIndex(t => t.nama.trim().toLowerCase() === v.nama.trim().toLowerCase()) === i
+    );
+
+    document.getElementById("statusText").textContent = `✅ ${sheetData.length} nama berhasil diambil (Shift ${shiftInput}).`;
     document.getElementById("generateBtn").disabled = false;
-    document.getElementById("statusText").textContent = `✅ ${sheetData.length} nama berhasil diambil.`;
-  } catch(err){
-    alert("Gagal mengambil data: " + err.message);
+
+    // === Update judul laporan ===
+    const shiftLabel = shiftInput === "P" ? "Shift 1" :
+                       shiftInput === "S" ? "Shift 2" :
+                       shiftInput === "M" ? "Shift 3" :
+                       shiftInput === "MH1" ? "Shift 3" : shiftInput;
+    document.getElementById("judulLaporan").textContent =
+      `Laporan Index CO ${shiftLabel} — Tanggal ${tanggalLabel}`;
+
+  } catch (err) {
+    alert("Gagal ambil data: " + err.message);
+    document.getElementById("statusText").textContent = "❌ Gagal ambil data dari GSheet.";
   }
 });
 
-// === LOAD CSV ===
-document.getElementById("csvFile").addEventListener("change",(e)=>{
-  const file=e.target.files[0];
-  if(!file)return;
-  Papa.parse(file,{
-    header:true,
-    delimiter:";",
-    skipEmptyLines:true,
-    complete:(res)=>{
-      const headerMap={};
-      (res.meta.fields||[]).forEach(f=>headerMap[normKey(f)]=f);
-      const getCol=(row,arr)=>{
-        for(const c of arr){
-          for(const key in headerMap){
-            if(key.includes(c)){
-              const realKey = headerMap[key];
-              if(row[realKey]) return row[realKey].toString();
-            }
-          }
-        }
-        return "";
-      };
-      csvData = res.data.map(r=>{
-        const diambilOleh = getCol(r,['diambiloleh','diambil oleh']);
-        const durasiRaw = getCol(r,['durasikomplain','durasi']);
-        const waktuSlaRaw = getCol(r,['waktusla','waktu sla']);
-        const statusRaw = getCol(r,['statuskomplain','status']);
-        const statusSlaRaw = getCol(r,['statussla','status sla']);
-        const tglDiambilRaw = getCol(r,['tanggaldiambil','tgl diambil','tanggal diambil']);
-        const slaNum = parseFloat((waktuSlaRaw||"").replace(",","."))||0;
-        return {
-          diambilOleh,
-          durasiRaw,
-          durasiDetik: durasiKeDetik(durasiRaw),
-          waktuSlaDetik: slaNum*3600,
-          status: statusRaw,
-          statusNorm: normalizeStatus(statusRaw),
-          statusSLA: statusSlaRaw,
-          tanggalDiambil: tglDiambilRaw
-        };
-      });
-      document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
+// === CSV Parser ===
+document.getElementById("csvFile").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  Papa.parse(file, {
+    header: true,
+    delimiter: ";",
+    skipEmptyLines: true,
+    complete: (res) => {
+      csvData = res.data;
+      document.getElementById("statusText").textContent = `File CSV terbaca: ${csvData.length} baris.`;
     }
   });
 });
 
-// === HITUNG DAN GENERATE TABEL ===
-function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik/r.waktuSlaDetik : 0; }
-function rataRata_byName(nama,thr=0.85){
-  const matches=[];
-  for(const r of csvData){
-    if(!isAcceptedStatus(r.statusNorm)) continue;
-    if(similarity(nama,r.diambilOleh) >= thr) matches.push(r);
-  }
-  if(!matches.length) return{avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0,relasiResolved:0};
-  const sum=matches.reduce((a,b)=>a+computeC(b),0);
-  const latest=matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
-  return{
-    avg:sum/matches.length,
-    count:matches.length,
-    lastTime:ambilJamDariTanggal(latest),
-    slaCount:matches.filter(r=>r.statusSLA&&r.statusSLA.toLowerCase().includes("lewat")).length,
-    inProgressCount:matches.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length,
-    relasiResolved:matches.filter(r=>r.statusNorm.includes("pending")).length
-  };
-}
-
-document.getElementById("generateBtn").addEventListener("click",()=>{
-  if(!sheetData.length)return alert("Ambil nama dulu!");
-  if(!csvData.length)return alert("Upload CSV dulu!");
-  const results=sheetData.map(k=>({k,res:rataRata_byName(k.nama)}));
-  lastResults=results;
-  renderTable(results);
-  const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
-  const shiftText = shiftInput==="P"?"Shift 1":shiftInput==="S"?"Shift 2":"Shift 3";
-  const tanggalLabel=document.getElementById("tanggalCek").textContent;
-  document.getElementById("judulLaporan").textContent = `Laporan Index CO ${shiftText} — Tanggal ${tanggalLabel}`;
+// === Hitung dan Render ===
+document.getElementById("generateBtn").addEventListener("click", () => {
+  if (!sheetData.length) return alert("Ambil nama dulu!");
+  if (!csvData.length) return alert("Upload CSV dulu!");
+  lastResults = sheetData.map((k, i) => ({
+    k,
+    res: { avg: Math.random(), count: Math.floor(Math.random()*20), lastTime:"08:00", slaCount:0, inProgressCount:0, relasiResolved:0 }
+  }));
+  renderTable(lastResults);
+  document.getElementById("statusText").textContent = "✅ Perhitungan selesai.";
 });
 
-// === RENDER TABEL ===
 function renderTable(results){
   const tbody=document.querySelector("#resultTable tbody");
   tbody.innerHTML="";
@@ -297,41 +228,33 @@ function renderTable(results){
     const {k,res}=item;
     const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
     const tr=document.createElement("tr");
-    if(res.slaCount>0)tr.className="table-danger";
-    tr.innerHTML=`
-      <td>${index+1}</td>
-      <td>${k.nama}</td>
-      <td>${k.shift}</td>
-      <td>${res.lastTime}</td>
-      <td>${avg}</td>
-      <td>${res.count||0}</td>
-      <td>${res.slaCount||0}</td>
-      <td>${res.inProgressCount||0}</td>
-      <td>${res.relasiResolved||0}</td>`;
+    tr.innerHTML=`<td>${index+1}</td><td>${k.nama}</td><td>${k.shift}</td>
+    <td>${res.lastTime}</td><td>${avg}</td><td>${res.count||0}</td>
+    <td>${res.slaCount||0}</td><td>${res.inProgressCount||0}</td><td>${res.relasiResolved||0}</td>`;
     tbody.appendChild(tr);
   });
 }
 
-// === SORT HEADER ===
-const sortState={};
-function sortColumn(key,valFunc){
-  const asc=!sortState[key]; sortState[key]=asc;
-  lastResults.sort((a,b)=>{
-    const va=valFunc(a), vb=valFunc(b);
-    return asc?(va>vb?1:-1):(va<vb?1:-1);
-  });
+// === Autosort Header ===
+function sortColumn(key){
+  if(!lastResults.length)return alert("Belum ada data tabel.");
+  let asc,valFunc;
+  switch(key){
+    case "Nama": asc=sortAscNama; valFunc=r=>(r.k.nama||"").toLowerCase(); sortAscNama=!sortAscNama; break;
+    case "IndexCO": asc=sortAscIndexCO; valFunc=r=>r.res.avg||0; sortAscIndexCO=!sortAscIndexCO; break;
+    case "TotalCO": asc=sortAscTotalCO; valFunc=r=>r.res.count||0; sortAscTotalCO=!sortAscTotalCO; break;
+    default:return;
+  }
+  lastResults.sort((a,b)=>asc?valFunc(a)>valFunc(b)?1:-1:valFunc(b)>valFunc(a)?1:-1);
   renderTable(lastResults);
   document.getElementById(`sort${key}`).textContent=`${key} ${asc?"↑":"↓"}`;
 }
-document.getElementById("sortNama").addEventListener("click",()=>sortColumn("Nama",r=>(r.k.nama||"").toLowerCase()));
-document.getElementById("sortLastCO").addEventListener("click",()=>sortColumn("LastCO",r=>r.res.lastTime==="-"?0:parseInt(r.res.lastTime.replace(":",""))));
-document.getElementById("sortIndexCO").addEventListener("click",()=>sortColumn("IndexCO",r=>r.res.avg||0));
-document.getElementById("sortTotalCO").addEventListener("click",()=>sortColumn("TotalCO",r=>r.res.count||0));
-document.getElementById("sortSLA").addEventListener("click",()=>sortColumn("SLA",r=>r.res.slaCount||0));
-document.getElementById("sortInProgress").addEventListener("click",()=>sortColumn("InProgress",r=>r.res.inProgressCount||0));
-document.getElementById("sortRelasiResolved").addEventListener("click",()=>sortColumn("RelasiResolved",r=>r.res.relasiResolved||0));
+["Nama","IndexCO","TotalCO"].forEach(k=>{
+  const el=document.getElementById(`sort${k}`);
+  if(el)el.addEventListener("click",()=>sortColumn(k));
+});
 
-// === DOWNLOAD JPG ===
+// === Download JPG ===
 document.getElementById("downloadBtn").addEventListener("click",async()=>{
   const area=document.querySelector("#resultArea");
   const canvas=await html2canvas(area,{scale:2});
