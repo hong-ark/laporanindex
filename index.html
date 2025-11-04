@@ -22,7 +22,6 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
 
-    /* === HEADER TABEL === */
     #resultTable.table thead tr th {
       background-color: #1976d2 !important;
       color: white !important;
@@ -49,7 +48,6 @@
       background-color: #ffeaea !important;
     }
 
-    /* === JUDUL LAPORAN DINAMIS === */
     #judulLaporan {
       font-size: 1.1rem;
       font-weight: 600;
@@ -98,7 +96,6 @@
     <button id="generateBtn" class="btn btn-success mb-3" disabled>Generate Tabel</button>
     <span id="statusText" class="ms-2 text-muted"></span>
 
-    <!-- === JUDUL LAPORAN DINAMIS === -->
     <div id="judulLaporan"></div>
 
     <div id="resultArea" class="mt-2">
@@ -131,23 +128,12 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFM
 let sheetData = [];
 let csvData = [];
 let lastResults = [];
-let tanggalLaporan = ""; // untuk judul
-let shiftDipilih = "";   // untuk judul
+let tanggalLaporan = "";
+let shiftDipilih = "";
 
-// === STATUS SORT ===
-let sortAscNama = true;
-let sortAscLastCO = false;
-let sortAscIndexCO = false;
-let sortAscTotalCO = true;
-let sortAscSLA = false;
-let sortAscInProgress = false;
-let sortAscRelasiResolved = false;
-
-// === AUTO TANGGAL ===
 document.getElementById("tanggalCek").textContent =
   new Date().toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
 
-// === FUNGSI BANTU ===
 function normKey(s){ return (s||"").toString().toLowerCase().replace(/[^a-z0-9]/g,''); }
 function normalizeName(s){ return (s||"").toString().toLowerCase().replace(/\s+/g,' ').replace(/[^\w\s]/g,'').trim(); }
 function durasiKeDetik(v){
@@ -184,7 +170,7 @@ function levenshtein(a,b){
 function similarity(a,b){
   a=normalizeName(a); b=normalizeName(b);
   if(!a||!b) return 0;
-  const d= levenshtein(a,b);
+  const d=levenshtein(a,b);
   return 1 - d/Math.max(a.length,b.length);
 }
 function ambilJamDariTanggal(s){
@@ -199,7 +185,6 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   if (!shiftInput) return alert("Pilih shift dulu!");
 
   shiftDipilih = shiftInput;
-
   document.getElementById("statusText").textContent = "Mengambil data dari GSheet...";
 
   try {
@@ -235,7 +220,6 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
 
     document.getElementById("generateBtn").disabled = false;
     document.getElementById("statusText").textContent = `✅ ${sheetData.length} nama berhasil diambil (Shift ${shiftInput}).`;
-
   } catch (err) {
     console.error(err);
     alert("Gagal mengambil data: " + err.message);
@@ -243,8 +227,36 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   }
 });
 
-// === LOAD CSV === (tidak diubah) ===
-// ... (kode load CSV sama persis dengan versi kamu di atas) ...
+// === LOAD CSV ===
+document.getElementById("csvFile").addEventListener("change", function(e) {
+  const file = e.target.files[0];
+  if (!file) return alert("Pilih file CSV terlebih dahulu!");
+
+  document.getElementById("statusText").textContent = "📥 Membaca file CSV...";
+
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: function(results) {
+      csvData = results.data.map(r => ({
+        diambilOleh: (r["Diambil Oleh"] || r["Assignee"] || "").trim(),
+        status: (r["Status"] || "").trim(),
+        statusNorm: normalizeStatus(r["Status"]),
+        tipeLokasi: (r["Tipe Lokasi"] || r["Site Type"] || "").trim(),
+        tanggalDiambil: (r["Tanggal Diambil"] || r["Created"] || r["Tanggal"] || "").trim(),
+        durasiDetik: durasiKeDetik(r["Durasi"] || r["Duration"]),
+        waktuSlaDetik: durasiKeDetik(r["Waktu SLA"] || r["SLA"]),
+        statusSLA: (r["Status SLA"] || "").trim()
+      }));
+      document.getElementById("statusText").textContent = `✅ File CSV berhasil dibaca (${csvData.length} baris).`;
+    },
+    error: function(err) {
+      console.error(err);
+      alert("Gagal membaca file CSV: " + err.message);
+      document.getElementById("statusText").textContent = "❌ Gagal membaca file CSV.";
+    }
+  });
+});
 
 // === PENGHITUNGAN ===
 function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik/r.waktuSlaDetik : 0; }
@@ -279,7 +291,6 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
   lastResults=results;
   renderTable(results);
 
-  // === Tambahkan judul dinamis ===
   const shiftLabel = shiftDipilih === "P" ? "Shift 1"
                     : shiftDipilih === "S" ? "Shift 2"
                     : (shiftDipilih === "M" || shiftDipilih === "MH1") ? "Shift 3"
