@@ -7,61 +7,111 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
   <style>
-    body { background: #f6f7fb; padding: 20px; }
-    .container { max-width: 1100px; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
-    table { font-size: 15px; }
-    #resultTable th { background: #f2f2f2; text-align: center; cursor: pointer; }
-    #resultTable th:hover { background:#e8e8e8; }
+    body {
+      background: #f6f7fb;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1100px;
+      background: white;
+      border-radius: 10px;
+      padding: 25px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    #judulLaporan {
+      font-weight: 700;
+      font-size: 18px;
+      text-align: left;
+      margin-bottom: 10px;
+    }
+
+    /* === HEADER TABEL === */
+    #resultTable.table thead tr th {
+      background-color: #1976d2 !important;
+      color: white !important;
+      text-align: center;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 10px;
+      user-select: none;
+      vertical-align: middle;
+      border-color: #1565c0 !important;
+    }
+
+    #resultTable.table thead tr th:hover {
+      background-color: #1565c0 !important;
+    }
+
+    #resultTable td {
+      text-align: center;
+      vertical-align: middle;
+      font-size: 0.95rem;
+    }
+
+    .table-danger {
+      background-color: #ffeaea !important;
+    }
   </style>
 </head>
+
 <body>
   <div class="container">
     <h4><b>Laporan Index Shift</b></h4>
-    <p>Input shift → Ambil nama dari GSheet → Upload CSV dari WEB CO → Generate Tabel.</p>
+    <p>Input shift → Ambil nama dari GSheet → Upload CSV → Generate Tabel</p>
 
     <div class="mb-3 row">
       <div class="col-md-2">
         <label class="form-label">Shift</label>
-        <input type="text" id="shiftInput" class="form-control" maxlength="2" placeholder="M / P / S" />
+        <select id="shiftInput" class="form-select">
+          <option value="">Pilih Shift</option>
+          <option value="M">M (Malam)</option>
+          <option value="MH1">M H-1 (Malam H-1)</option>
+          <option value="S">S (Siang)</option>
+          <option value="P">P (Pagi)</option>
+        </select>
       </div>
+
       <div class="col-md-4">
         <label class="form-label">&nbsp;</label><br />
-        <button id="ambilNamaBtn" class="btn btn-primary">Ambil Nama dari GSheet Jadwal</button>
+        <button id="ambilNamaBtn" class="btn btn-primary">Ambil Nama dari GSheet</button>
       </div>
+
       <div class="col-md-6 text-end">
-        <label class="form-label">Tanggal yang dicek:</label>
+        <label class="form-label">Tanggal dicek:</label>
         <p id="tanggalCek"></p>
       </div>
     </div>
 
-    <hr />
+    <hr>
 
     <div class="mb-3">
-      <label for="csvFile" class="form-label">Upload file CSV dari WEB CO</label>
+      <label class="form-label">Upload CSV</label>
       <input type="file" id="csvFile" class="form-control" accept=".csv" />
-      <small class="text-muted">
-        Pastikan CSV punya header seperti (NIK Pengambil, Durasi Komplain, Waktu SLA, Status Komplain, Status SLA, 
-        Tanggal Diambil, Diambil Oleh, Dibuat Oleh).
-      </small>
     </div>
 
     <button id="generateBtn" class="btn btn-success mb-3" disabled>Generate Tabel</button>
     <span id="statusText" class="ms-2 text-muted"></span>
 
-    <div id="resultArea" class="mt-4">
-      <h5 id="judulLaporan" class="mb-3 text-start"></h5>
+    <!-- === Tambahan Judul di atas tabel === -->
+    <h5 id="judulLaporan" class="mt-4"></h5>
+
+    <div id="resultArea" class="mt-2">
       <table id="resultTable" class="table table-bordered table-striped">
         <thead>
           <tr>
             <th>No</th>
-            <th id="sortNama">Nama Karyawan ⬍</th>
+            <th id="sortNama">Nama Karyawan</th>
             <th>Shift</th>
-            <th id="sortLastCO">LastCO ⬍</th>
-            <th id="sortIndexCO">IndexCO ⬍</th>
-            <th id="sortTotalCO">TotalCO ⬍</th>
-            <th id="sortSLA">SLA ⬍</th>
-            <th id="sortInProgress">InProgress ⬍</th>
+            <th id="sortLastCO">LastCO</th>
+            <th id="sortIndexCO">IndexCO</th>
+            <th id="sortTotalCO">TotalCO</th>
+            <th id="sortSLA">SLA</th>
+            <th id="sortInProgress">InProgress</th>
+            <th id="sortRelasiResolved">RelasiResolved</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -74,107 +124,126 @@
   </div>
 
 <script>
-const GAS_URL = "https://script.google.com/macros/s/AKfycbyoPTlFn5NSBWlDLAT5tvfui9ZKe-l1-INlSmjZ9wWTD3bva3XiP1xp9R2i7K5eTPHqIg/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFMrU-NNqxMW2ZtSCRIpESCpC4Nz7VzdKRmt-Zx1rJXjnRd-g/exec";
 
 let sheetData = [];
 let csvData = [];
 let lastResults = [];
+let shiftLabel = "";
 
-// status sort default
+// === Status Sort ===
 let sortAscNama = true;
 let sortAscLastCO = false;
 let sortAscIndexCO = false;
 let sortAscTotalCO = true;
 let sortAscSLA = false;
 let sortAscInProgress = false;
+let sortAscRelasiResolved = false;
 
+// === AUTO TANGGAL ===
 document.getElementById("tanggalCek").textContent =
   new Date().toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
 
-// ==== Fungsi bantu umum ====
+// === FUNGSI BANTU ===
 function normKey(s){ return (s||"").toString().toLowerCase().replace(/[^a-z0-9]/g,''); }
 function normalizeName(s){ return (s||"").toString().toLowerCase().replace(/\s+/g,' ').replace(/[^\w\s]/g,'').trim(); }
-
 function durasiKeDetik(v){
   if (!v) return 0;
   const s = v.toString().trim();
-  const m1 = s.match(/(\d+)\s*d\s*(\d{1,2}):(\d{2}):(\d{2})$/i);
+  const m1 = s.match(/(\d+) d (\d{1,2}):(\d{2}):(\d{2})/i);
   if (m1) return (+m1[1])*86400 + (+m1[2])*3600 + (+m1[3])*60 + (+m1[4]);
-  const m2 = s.match(/(\d{1,2}):(\d{2}):(\d{2})$/);
+  const m2 = s.match(/(\d{1,2}):(\d{2}):(\d{2})/);
   if (m2) return (+m2[1])*3600 + (+m2[2])*60 + (+m2[3]);
   return 0;
 }
-
 function normalizeStatus(s){
-  if (!s && s !== 0) return "";
+  if (!s) return "";
   return String(s).replace(/\u00A0/g,' ').replace(/[_\-]/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
 }
-function isAcceptedStatus(norm){ 
+function isAcceptedStatus(norm){
   return norm.includes("resolved") || norm.includes("closed") ||
-         norm.includes("in progress") || norm.includes("inprogress") ||
-         norm.includes("pending"); 
+         norm.includes("inprogress") || norm.includes("in progress") ||
+         norm.includes("pending");
 }
-
 function levenshtein(a,b){
   a=a||""; b=b||"";
   const al=a.length, bl=b.length;
-  if(!al)return bl; if(!bl)return al;
-  const dp=Array.from({length:al+1},()=>new Array(bl+1).fill(0));
-  for(let i=0;i<=al;i++)dp[i][0]=i;
-  for(let j=0;j<=bl;j++)dp[0][j]=j;
+  if(!al) return bl;
+  if(!bl) return al;
+  const dp = Array.from({length:al+1}, ()=>Array(bl+1).fill(0));
+  for(let i=0;i<=al;i++) dp[i][0]=i;
+  for(let j=0;j<=bl;j++) dp[0][j]=j;
   for(let i=1;i<=al;i++)
     for(let j=1;j<=bl;j++)
-      dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+      dp[i][j] = Math.min(dp[i-1][j]+1, dp[i][j-1]+1, dp[i-1][j-1] + (a[i-1]===b[j-1]?0:1));
   return dp[al][bl];
 }
 function similarity(a,b){
   a=normalizeName(a); b=normalizeName(b);
-  if(!a||!b)return 0;
-  const d=levenshtein(a,b);
+  if(!a||!b) return 0;
+  const d= levenshtein(a,b);
   return 1 - d/Math.max(a.length,b.length);
 }
-
 function ambilJamDariTanggal(s){
-  if(!s)return "-";
-  const m=s.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
+  if(!s) return "-";
+  const m=s.match(/(\d{1,2}):(\d{2})/);
   return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-";
 }
 
-// ==== Ambil data dari GSheet ====
+// === Ambil data dari GSheet ===
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
-  if (!shiftInput) return alert("Masukkan shift (M, P, atau S)");
-  document.getElementById("statusText").textContent = "Mengambil data dari Google Sheet...";
+  if (!shiftInput) return alert("Pilih shift dulu!");
+
+  document.getElementById("statusText").textContent = "Mengambil data dari GSheet...";
 
   try {
-    // Jika shift P, ambil juga P1
+    const now = new Date();
+    let tanggalLabel;
+    if (shiftInput === "MH1") {
+      const y = new Date(now);
+      y.setDate(now.getDate() - 1);
+      tanggalLabel = y.toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
+    } else {
+      tanggalLabel = now.toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
+    }
+    document.getElementById("tanggalCek").textContent = tanggalLabel;
+
     let shifts = [shiftInput];
     if (shiftInput === "P") shifts = ["P", "P1"];
 
-    sheetData = [];
+    // label shift human-readable
+    const shiftMap = { P: "Shift 1", S: "Shift 2", M: "Shift 3", MH1: "Shift 3 (H-1)" };
+    shiftLabel = shiftMap[shiftInput] || shiftInput;
 
+    sheetData = [];
     for (const s of shifts) {
-      const res = await fetch(`${GAS_URL}?shift=${s}`);
+      const url = `${GAS_URL}?shift=${encodeURIComponent(s)}`;
+      const res = await fetch(url);
       const data = await res.json();
-      const karyawanList = (data.karyawan || []).map(k => ({
+      if (!data.ok) throw new Error(data.error || "Gagal ambil data GSheet");
+
+      const list = (data.karyawan || []).map(k => ({
         nama: (k.nama || "").trim(),
         nik: (k.nik || "").trim(),
-        shift: s
+        shift: (k.shift || "").trim()
       }));
-      sheetData = sheetData.concat(karyawanList);
+      sheetData = sheetData.concat(list);
     }
 
-    document.getElementById("statusText").textContent =
-      sheetData.length ? `✅ Data ditemukan: ${sheetData.length} orang (Shift ${shifts.join(" / ")})`
-                       : "⚠️ Tidak ada data karyawan ditemukan.";
-    document.getElementById("generateBtn").disabled = !sheetData.length;
+    sheetData = sheetData.filter((obj, idx, arr) => idx === arr.findIndex(t => t.nama === obj.nama));
+
+    document.getElementById("generateBtn").disabled = false;
+    document.getElementById("statusText").textContent = `✅ ${sheetData.length} nama berhasil diambil (Shift ${shiftInput}).`;
 
   } catch (err) {
-    document.getElementById("statusText").textContent = "Gagal memanggil API: " + err.message;
+    console.error(err);
+    alert("Gagal mengambil data: " + err.message);
+    document.getElementById("statusText").textContent = "❌ Gagal mengambil data dari GSheet.";
   }
 });
 
-// ==== Upload CSV ====
+// === CSV Load ===
 document.getElementById("csvFile").addEventListener("change",(e)=>{
   const file=e.target.files[0];
   if(!file)return;
@@ -185,8 +254,18 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
     complete:(res)=>{
       const headerMap={};
       (res.meta.fields||[]).forEach(f=>headerMap[normKey(f)]=f);
-      const getCol=(row,arr)=>{ for(const c of arr){ const k=headerMap[c]; if(k&&row[k]) return row[k].toString(); } return ""; };
-      csvData=res.data.map(r=>{
+      const getCol=(row,arr)=>{
+        for(const c of arr){
+          for(const key in headerMap){
+            if(key.includes(c)){
+              const realKey = headerMap[key];
+              if(row[realKey]) return row[realKey].toString();
+            }
+          }
+        }
+        return "";
+      };
+      csvData = res.data.map(r=>{
         const nikRaw=(getCol(r,['nikpengambil','nik'])).replace(/\D/g,'').trim();
         const diambilOleh=getCol(r,['diambiloleh','diambil oleh']);
         const durasiRaw=getCol(r,['durasikomplain','durasi']);
@@ -194,6 +273,7 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
         const statusRaw=getCol(r,['statuskomplain','status']);
         const statusSlaRaw=getCol(r,['statussla','status sla']);
         const tglDiambilRaw=getCol(r,['tanggaldiambil','tgl diambil','tanggal diambil']);
+        const tipeLokasiRaw=getCol(r,['tipelokasiasal','tipe lokasi asal']);
         const slaNum=parseFloat((waktuSlaRaw||"").replace(",","."))||0;
         return{
           nik:nikRaw,
@@ -204,7 +284,8 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
           status:statusRaw,
           statusNorm:normalizeStatus(statusRaw),
           statusSLA:statusSlaRaw,
-          tanggalDiambil:tglDiambilRaw
+          tanggalDiambil:tglDiambilRaw,
+          tipeLokasi:(tipeLokasiRaw||"").trim()
         };
       });
       document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
@@ -212,24 +293,41 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
   });
 });
 
-// ==== Perhitungan ====
+// === Perhitungan ===
 function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik/r.waktuSlaDetik : 0; }
-
-function rataRata_byName(nama,thr=0.65){
+function rataRata_byName(nama,thr=0.85){
   const matches=[];
   for(const r of csvData){
-    if(!isAcceptedStatus(r.statusNorm))continue;
-    if(similarity(nama,r.diambilOleh)>=thr)matches.push(r);
+    if(!isAcceptedStatus(r.statusNorm)) continue;
+    if (r.tipeLokasi && r.tipeLokasi.trim().toLowerCase()==="branch") continue;
+    if(similarity(nama,r.diambilOleh)>=thr) matches.push(r);
   }
-  if(!matches.length)return{avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0};
+  if(!matches.length) return {avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0,relasiResolved:0};
   const sum=matches.reduce((a,b)=>a+computeC(b),0);
   const latest=matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
-  const slaCount=matches.filter(r=>r.statusSLA&&r.statusSLA.toLowerCase().includes("lewat")).length;
-  const inProgressCount=matches.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length;
-  return{avg:sum/matches.length,count:matches.length,lastTime:ambilJamDariTanggal(latest),slaCount,inProgressCount};
+  return{
+    avg:sum/matches.length,
+    count:matches.length,
+    lastTime:ambilJamDariTanggal(latest),
+    slaCount:matches.filter(r=>r.statusSLA&&r.statusSLA.toLowerCase().includes("lewat")).length,
+    inProgressCount:matches.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length,
+    relasiResolved:matches.filter(r=>r.statusNorm.includes("pending")).length
+  };
 }
 
-// ==== Render tabel ====
+// === Generate Tabel ===
+document.getElementById("generateBtn").addEventListener("click",()=>{
+  if(!sheetData.length)return alert("Ambil nama dulu!");
+  if(!csvData.length)return alert("Upload CSV dulu!");
+  const results=sheetData.map(k=>({k,res:rataRata_byName(k.nama)}));
+  lastResults=results;
+  renderTable(results);
+  const tgl=document.getElementById("tanggalCek").textContent;
+  document.getElementById("judulLaporan").textContent = `Laporan Index CO ${shiftLabel} — Tanggal ${tgl}`;
+  document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
+});
+
+// === Render Tabel ===
 function renderTable(results){
   const tbody=document.querySelector("#resultTable tbody");
   tbody.innerHTML="";
@@ -237,6 +335,7 @@ function renderTable(results){
     const {k,res}=item;
     const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
     const tr=document.createElement("tr");
+    if(res.slaCount>0)tr.className="table-danger";
     tr.innerHTML=`
       <td>${index+1}</td>
       <td>${k.nama}</td>
@@ -245,96 +344,40 @@ function renderTable(results){
       <td>${avg}</td>
       <td>${res.count||0}</td>
       <td>${res.slaCount||0}</td>
-      <td>${res.inProgressCount||0}</td>`;
+      <td>${res.inProgressCount||0}</td>
+      <td>${res.relasiResolved||0}</td>`;
     tbody.appendChild(tr);
   });
 }
 
-// ==== Generate tabel utama ====
-document.getElementById("generateBtn").addEventListener("click", () => {
-  if (!sheetData.length) return alert("Ambil nama dari GSheet dulu.");
-  if (!csvData.length) return alert("Upload file CSV dulu.");
-
-  const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
-  let shiftLabel = "";
-  if (shiftInput === "P") shiftLabel = "Shift 1";
-  else if (shiftInput === "S") shiftLabel = "Shift 2";
-  else if (shiftInput === "M") shiftLabel = "Shift 3";
-  else shiftLabel = `Shift ${shiftInput}`;
-
-  const tanggal = document.getElementById("tanggalCek").textContent || "-";
-
-  // update judul laporan
-  const judul = document.getElementById("judulLaporan");
-  judul.textContent = `Laporan Index CO ${shiftLabel} - Tgl ${tanggal}`;
-  judul.style.fontWeight = "bold";
-  judul.style.textAlign = "left";
-
-  const results = sheetData.map(k => ({ k, res: rataRata_byName(k.nama) }));
-  lastResults = results;
-  renderTable(results);
-  document.getElementById("statusText").textContent = "✅ Perhitungan selesai.";
-});
-
-// ==== Sort fungsi universal ====
+// === Sorting ===
 function sortColumn(key){
-  if(!lastResults.length) return alert("Belum ada data tabel.");
-  let asc;
-  let valFunc;
+  if(!lastResults.length)return alert("Belum ada data tabel.");
+  let asc,valFunc;
   switch(key){
-    case "Nama": 
-      asc = sortAscNama;
-      valFunc = r => (r.k.nama || "").toLowerCase();
-      sortAscNama = !sortAscNama;
-      break;
-    case "LastCO": 
-      asc = sortAscLastCO; 
-      valFunc = r => r.res.lastTime==="-" ? 0 : parseInt(r.res.lastTime.replace(":","")); 
-      sortAscLastCO = !sortAscLastCO; 
-      break;
-    case "IndexCO": 
-      asc = sortAscIndexCO; 
-      valFunc = r => r.res.avg!==null ? r.res.avg : 0; 
-      sortAscIndexCO = !sortAscIndexCO; 
-      break;
-    case "TotalCO": 
-      asc = sortAscTotalCO; 
-      valFunc = r => r.res.count||0; 
-      sortAscTotalCO = !sortAscTotalCO; 
-      break;
-    case "SLA": 
-      asc = sortAscSLA; 
-      valFunc = r => r.res.slaCount||0; 
-      sortAscSLA = !sortAscSLA; 
-      break;
-    case "InProgress": 
-      asc = sortAscInProgress; 
-      valFunc = r => r.res.inProgressCount||0; 
-      sortAscInProgress = !sortAscInProgress; 
-      break;
-    default: return;
+    case "Nama": asc=sortAscNama; valFunc=r=>(r.k.nama||"").toLowerCase(); sortAscNama=!sortAscNama; break;
+    case "LastCO": asc=sortAscLastCO; valFunc=r=>r.res.lastTime==="-"?0:parseInt(r.res.lastTime.replace(":","")); sortAscLastCO=!sortAscLastCO; break;
+    case "IndexCO": asc=sortAscIndexCO; valFunc=r=>r.res.avg||0; sortAscIndexCO=!sortAscIndexCO; break;
+    case "TotalCO": asc=sortAscTotalCO; valFunc=r=>r.res.count||0; sortAscTotalCO=!sortAscTotalCO; break;
+    case "SLA": asc=sortAscSLA; valFunc=r=>r.res.slaCount||0; sortAscSLA=!sortAscSLA; break;
+    case "InProgress": asc=sortAscInProgress; valFunc=r=>r.res.inProgressCount||0; sortAscInProgress=!sortAscInProgress; break;
+    case "RelasiResolved": asc=sortAscRelasiResolved; valFunc=r=>r.res.relasiResolved||0; sortAscRelasiResolved=!sortAscRelasiResolved; break;
+    default:return;
   }
-
-  if(key === "Nama"){
-    lastResults.sort((a,b)=> asc 
-      ? valFunc(a).localeCompare(valFunc(b))
-      : valFunc(b).localeCompare(valFunc(a))
-    );
-  } else {
-    lastResults.sort((a,b)=> asc ? (valFunc(a)-valFunc(b)) : (valFunc(b)-valFunc(a)));
+  if(key==="Nama"){
+    lastResults.sort((a,b)=>asc?valFunc(a).localeCompare(valFunc(b)):valFunc(b).localeCompare(valFunc(a)));
+  }else{
+    lastResults.sort((a,b)=>asc?(valFunc(a)-valFunc(b)):(valFunc(b)-valFunc(a)));
   }
-
   renderTable(lastResults);
-  document.getElementById(`sort${key}`).textContent = `${key} ${asc?"↑":"↓"}`;
+  document.getElementById(`sort${key}`).textContent=`${key} ${asc?"↑":"↓"}`;
 }
-
-// ==== Event listener sort ====
-["Nama","LastCO","IndexCO","TotalCO","SLA","InProgress"].forEach(k=>{
+["Nama","LastCO","IndexCO","TotalCO","SLA","InProgress","RelasiResolved"].forEach(k=>{
   const el=document.getElementById(`sort${k}`);
-  if(el) el.addEventListener("click",()=>sortColumn(k));
+  if(el)el.addEventListener("click",()=>sortColumn(k));
 });
 
-// ==== Download JPG ====
+// === Download JPG ===
 document.getElementById("downloadBtn").addEventListener("click",async()=>{
   const area=document.querySelector("#resultArea");
   const canvas=await html2canvas(area,{scale:2});
