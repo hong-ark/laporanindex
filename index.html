@@ -22,33 +22,40 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
 
-   /* === HEADER TABEL === */
-#resultTable.table thead tr th {
-  background-color: #1976d2 !important; /* Biru solid */
-  color: white !important;               /* Font putih */
-  text-align: center;
-  font-weight: 700;
-  cursor: pointer;
-  padding: 10px;
-  user-select: none;
-  vertical-align: middle;
-  border-color: #1565c0 !important;      /* Batas antar header lebih lembut */
-}
+    #resultTable.table thead tr th {
+      background-color: #1976d2 !important;
+      color: white !important;
+      text-align: center;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 10px;
+      user-select: none;
+      vertical-align: middle;
+      border-color: #1565c0 !important;
+    }
 
-#resultTable.table thead tr th:hover {
-  background-color: #1565c0 !important;  /* Biru lebih gelap saat hover */
-}
+    #resultTable.table thead tr th:hover {
+      background-color: #1565c0 !important;
+    }
 
-#resultTable td {
-  text-align: center;
-  vertical-align: middle;
-  font-size: 0.95rem;
-}
+    #resultTable td {
+      text-align: center;
+      vertical-align: middle;
+      font-size: 0.95rem;
+    }
 
-.table-danger {
-  background-color: #ffeaea !important;
-}
+    .table-danger {
+      background-color: #ffeaea !important;
+    }
 
+    #judulLaporan {
+      text-align: center;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: #0d47a1;
+      margin-top: 15px;
+      margin-bottom: 15px;
+    }
   </style>
 </head>
 
@@ -90,7 +97,10 @@
     <button id="generateBtn" class="btn btn-success mb-3" disabled>Generate Tabel</button>
     <span id="statusText" class="ms-2 text-muted"></span>
 
-    <div id="resultArea" class="mt-4">
+    <!-- Judul laporan dinamis -->
+    <div id="judulLaporan"></div>
+
+    <div id="resultArea" class="mt-2">
       <table id="resultTable" class="table table-bordered table-striped">
         <thead>
           <tr>
@@ -114,22 +124,14 @@
     </div>
   </div>
 
-
 <script>
 const GAS_URL = "https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFMrU-NNqxMW2ZtSCRIpESCpC4Nz7VzdKRmt-Zx1rJXjnRd-g/exec";
 
 let sheetData = [];
 let csvData = [];
 let lastResults = [];
-
-// === Status Sort ===
-let sortAscNama = true;
-let sortAscLastCO = false;
-let sortAscIndexCO = false;
-let sortAscTotalCO = true;
-let sortAscSLA = false;
-let sortAscInProgress = false;
-let sortAscRelasiResolved = false;
+let tanggalLaporan = "";
+let shiftDipilih = "";
 
 // === AUTO TANGGAL ===
 document.getElementById("tanggalCek").textContent =
@@ -181,24 +183,24 @@ function ambilJamDariTanggal(s){
   return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-";
 }
 
-// === AMBIL DATA GSheet (termasuk MH1) ===
+// === AMBIL DATA GSheet ===
 document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
   if (!shiftInput) return alert("Pilih shift dulu!");
 
+  shiftDipilih = shiftInput;
   document.getElementById("statusText").textContent = "Mengambil data dari GSheet...";
 
   try {
     const now = new Date();
-    let tanggalLabel;
     if (shiftInput === "MH1") {
       const y = new Date(now);
       y.setDate(now.getDate() - 1);
-      tanggalLabel = y.toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
+      tanggalLaporan = y.toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
     } else {
-      tanggalLabel = now.toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
+      tanggalLaporan = now.toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
     }
-    document.getElementById("tanggalCek").textContent = tanggalLabel;
+    document.getElementById("tanggalCek").textContent = tanggalLaporan;
 
     let shifts = [shiftInput];
     if (shiftInput === "P") shifts = ["P", "P1"];
@@ -219,7 +221,6 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
     }
 
     sheetData = sheetData.filter((obj, idx, arr) => idx === arr.findIndex(t => t.nama === obj.nama));
-
     document.getElementById("generateBtn").disabled = false;
     document.getElementById("statusText").textContent = `✅ ${sheetData.length} nama berhasil diambil (Shift ${shiftInput}).`;
 
@@ -230,170 +231,30 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
   }
 });
 
-// === LOAD CSV ===
-document.getElementById("csvFile").addEventListener("change",(e)=>{
-  const file=e.target.files[0];
-  if(!file)return;
-  Papa.parse(file,{
-    header:true,
-    delimiter:";",
-    skipEmptyLines:true,
-    complete:(res)=>{
-      const headerMap={};
-      (res.meta.fields||[]).forEach(f=>headerMap[normKey(f)]=f);
-
-      // cari kolom berdasarkan pola nama
-      const getCol=(row,arr)=>{
-        for(const c of arr){
-          for(const key in headerMap){
-            if(key.includes(c)){
-              const realKey = headerMap[key];
-              if(row[realKey]) return row[realKey].toString();
-            }
-          }
-        }
-        return "";
-      };
-
-      csvData = res.data.map(r=>{
-        const nikRaw = (getCol(r,['nikpengambil','nik'])).replace(/\D/g,'').trim();
-        const diambilOleh = getCol(r,['diambiloleh','diambil oleh']);
-        const durasiRaw = getCol(r,['durasikomplain','durasi']);
-        const waktuSlaRaw = getCol(r,['waktusla','waktu sla']);
-        const statusRaw = getCol(r,['statuskomplain','status']);
-        const statusSlaRaw = getCol(r,['statussla','status sla']);
-        const tglDiambilRaw = getCol(r,['tanggaldiambil','tgl diambil','tanggal diambil']);
-        const tipeLokasiRaw = getCol(r,['tipelokasiasal','tipe lokasi asal']); // ✅ kolom baru
-
-        const slaNum = parseFloat((waktuSlaRaw||"").replace(",","."))||0;
-        return {
-          nik: nikRaw,
-          diambilOleh,
-          durasiRaw,
-          durasiDetik: durasiKeDetik(durasiRaw),
-          waktuSlaDetik: slaNum*3600,
-          status: statusRaw,
-          statusNorm: normalizeStatus(statusRaw),
-          statusSLA: statusSlaRaw,
-          tanggalDiambil: tglDiambilRaw,
-          tipeLokasi: (tipeLokasiRaw || "").trim()
-        };
-      });
-      document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
-    }
-  });
-});
-
-// === PENGHITUNGAN ===
-function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik/r.waktuSlaDetik : 0; }
-function rataRata_byName(nama,thr=0.85){
-  const matches=[];
-  for(const r of csvData){
-    if(!isAcceptedStatus(r.statusNorm)) continue;
-
-    // ❌ Abaikan jika tipe lokasi asal = Branch
-    if (r.tipeLokasi && r.tipeLokasi.trim().toLowerCase() === "branch") continue;
-
-    if(similarity(nama,r.diambilOleh) >= thr) matches.push(r);
-  }
-  if(!matches.length)
-    return{avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0,relasiResolved:0};
-
-  const sum=matches.reduce((a,b)=>a+computeC(b),0);
-  const latest=matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
-  return{
-    avg:sum/matches.length,
-    count:matches.length,
-    lastTime:ambilJamDariTanggal(latest),
-    slaCount:matches.filter(r=>r.statusSLA&&r.statusSLA.toLowerCase().includes("lewat")).length,
-    inProgressCount:matches.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length,
-    relasiResolved:matches.filter(r=>r.statusNorm.includes("pending")).length
-  };
-}
-
 // === GENERATE TABEL ===
 document.getElementById("generateBtn").addEventListener("click",()=>{
   if(!sheetData.length)return alert("Ambil nama dulu!");
   if(!csvData.length)return alert("Upload CSV dulu!");
-  
+
   const results=sheetData.map(k=>({k,res:rataRata_byName(k.nama)}));
   lastResults=results;
   renderTable(results);
 
   const tgl=document.getElementById("tanggalCek").textContent;
-  const shiftLabel=document.getElementById("shiftInput").value.trim().toUpperCase();
+  const shiftInput=document.getElementById("shiftInput").value.trim().toUpperCase();
+
+  // === Mapping Shift ===
+  let shiftLabel = "";
+  if (shiftInput === "P") shiftLabel = "Shift 1";
+  else if (shiftInput === "S") shiftLabel = "Shift 2";
+  else if (shiftInput === "M" || shiftInput === "MH1") shiftLabel = "Shift 3";
+  else shiftLabel = "Shift ?";
 
   document.getElementById("judulLaporan").textContent =
     `Laporan Index CO ${shiftLabel} — Tanggal ${tgl}`;
-    
+
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
-});
-
-// === RENDER TABEL ===
-function renderTable(results){
-  const tbody=document.querySelector("#resultTable tbody");
-  tbody.innerHTML="";
-  results.forEach((item,index)=>{
-    const {k,res}=item;
-    const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
-    const tr=document.createElement("tr");
-    if(res.slaCount>0)tr.className="table-danger";
-    tr.innerHTML=`
-      <td>${index+1}</td>
-      <td>${k.nama}</td>
-      <td>${k.shift}</td>
-      <td>${res.lastTime}</td>
-      <td>${avg}</td>
-      <td>${res.count||0}</td>
-      <td>${res.slaCount||0}</td>
-      <td>${res.inProgressCount||0}</td>
-      <td>${res.relasiResolved||0}</td>`;
-    tbody.appendChild(tr);
-  });
-}
-
-// === SORT HEADER ===
-function sortColumn(key){
-  if(!lastResults.length)return alert("Belum ada data tabel.");
-  let asc;
-  let valFunc;
-  switch(key){
-    case "Nama": asc=sortAscNama; valFunc=r=>(r.k.nama||"").toLowerCase(); sortAscNama=!sortAscNama; break;
-    case "LastCO": asc=sortAscLastCO; valFunc=r=>r.res.lastTime==="-"?0:parseInt(r.res.lastTime.replace(":","")); sortAscLastCO=!sortAscLastCO; break;
-    case "IndexCO": asc=sortAscIndexCO; valFunc=r=>r.res.avg||0; sortAscIndexCO=!sortAscIndexCO; break;
-    case "TotalCO": asc=sortAscTotalCO; valFunc=r=>r.res.count||0; sortAscTotalCO=!sortAscTotalCO; break;
-    case "SLA": asc=sortAscSLA; valFunc=r=>r.res.slaCount||0; sortAscSLA=!sortAscSLA; break;
-    case "InProgress": asc=sortAscInProgress; valFunc=r=>r.res.inProgressCount||0; sortAscInProgress=!sortAscInProgress; break;
-    case "RelasiResolved": asc=sortAscRelasiResolved; valFunc=r=>r.res.relasiResolved||0; sortAscRelasiResolved=!sortAscRelasiResolved; break;
-    default:return;
-  }
-  if(key==="Nama"){
-    lastResults.sort((a,b)=>asc?valFunc(a).localeCompare(valFunc(b)):valFunc(b).localeCompare(valFunc(a)));
-  }else{
-    lastResults.sort((a,b)=>asc?(valFunc(a)-valFunc(b)):(valFunc(b)-valFunc(a)));
-  }
-  renderTable(lastResults);
-  document.getElementById(`sort${key}`).textContent=`${key} ${asc?"↑":"↓"}`;
-}
-["Nama","LastCO","IndexCO","TotalCO","SLA","InProgress","RelasiResolved"].forEach(k=>{
-  const el=document.getElementById(`sort${k}`);
-  if(el)el.addEventListener("click",()=>sortColumn(k));
-});
-
-// === DOWNLOAD JPG ===
-document.getElementById("downloadBtn").addEventListener("click",async()=>{
-  const area=document.querySelector("#resultArea");
-  const canvas=await html2canvas(area,{scale:2});
-  const link=document.createElement("a");
-  link.download="Laporan_Index_Shift.jpg";
-  link.href=canvas.toDataURL("image/jpeg");
-  link.click();
 });
 </script>
 </body>
 </html>
-
-
-
-
-
