@@ -13,7 +13,14 @@
     .container { max-width: 1100px; background: white; border-radius: 10px; padding: 25px;
                  box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
     #judulLaporan { font-weight: 700; font-size: 18px; text-align: center; margin-bottom: 15px; color:#000000; }
-
+#copyright {
+  text-align: center;
+  font-size: 14px;
+  color: #000; /* warna hitam */
+  margin-top: 40px;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
     #resultTable.table thead tr th {
       background-color: #1976d2 !important; color: white !important; text-align: center;
       font-weight: 700; cursor: pointer; padding: 10px; user-select: none;
@@ -262,17 +269,25 @@ function sortColumn(key){
 }
 
 // === Download JPG ===
-document.getElementById("downloadBtn").addEventListener("click",async()=>{
-  const area=document.querySelector("#resultArea");
-  const canvas=await html2canvas(area,{scale:2});
-  const link=document.createElement("a");
-  link.download="Laporan_Index_Shift.jpg";
-  link.href=canvas.toDataURL("image/jpeg");
+document.getElementById("downloadBtn").addEventListener("click", async () => {
+  const area = document.querySelector("#resultArea");
+  const canvas = await html2canvas(area, { scale: 2 });
+  const link = document.createElement("a");
+  link.download = "Laporan_Index_Shift.jpg";
+  link.href = canvas.toDataURL("image/jpeg");
   link.click();
 });
 </script>
+
+<!-- ===== COPYRIGHT SECTION ===== -->
+<div id="copyright">
+  © 2025 EDP Fai
+</div>
+
 </body>
 </html>
+
+
 
 
 
