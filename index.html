@@ -144,7 +144,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click",async()=>{
     let shifts=[shiftInput];
     if(shiftInput==="P")shifts=["P","P1"];
 
-    const shiftMap={P:"Shift 1",S:"Shift 2",M:"Shift 3",MH1:"Shift 3 (H-1)"};
+    const shiftMap={P:"Shift 1",S:"Shift 2",M:"Shift 3",MH1:"Shift 3"};
     shiftLabel=shiftMap[shiftInput]||shiftInput;
 
     sheetData=[];
@@ -273,3 +273,4 @@ document.getElementById("downloadBtn").addEventListener("click",async()=>{
 </script>
 </body>
 </html>
+
