@@ -130,8 +130,6 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFM
 let sheetData = [];
 let csvData = [];
 let lastResults = [];
-let tanggalLaporan = "";
-let shiftDipilih = "";
 
 // === AUTO TANGGAL ===
 document.getElementById("tanggalCek").textContent =
@@ -183,55 +181,128 @@ function ambilJamDariTanggal(s){
   return m ? `${m[1].padStart(2,'0')}:${m[2]}` : "-";
 }
 
-// === AMBIL DATA GSheet ===
-document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
-  const shiftInput = document.getElementById("shiftInput").value.trim().toUpperCase();
-  if (!shiftInput) return alert("Pilih shift dulu!");
+// === LOAD CSV ===
+document.getElementById("csvFile").addEventListener("change",(e)=>{
+  const file=e.target.files[0];
+  if(!file)return;
+  Papa.parse(file,{
+    header:true,
+    delimiter:";",
+    skipEmptyLines:true,
+    complete:(res)=>{
+      const headerMap={};
+      (res.meta.fields||[]).forEach(f=>headerMap[normKey(f)]=f);
 
-  shiftDipilih = shiftInput;
-  document.getElementById("statusText").textContent = "Mengambil data dari GSheet...";
+      const getCol=(row,arr)=>{
+        for(const c of arr){
+          for(const key in headerMap){
+            if(key.includes(c)){
+              const realKey = headerMap[key];
+              if(row[realKey]) return row[realKey].toString();
+            }
+          }
+        }
+        return "";
+      };
 
-  try {
-    const now = new Date();
-    if (shiftInput === "MH1") {
-      const y = new Date(now);
-      y.setDate(now.getDate() - 1);
-      tanggalLaporan = y.toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
-    } else {
-      tanggalLaporan = now.toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
+      csvData = res.data.map(r=>{
+        const nikRaw = (getCol(r,['nikpengambil','nik'])).replace(/\D/g,'').trim();
+        const diambilOleh = getCol(r,['diambiloleh','diambil oleh']);
+        const durasiRaw = getCol(r,['durasikomplain','durasi']);
+        const waktuSlaRaw = getCol(r,['waktusla','waktu sla']);
+        const statusRaw = getCol(r,['statuskomplain','status']);
+        const statusSlaRaw = getCol(r,['statussla','status sla']);
+        const tglDiambilRaw = getCol(r,['tanggaldiambil','tgl diambil','tanggal diambil']);
+        const tipeLokasiRaw = getCol(r,['tipelokasiasal','tipe lokasi asal']);
+
+        const slaNum = parseFloat((waktuSlaRaw||"").replace(",","."))||0;
+        return {
+          nik: nikRaw,
+          diambilOleh,
+          durasiRaw,
+          durasiDetik: durasiKeDetik(durasiRaw),
+          waktuSlaDetik: slaNum*3600,
+          status: statusRaw,
+          statusNorm: normalizeStatus(statusRaw),
+          statusSLA: statusSlaRaw,
+          tanggalDiambil: tglDiambilRaw,
+          tipeLokasi: (tipeLokasiRaw || "").trim()
+        };
+      });
+
+      if(csvData.length>0){
+        document.getElementById("statusText").textContent=`✅ File CSV terbaca (${csvData.length} baris).`;
+      }else{
+        document.getElementById("statusText").textContent="⚠️ CSV kosong atau tidak terbaca.";
+      }
     }
-    document.getElementById("tanggalCek").textContent = tanggalLaporan;
+  });
+});
 
-    let shifts = [shiftInput];
-    if (shiftInput === "P") shifts = ["P", "P1"];
+// === HITUNG ===
+function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik/r.waktuSlaDetik : 0; }
+function rataRata_byName(nama,thr=0.85){
+  const matches=[];
+  for(const r of csvData){
+    if(!isAcceptedStatus(r.statusNorm)) continue;
+    if (r.tipeLokasi && r.tipeLokasi.trim().toLowerCase() === "branch") continue;
+    if(similarity(nama,r.diambilOleh) >= thr) matches.push(r);
+  }
+  if(!matches.length)
+    return{avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0,relasiResolved:0};
 
-    sheetData = [];
-    for (const s of shifts) {
-      const url = `${GAS_URL}?shift=${encodeURIComponent(s)}`;
-      const res = await fetch(url);
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "Gagal ambil data GSheet");
+  const sum=matches.reduce((a,b)=>a+computeC(b),0);
+  const latest=matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
+  return{
+    avg:sum/matches.length,
+    count:matches.length,
+    lastTime:ambilJamDariTanggal(latest),
+    slaCount:matches.filter(r=>r.statusSLA&&r.statusSLA.toLowerCase().includes("lewat")).length,
+    inProgressCount:matches.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length,
+    relasiResolved:matches.filter(r=>r.statusNorm.includes("pending")).length
+  };
+}
 
-      const list = (data.karyawan || []).map(k => ({
-        nama: (k.nama || "").trim(),
-        nik: (k.nik || "").trim(),
-        shift: (k.shift || "").trim()
-      }));
-      sheetData = sheetData.concat(list);
+// === AMBIL NAMA DARI GSheet ===
+document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
+  const shiftInput=document.getElementById("shiftInput").value.trim().toUpperCase();
+  if(!shiftInput)return alert("Pilih shift dulu!");
+  document.getElementById("statusText").textContent="Mengambil data dari GSheet...";
+
+  try{
+    const now=new Date();
+    let tanggalLabel;
+    if(shiftInput==="MH1"){
+      const y=new Date(now); y.setDate(now.getDate()-1);
+      tanggalLabel=y.toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});
+    }else{
+      tanggalLabel=now.toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});
+    }
+    document.getElementById("tanggalCek").textContent=tanggalLabel;
+
+    let shifts=[shiftInput];
+    if(shiftInput==="P")shifts=["P","P1"];
+
+    sheetData=[];
+    for(const s of shifts){
+      const url=`${GAS_URL}?shift=${encodeURIComponent(s)}`;
+      const res=await fetch(url);
+      const data=await res.json();
+      if(!data.ok)throw new Error(data.error||"Gagal ambil data GSheet");
+      const list=(data.karyawan||[]).map(k=>({nama:(k.nama||"").trim(),nik:(k.nik||"").trim(),shift:(k.shift||"").trim()}));
+      sheetData=sheetData.concat(list);
     }
 
-    sheetData = sheetData.filter((obj, idx, arr) => idx === arr.findIndex(t => t.nama === obj.nama));
-    document.getElementById("generateBtn").disabled = false;
-    document.getElementById("statusText").textContent = `✅ ${sheetData.length} nama berhasil diambil (Shift ${shiftInput}).`;
-
-  } catch (err) {
-    console.error(err);
-    alert("Gagal mengambil data: " + err.message);
-    document.getElementById("statusText").textContent = "❌ Gagal mengambil data dari GSheet.";
+    sheetData=sheetData.filter((obj,idx,arr)=>idx===arr.findIndex(t=>t.nama===obj.nama));
+    document.getElementById("generateBtn").disabled=false;
+    document.getElementById("statusText").textContent=`✅ ${sheetData.length} nama berhasil diambil (Shift ${shiftInput}).`;
+  }catch(err){
+    alert("Gagal mengambil data: "+err.message);
+    document.getElementById("statusText").textContent="❌ Gagal mengambil data dari GSheet.";
   }
 });
 
-// === GENERATE TABEL ===
+// === GENERATE ===
 document.getElementById("generateBtn").addEventListener("click",()=>{
   if(!sheetData.length)return alert("Ambil nama dulu!");
   if(!csvData.length)return alert("Upload CSV dulu!");
@@ -243,18 +314,38 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
   const tgl=document.getElementById("tanggalCek").textContent;
   const shiftInput=document.getElementById("shiftInput").value.trim().toUpperCase();
 
-  // === Mapping Shift ===
-  let shiftLabel = "";
-  if (shiftInput === "P") shiftLabel = "Shift 1";
-  else if (shiftInput === "S") shiftLabel = "Shift 2";
-  else if (shiftInput === "M" || shiftInput === "MH1") shiftLabel = "Shift 3";
-  else shiftLabel = "Shift ?";
+  let shiftLabel="";
+  if(shiftInput==="P")shiftLabel="Shift 1";
+  else if(shiftInput==="S")shiftLabel="Shift 2";
+  else if(shiftInput==="M"||shiftInput==="MH1")shiftLabel="Shift 3";
+  else shiftLabel="Shift ?";
 
-  document.getElementById("judulLaporan").textContent =
-    `Laporan Index CO ${shiftLabel} — Tanggal ${tgl}`;
-
+  document.getElementById("judulLaporan").textContent=`Laporan Index CO ${shiftLabel} — Tanggal ${tgl}`;
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 });
+
+// === RENDER TABEL ===
+function renderTable(results){
+  const tbody=document.querySelector("#resultTable tbody");
+  tbody.innerHTML="";
+  results.forEach((item,index)=>{
+    const {k,res}=item;
+    const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
+    const tr=document.createElement("tr");
+    if(res.slaCount>0)tr.className="table-danger";
+    tr.innerHTML=`
+      <td>${index+1}</td>
+      <td>${k.nama}</td>
+      <td>${k.shift}</td>
+      <td>${res.lastTime}</td>
+      <td>${avg}</td>
+      <td>${res.count||0}</td>
+      <td>${res.slaCount||0}</td>
+      <td>${res.inProgressCount||0}</td>
+      <td>${res.relasiResolved||0}</td>`;
+    tbody.appendChild(tr);
+  });
+}
 </script>
 </body>
 </html>
