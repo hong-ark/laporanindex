@@ -42,7 +42,7 @@
         <option value="M">M (Malam)</option>
         <option value="MH1">M H-1 (Malam H-1)</option>
       </select>
-      <!-- Note dipindah ke bawah dropdown -->
+      <!-- Note di bawah dropdown (dibiarkan kosong agar tampilan rapi) -->
       <div id="modeNote" class="form-text text-muted mt-1"></div>
     </div>
 
@@ -173,13 +173,14 @@ document.getElementById("ambilNamaBtn").addEventListener("click",async()=>{
   if(shiftInput==="IDX"){
     shiftLabel="Index Hari Ini";
     if(!csvData.length){
-      note.textContent="(Mode Index) Upload CSV dulu, lalu klik Generate.";
+      note.textContent=""; // biar tetap rapi
+      document.getElementById("statusText").textContent="Mode Index: upload CSV dulu.";
       document.getElementById("generateBtn").disabled=true;
       return;
     }
     sheetData = buildUniqueNamesFromCSV(csvData);
     document.getElementById("generateBtn").disabled=false;
-    note.textContent=`(Mode Index) ${sheetData.length} nama diambil dari CSV.`;
+    note.textContent=""; // tidak tampilkan pesan panjang
     document.getElementById("statusText").textContent=`✅ Mode Index: ${sheetData.length} nama siap dihitung.`;
     return;
   }
@@ -256,14 +257,11 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
           waktuSlaDetik:slaNum*3600,status:statusRaw,statusNorm:normalizeStatus(statusRaw),
           statusSLA:statusSlaRaw,tanggalDiambil:tglDiambilRaw,tipeLokasi:(tipeLokasiRaw||"").trim()};
       });
-      // Jika mode Index dipilih, siap-siap enable Generate setelah CSV ada
       const shift=document.getElementById("shiftInput").value.trim().toUpperCase();
       if(shift==="IDX"){
         sheetData=buildUniqueNamesFromCSV(csvData);
         document.getElementById("generateBtn").disabled = sheetData.length===0;
-        document.getElementById("modeNote").textContent = sheetData.length
-          ? `(Mode Index) ${sheetData.length} nama diambil dari CSV.`
-          : `(Mode Index) Tidak ada nama pada kolom "Diambil oleh".`;
+        document.getElementById("modeNote").textContent = ""; // kosongkan supaya rapi
       }
       document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
     }});
@@ -393,13 +391,16 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
   link.click();
 });
 
-// === UI: Auto enable/disable toggle Siang berdasarkan mode ===
+// === UI: Auto enable/disable toggle Siang + tombol GSheet berdasarkan mode ===
 function updateToggleSiangAvailability(){
   const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
   const cb = document.getElementById("toggleSiang14");
   const label = document.getElementById("labelToggleSiang14");
+  const btnGsheet = document.getElementById("ambilNamaBtn");
+  const note = document.getElementById("modeNote");
   const isSiang = (shift === "S");
 
+  // Toggle Siang
   cb.disabled = !isSiang;
   if(!isSiang){
     cb.checked = false;
@@ -413,11 +414,15 @@ function updateToggleSiangAvailability(){
     cb.title = "Aktifkan untuk hitung mulai jam 14:00";
   }
 
-  const note=document.getElementById("modeNote");
+  // Disable tombol GSheet saat IDX (rapi, tidak mengubah layout)
   if(shift==="IDX"){
-    note.textContent="Index hari ini tidak perlu Generate Jadwal";
+    btnGsheet.disabled = true;
+    btnGsheet.title = "Mode Index: tidak perlu ambil dari GSheet";
+    note.textContent = ""; // kosongkan agar tampilan bersih
   }else{
-    note.textContent="";
+    btnGsheet.disabled = false;
+    btnGsheet.title = "Ambil nama dari GSheet";
+    note.textContent = "";
   }
 }
 
@@ -429,9 +434,6 @@ document.getElementById("shiftInput").addEventListener("change", ()=>{
     if(csvData.length){
       sheetData=buildUniqueNamesFromCSV(csvData);
       document.getElementById("generateBtn").disabled = sheetData.length===0;
-      document.getElementById("modeNote").textContent = sheetData.length
-        ? `(Mode Index) ${sheetData.length} nama diambil dari CSV.`
-        : `(Mode Index) Tidak ada nama pada kolom "Diambil oleh".`;
     }else{
       document.getElementById("generateBtn").disabled = true;
     }
@@ -449,4 +451,3 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 
 </body>
 </html>
-
