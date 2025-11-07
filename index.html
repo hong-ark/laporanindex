@@ -31,7 +31,7 @@
   <p>Pilih shift → Generate Jadwal → Upload CSV → Hitung Index</p>
 
   <div class="mb-3 row align-items-end">
-    <!-- 👇 Dropdown dibuat proporsional: col-auto + w-auto -->
+    <!-- Dropdown proporsional: col-auto + w-auto -->
     <div class="col-auto">
       <label class="form-label">Mode</label><br />
       <select id="shiftInput" class="form-select w-auto d-inline-block">
@@ -42,12 +42,13 @@
         <option value="M">M (Malam)</option>
         <option value="MH1">M H-1 (Malam H-1)</option>
       </select>
+      <!-- Note dipindah ke bawah dropdown -->
+      <div id="modeNote" class="form-text text-muted mt-1"></div>
     </div>
 
     <div class="col-md-5">
       <label class="form-label">&nbsp;</label><br />
       <button id="ambilNamaBtn" class="btn btn-primary">Generate Jadwal</button>
-      <span id="modeNote" class="ms-2 text-muted"></span>
     </div>
 
     <div class="col-md-4 text-end">
