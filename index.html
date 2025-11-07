@@ -312,6 +312,7 @@ function rataRata_byName(nama,thr=0.85){
 }
 
 // === Generate Tabel ===
+// === Generate Tabel ===
 document.getElementById("generateBtn").addEventListener("click",()=>{
   const mode=document.getElementById("shiftInput").value.trim().toUpperCase();
   if(!csvData.length) return alert("Upload CSV dulu!");
@@ -327,7 +328,20 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
     shiftLabel=shiftMap[mode]||mode;
   }
 
-  const results=sheetData.map(k=>({k,res:rataRata_byName(k.nama)}));
+  let results=sheetData.map(k=>({k,res:rataRata_byName(k.nama)}));
+
+  // --- PATCH: autosort khusus Mode "Index hari ini" (desc: terbesar → terkecil)
+  if(mode==="IDX"){
+    const val = (x)=> (x.res.avg==null ? -Infinity : x.res.avg);
+    results.sort((a,b)=> val(b) - val(a));
+    // Perbarui indikator header agar user paham urutannya desc
+    const hdr = document.getElementById("sortIndexCO");
+    if(hdr) hdr.textContent = "IndexCO ↓";
+    // Set state sort agar klik berikutnya membalik ke ascending (opsional)
+    if(typeof sortAscIndexCO!=="undefined") sortAscIndexCO=false;
+  }
+  // --- END PATCH
+
   lastResults=results;
   renderTable(results);
 
@@ -339,6 +353,7 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
 
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 });
+
 
 // === Render Tabel ===
 function renderTable(results){
@@ -446,3 +461,4 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 
 </body>
 </html>
+
