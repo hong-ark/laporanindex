@@ -13,14 +13,7 @@
     .container { max-width: 1100px; background: white; border-radius: 10px; padding: 25px;
                  box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
     #judulLaporan { font-weight: 700; font-size: 18px; text-align: center; margin-bottom: 15px; color:#000000; }
-#copyright {
-  text-align: center;
-  font-size: 14px;
-  color: #000; /* warna hitam */
-  margin-top: 40px;
-  margin-bottom: 10px;
-  font-weight: 600;
-}
+    #copyright { text-align: center; font-size: 14px; color: #000; margin-top: 40px; margin-bottom: 10px; font-weight: 600; }
     #resultTable.table thead tr th {
       background-color: #1976d2 !important; color: white !important; text-align: center;
       font-weight: 700; cursor: pointer; padding: 10px; user-select: none;
@@ -52,6 +45,14 @@
     <div class="col-md-4">
       <label class="form-label">&nbsp;</label><br />
       <button id="ambilNamaBtn" class="btn btn-primary">Ambil Nama dari GSheet</button>
+
+      <!-- Toggle Siang ≥ 14:00 (auto-disable kecuali Shift S) -->
+      <div class="form-check mt-2">
+        <input class="form-check-input" type="checkbox" id="toggleSiang14" checked>
+        <label class="form-check-label" for="toggleSiang14" id="labelToggleSiang14">
+          Hitung Siang mulai ≥ 14:00
+        </label>
+      </div>
     </div>
 
     <div class="col-md-6 text-end">
@@ -134,6 +135,30 @@ function similarity(a,b){a=normalizeName(a);b=normalizeName(b);if(!a||!b)return 
 function ambilJamDariTanggal(s){if(!s)return"-";const m=s.match(/(\d{1,2}):(\d{2})/);
   return m?`${m[1].padStart(2,'0')}:${m[2]}`:"-";}
 
+// Helper ambil HH:MM robust (untuk filter Siang)
+function jamMenitDariTanggal(s){
+  const m = (s||"").match(/(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?/);
+  if(!m) return null;
+  return { h: parseInt(m[1],10), m: parseInt(m[2],10) };
+}
+
+// Filter khusus Shift S (Siang) berbasis "Tanggal diambil" & toggle
+function lolosFilterShiftSiangByTanggalDiambil(record){
+  const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
+  if(shift !== "S") return true; // hanya berlaku untuk Siang
+
+  // Jika toggle dimatikan, jangan filter jam (semua lolos)
+  const useSiang14 = document.getElementById("toggleSiang14")?.checked;
+  if(!useSiang14) return true;
+
+  const sumber = record.tanggalDiambil || "";
+  const t = jamMenitDariTanggal(sumber);
+  if(!t) return false;            // jika tidak ada jam, abaikan saat rule aktif
+  if(t.h > 14) return true;       // > 14:00
+  if(t.h === 14 && t.m >= 0) return true; // mulai 14:00
+  return false;                   // < 14:00
+}
+
 // === Ambil data dari GSheet ===
 document.getElementById("ambilNamaBtn").addEventListener("click",async()=>{
   const shiftInput=document.getElementById("shiftInput").value.trim().toUpperCase();
@@ -207,6 +232,10 @@ function rataRata_byName(nama,thr=0.85){
   const matches=[];for(const r of csvData){
     if(!isAcceptedStatus(r.statusNorm))continue;
     if(r.tipeLokasi&&r.tipeLokasi.trim().toLowerCase()==="branch")continue;
+
+    // Filter khusus Siang (S) berdasarkan "Tanggal diambil" >= 14:00 + toggle
+    if(!lolosFilterShiftSiangByTanggalDiambil(r)) continue;
+
     if(similarity(nama,r.diambilOleh)>=thr)matches.push(r);}
   if(!matches.length)return{avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0,relasiResolved:0};
   const sum=matches.reduce((a,b)=>a+computeC(b),0);
@@ -277,6 +306,29 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
   link.href = canvas.toDataURL("image/jpeg");
   link.click();
 });
+
+// === UI Enhancement: auto enable/disable toggle Siang berdasarkan Shift ===
+function updateToggleSiangAvailability(){
+  const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
+  const cb = document.getElementById("toggleSiang14");
+  const label = document.getElementById("labelToggleSiang14");
+  const isSiang = (shift === "S");
+
+  cb.disabled = !isSiang;
+  if(!isSiang){
+    cb.checked = false;               // biar jelas kalau tidak berlaku
+    label.classList.add("text-muted");
+    cb.title = "Tidak berlaku untuk shift selain Siang (S)";
+  }else{
+    if(cb.checked === false) cb.checked = true; // default aktif saat S dipilih
+    label.classList.remove("text-muted");
+    cb.title = "Aktifkan untuk hitung mulai jam 14:00";
+  }
+}
+
+// panggil saat shift berubah & saat halaman dibuka
+document.getElementById("shiftInput").addEventListener("change", updateToggleSiangAvailability);
+document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </script>
 
 <!-- ===== COPYRIGHT SECTION ===== -->
@@ -286,8 +338,3 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
 
 </body>
 </html>
-
-
-
-
-
