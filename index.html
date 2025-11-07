@@ -28,14 +28,15 @@
 <body>
 <div class="container">
   <h4><b>Laporan Index Shift</b></h4>
-  <p>Input shift → Generate Jadwal → Upload CSV → Hitung Index</p>
+  <p>Pilih shift → Generate Jadwal → Upload CSV → Hitung Index</p>
 
-  <div class="mb-3 row">
-    <div class="col-md-3">
-      <label class="form-label">Mode</label>
-      <select id="shiftInput" class="form-select">
-        <option value="">Pilih Mode</option>
-        <option value="IDX">Index hari ini</option> <!-- ⬅️ Mode baru -->
+  <div class="mb-3 row align-items-end">
+    <!-- 👇 Dropdown dibuat proporsional: col-auto + w-auto -->
+    <div class="col-auto">
+      <label class="form-label">Mode</label><br />
+      <select id="shiftInput" class="form-select w-auto d-inline-block">
+        <option value="">Pilih Shift</option>
+        <option value="IDX">Index hari ini</option>
         <option value="P">P (Pagi)</option>
         <option value="S">S (Siang)</option>
         <option value="M">M (Malam)</option>
@@ -170,7 +171,6 @@ document.getElementById("ambilNamaBtn").addEventListener("click",async()=>{
   // Mode Index hari ini -> tidak ambil dari GSheet
   if(shiftInput==="IDX"){
     shiftLabel="Index Hari Ini";
-    // Build nama dari CSV
     if(!csvData.length){
       note.textContent="(Mode Index) Upload CSV dulu, lalu klik Generate.";
       document.getElementById("generateBtn").disabled=true;
@@ -180,7 +180,6 @@ document.getElementById("ambilNamaBtn").addEventListener("click",async()=>{
     document.getElementById("generateBtn").disabled=false;
     note.textContent=`(Mode Index) ${sheetData.length} nama diambil dari CSV.`;
     document.getElementById("statusText").textContent=`✅ Mode Index: ${sheetData.length} nama siap dihitung.`;
-    // Tanggal cek pakai hari ini (atau biarkan apa adanya)
     return;
   }
 
@@ -222,14 +221,13 @@ document.getElementById("ambilNamaBtn").addEventListener("click",async()=>{
 
 // Build nama unik dari CSV (mode Index)
 function buildUniqueNamesFromCSV(rows){
-  const map=new Map(); // key=normalized name, val=display original
+  const map=new Map();
   for(const r of rows){
     const raw=(r.diambilOleh||"").trim();
     if(!raw) continue;
     const key=normalizeName(raw);
     if(!map.has(key)) map.set(key, raw);
   }
-  // Sheet-like structure: {nama, nik:'', shift:'Index'}
   return Array.from(map.values()).map(nm=>({nama:nm, nik:'', shift:'Index'}));
 }
 
@@ -285,12 +283,10 @@ function rataRata_byName(nama,thr=0.85){
     // Filter khusus Siang (hanya saat Shift=S)
     if(!lolosFilterShiftSiangByTanggalDiambil(r)) continue;
 
-    // MODE INDEX: pakai pencocokan exact (lebih ketat)
     const currentShift=document.getElementById("shiftInput").value.trim().toUpperCase();
     if(currentShift==="IDX"){
       if(normalizeName(r.diambilOleh)!==keyNama) continue;
     }else{
-      // MODE SHIFT: tetap gunakan similarity agar toleran typo
       if(similarity(nama,r.diambilOleh)<thr) continue;
     }
 
@@ -312,13 +308,11 @@ function rataRata_byName(nama,thr=0.85){
 }
 
 // === Generate Tabel ===
-// === Generate Tabel ===
 document.getElementById("generateBtn").addEventListener("click",()=>{
   const mode=document.getElementById("shiftInput").value.trim().toUpperCase();
   if(!csvData.length) return alert("Upload CSV dulu!");
 
   if(mode==="IDX"){
-    // pastikan sheetData diisi dari CSV
     if(!sheetData.length) sheetData=buildUniqueNamesFromCSV(csvData);
     if(!sheetData.length){ alert('Tidak ada nama pada kolom "Diambil oleh" di CSV.'); return; }
     shiftLabel="Index Hari Ini";
@@ -330,17 +324,14 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
 
   let results=sheetData.map(k=>({k,res:rataRata_byName(k.nama)}));
 
-  // --- PATCH: autosort khusus Mode "Index hari ini" (desc: terbesar → terkecil)
+  // Autosort khusus Mode "Index hari ini" (desc: terbesar → terkecil)
   if(mode==="IDX"){
     const val = (x)=> (x.res.avg==null ? -Infinity : x.res.avg);
     results.sort((a,b)=> val(b) - val(a));
-    // Perbarui indikator header agar user paham urutannya desc
     const hdr = document.getElementById("sortIndexCO");
     if(hdr) hdr.textContent = "IndexCO ↓";
-    // Set state sort agar klik berikutnya membalik ke ascending (opsional)
     if(typeof sortAscIndexCO!=="undefined") sortAscIndexCO=false;
   }
-  // --- END PATCH
 
   lastResults=results;
   renderTable(results);
@@ -354,7 +345,6 @@ document.getElementById("generateBtn").addEventListener("click",()=>{
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 });
 
-
 // === Render Tabel ===
 function renderTable(results){
   const tbody=document.querySelector("#resultTable tbody");tbody.innerHTML="";
@@ -366,7 +356,6 @@ function renderTable(results){
       <td>${res.slaCount||0}</td><td>${res.inProgressCount||0}</td><td>${res.relasiResolved||0}</td>`;
     tbody.appendChild(tr);
   });
-  // Re-bind listener sort setiap kali render ulang
   ["Nama","LastCO","IndexCO","TotalCO","SLA","InProgress","RelasiResolved"].forEach(k=>{
     const el=document.getElementById(`sort${k}`);
     if(el)el.onclick=()=>sortColumn(k);
@@ -412,18 +401,17 @@ function updateToggleSiangAvailability(){
 
   cb.disabled = !isSiang;
   if(!isSiang){
-    cb.checked = false;               // non-aktif jelas saat bukan S
+    cb.checked = false;
     label.classList.add("text-muted");
     cb.title = (shift==="IDX")
       ? "Tidak berlaku pada mode Index hari ini"
       : "Tidak berlaku untuk shift selain Siang (S)";
   }else{
-    if(cb.checked === false) cb.checked = true; // default aktif saat S dipilih
+    if(cb.checked === false) cb.checked = true;
     label.classList.remove("text-muted");
     cb.title = "Aktifkan untuk hitung mulai jam 14:00";
   }
 
-  // Catatan mode
   const note=document.getElementById("modeNote");
   if(shift==="IDX"){
     note.textContent="(Mode Index) Nama diambil dari CSV. Tidak perlu ambil dari GSheet.";
@@ -435,7 +423,6 @@ function updateToggleSiangAvailability(){
 // panggil saat mode berubah & saat halaman dibuka
 document.getElementById("shiftInput").addEventListener("change", ()=>{
   updateToggleSiangAvailability();
-  // Saat pindah ke Mode Index dan CSV sudah ada, siapkan sheetData & enable generate
   const mode=document.getElementById("shiftInput").value.trim().toUpperCase();
   if(mode==="IDX"){
     if(csvData.length){
@@ -448,7 +435,7 @@ document.getElementById("shiftInput").addEventListener("change", ()=>{
       document.getElementById("generateBtn").disabled = true;
     }
   }else{
-    document.getElementById("generateBtn").disabled = true; // menunggu ambil nama GSheet
+    document.getElementById("generateBtn").disabled = true;
   }
 });
 document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
@@ -461,5 +448,3 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 
 </body>
 </html>
-
-
