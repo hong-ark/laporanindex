@@ -28,26 +28,28 @@
 <body>
 <div class="container">
   <h4><b>Laporan Index Shift</b></h4>
-  <p>Input shift → Ambil nama dari GSheet → Upload CSV → Hitung index</p>
+  <p>Input shift → Ambil nama dari GSheet → Upload CSV → Hitung Index</p>
 
   <div class="mb-3 row">
-    <div class="col-md-2">
-      <label class="form-label">Shift</label>
+    <div class="col-md-3">
+      <label class="form-label">Mode</label>
       <select id="shiftInput" class="form-select">
-        <option value="">Pilih Shift</option>
+        <option value="">Pilih Mode</option>
+        <option value="IDX">Index hari ini</option> <!-- ⬅️ Mode baru -->
+        <option value="P">P (Pagi)</option>
+        <option value="S">S (Siang)</option>
         <option value="M">M (Malam)</option>
         <option value="MH1">M H-1 (Malam H-1)</option>
-        <option value="S">S (Siang)</option>
-        <option value="P">P (Pagi)</option>
       </select>
     </div>
 
-    <div class="col-md-4">
+    <div class="col-md-5">
       <label class="form-label">&nbsp;</label><br />
       <button id="ambilNamaBtn" class="btn btn-primary">Ambil Nama dari GSheet</button>
+      <span id="modeNote" class="ms-2 text-muted"></span>
     </div>
 
-    <div class="col-md-6 text-end">
+    <div class="col-md-4 text-end">
       <label class="form-label">Tanggal dicek:</label>
       <p id="tanggalCek"></p>
     </div>
@@ -60,17 +62,16 @@
     <input type="file" id="csvFile" class="form-control" accept=".csv" />
   </div>
 
-  <button id="generateBtn" class="btn btn-success mb-1" disabled>Hitung index</button>
+  <button id="generateBtn" class="btn btn-success mb-1" disabled>Hitung Index</button>
   <span id="statusText" class="ms-2 text-muted"></span>
 
-  <!-- ⬇️ Toggle dipindah ke bawah tombol Generate -->
+  <!-- Toggle di bawah tombol Generate -->
   <div class="form-check mt-2">
     <input class="form-check-input" type="checkbox" id="toggleSiang14" checked>
     <label class="form-check-label" for="toggleSiang14" id="labelToggleSiang14">
-      Hitung Siang mulai 14:00
+      Hitung Siang mulai ≥ 14:00
     </label>
   </div>
-  <!-- ⬆️ End Toggle -->
 
   <div id="judulLaporan" class="mt-2"></div>
 
@@ -80,7 +81,7 @@
         <tr>
           <th>No</th>
           <th id="sortNama">Nama Karyawan</th>
-          <th>Shift</th>
+          <th>Shift/Mode</th>
           <th id="sortLastCO">LastCO</th>
           <th id="sortIndexCO">IndexCO</th>
           <th id="sortTotalCO">TotalCO</th>
@@ -160,12 +161,32 @@ function lolosFilterShiftSiangByTanggalDiambil(record){
   return false;                   // < 14:00
 }
 
-// === Ambil data dari GSheet ===
+// === Ambil data dari GSheet atau Mode Index ===
 document.getElementById("ambilNamaBtn").addEventListener("click",async()=>{
   const shiftInput=document.getElementById("shiftInput").value.trim().toUpperCase();
-  if(!shiftInput)return alert("Pilih shift dulu!");
-  document.getElementById("statusText").textContent="Mengambil data dari GSheet...";
+  const note=document.getElementById("modeNote");
+  if(!shiftInput){ alert("Pilih mode dulu!"); return; }
 
+  // Mode Index hari ini -> tidak ambil dari GSheet
+  if(shiftInput==="IDX"){
+    shiftLabel="Index Hari Ini";
+    // Build nama dari CSV
+    if(!csvData.length){
+      note.textContent="(Mode Index) Upload CSV dulu, lalu klik Generate.";
+      document.getElementById("generateBtn").disabled=true;
+      return;
+    }
+    sheetData = buildUniqueNamesFromCSV(csvData);
+    document.getElementById("generateBtn").disabled=false;
+    note.textContent=`(Mode Index) ${sheetData.length} nama diambil dari CSV.`;
+    document.getElementById("statusText").textContent=`✅ Mode Index: ${sheetData.length} nama siap dihitung.`;
+    // Tanggal cek pakai hari ini (atau biarkan apa adanya)
+    return;
+  }
+
+  // Mode berbasis Shift -> ambil dari GSheet seperti biasa
+  document.getElementById("statusText").textContent="Mengambil data dari GSheet...";
+  note.textContent="";
   try{
     const now=new Date();
     let tanggalLabel;
@@ -199,6 +220,19 @@ document.getElementById("ambilNamaBtn").addEventListener("click",async()=>{
   }
 });
 
+// Build nama unik dari CSV (mode Index)
+function buildUniqueNamesFromCSV(rows){
+  const map=new Map(); // key=normalized name, val=display original
+  for(const r of rows){
+    const raw=(r.diambilOleh||"").trim();
+    if(!raw) continue;
+    const key=normalizeName(raw);
+    if(!map.has(key)) map.set(key, raw);
+  }
+  // Sheet-like structure: {nama, nik:'', shift:'Index'}
+  return Array.from(map.values()).map(nm=>({nama:nm, nik:'', shift:'Index'}));
+}
+
 // === CSV Load ===
 document.getElementById("csvFile").addEventListener("change",(e)=>{
   const file=e.target.files[0];if(!file)return;
@@ -223,40 +257,86 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
           waktuSlaDetik:slaNum*3600,status:statusRaw,statusNorm:normalizeStatus(statusRaw),
           statusSLA:statusSlaRaw,tanggalDiambil:tglDiambilRaw,tipeLokasi:(tipeLokasiRaw||"").trim()};
       });
+      // Jika mode Index dipilih, siap-siap enable Generate setelah CSV ada
+      const shift=document.getElementById("shiftInput").value.trim().toUpperCase();
+      if(shift==="IDX"){
+        sheetData=buildUniqueNamesFromCSV(csvData);
+        document.getElementById("generateBtn").disabled = sheetData.length===0;
+        document.getElementById("modeNote").textContent = sheetData.length
+          ? `(Mode Index) ${sheetData.length} nama diambil dari CSV.`
+          : `(Mode Index) Tidak ada nama pada kolom "Diambil oleh".`;
+      }
       document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
     }});
 });
 
 // === Perhitungan ===
 function computeC(r){return r.waktuSlaDetik>0?r.durasiDetik/r.waktuSlaDetik:0;}
-function rataRata_byName(nama,thr=0.85){
-  const matches=[];for(const r of csvData){
-    if(!isAcceptedStatus(r.statusNorm))continue;
-    if(r.tipeLokasi&&r.tipeLokasi.trim().toLowerCase()==="branch")continue;
 
-    // Filter khusus Siang (S) berdasarkan "Tanggal diambil" >= 14:00 + toggle
+// Perhitungan standar (dipakai untuk semua mode; filter Siang aktif hanya saat Shift=S)
+function rataRata_byName(nama,thr=0.85){
+  const matches=[];
+  const keyNama=normalizeName(nama);
+
+  for(const r of csvData){
+    if(!isAcceptedStatus(r.statusNorm))continue;
+    if(r.tipeLokasi && r.tipeLokasi.trim().toLowerCase()==="branch")continue;
+
+    // Filter khusus Siang (hanya saat Shift=S)
     if(!lolosFilterShiftSiangByTanggalDiambil(r)) continue;
 
-    if(similarity(nama,r.diambilOleh)>=thr)matches.push(r);}
+    // MODE INDEX: pakai pencocokan exact (lebih ketat)
+    const currentShift=document.getElementById("shiftInput").value.trim().toUpperCase();
+    if(currentShift==="IDX"){
+      if(normalizeName(r.diambilOleh)!==keyNama) continue;
+    }else{
+      // MODE SHIFT: tetap gunakan similarity agar toleran typo
+      if(similarity(nama,r.diambilOleh)<thr) continue;
+    }
+
+    matches.push(r);
+  }
+
   if(!matches.length)return{avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0,relasiResolved:0};
+
   const sum=matches.reduce((a,b)=>a+computeC(b),0);
   const latest=matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
-  return{avg:sum/matches.length,count:matches.length,lastTime:ambilJamDariTanggal(latest),
+  return{
+    avg:sum/matches.length,
+    count:matches.length,
+    lastTime:ambilJamDariTanggal(latest),
     slaCount:matches.filter(r=>r.statusSLA&&r.statusSLA.toLowerCase().includes("lewat")).length,
     inProgressCount:matches.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length,
-    relasiResolved:matches.filter(r=>r.statusNorm.includes("pending")).length};
+    relasiResolved:matches.filter(r=>r.statusNorm.includes("pending")).length
+  };
 }
 
 // === Generate Tabel ===
 document.getElementById("generateBtn").addEventListener("click",()=>{
-  if(!sheetData.length)return alert("Ambil nama dulu!");
-  if(!csvData.length)return alert("Upload CSV dulu!");
+  const mode=document.getElementById("shiftInput").value.trim().toUpperCase();
+  if(!csvData.length) return alert("Upload CSV dulu!");
+
+  if(mode==="IDX"){
+    // pastikan sheetData diisi dari CSV
+    if(!sheetData.length) sheetData=buildUniqueNamesFromCSV(csvData);
+    if(!sheetData.length){ alert('Tidak ada nama pada kolom "Diambil oleh" di CSV.'); return; }
+    shiftLabel="Index Hari Ini";
+  }else{
+    if(!sheetData.length) return alert("Ambil nama dulu!");
+    const shiftMap={P:"Shift 1",S:"Shift 2",M:"Shift 3",MH1:"Shift 3"};
+    shiftLabel=shiftMap[mode]||mode;
+  }
+
   const results=sheetData.map(k=>({k,res:rataRata_byName(k.nama)}));
   lastResults=results;
   renderTable(results);
 
   const tgl=document.getElementById("tanggalCek").textContent;
-  document.getElementById("judulLaporan").textContent=`Laporan Index CO ${shiftLabel} — Tanggal ${tgl}`;
+  document.getElementById("judulLaporan").textContent=
+    (mode==="IDX")
+      ? `Laporan Index CO — Index Hari Ini — Tanggal ${tgl}`
+      : `Laporan Index CO ${shiftLabel} — Tanggal ${tgl}`;
+
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 });
 
@@ -266,7 +346,7 @@ function renderTable(results){
   results.forEach((item,index)=>{
     const {k,res}=item;const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
     const tr=document.createElement("tr");if(res.slaCount>0)tr.className="table-danger";
-    tr.innerHTML=`<td>${index+1}</td><td>${k.nama}</td><td>${k.shift}</td>
+    tr.innerHTML=`<td>${index+1}</td><td>${k.nama}</td><td>${k.shift||'-'}</td>
       <td>${res.lastTime}</td><td>${avg}</td><td>${res.count||0}</td>
       <td>${res.slaCount||0}</td><td>${res.inProgressCount||0}</td><td>${res.relasiResolved||0}</td>`;
     tbody.appendChild(tr);
@@ -308,7 +388,7 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
   link.click();
 });
 
-// === UI: Auto enable/disable toggle Siang berdasarkan Shift ===
+// === UI: Auto enable/disable toggle Siang berdasarkan mode ===
 function updateToggleSiangAvailability(){
   const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
   const cb = document.getElementById("toggleSiang14");
@@ -319,16 +399,43 @@ function updateToggleSiangAvailability(){
   if(!isSiang){
     cb.checked = false;               // non-aktif jelas saat bukan S
     label.classList.add("text-muted");
-    cb.title = "Tidak berlaku untuk shift selain Siang (S)";
+    cb.title = (shift==="IDX")
+      ? "Tidak berlaku pada mode Index hari ini"
+      : "Tidak berlaku untuk shift selain Siang (S)";
   }else{
     if(cb.checked === false) cb.checked = true; // default aktif saat S dipilih
     label.classList.remove("text-muted");
     cb.title = "Aktifkan untuk hitung mulai jam 14:00";
   }
+
+  // Catatan mode
+  const note=document.getElementById("modeNote");
+  if(shift==="IDX"){
+    note.textContent="(Mode Index) Nama diambil dari CSV. Tidak perlu ambil dari GSheet.";
+  }else{
+    note.textContent="";
+  }
 }
 
-// panggil saat shift berubah & saat halaman dibuka
-document.getElementById("shiftInput").addEventListener("change", updateToggleSiangAvailability);
+// panggil saat mode berubah & saat halaman dibuka
+document.getElementById("shiftInput").addEventListener("change", ()=>{
+  updateToggleSiangAvailability();
+  // Saat pindah ke Mode Index dan CSV sudah ada, siapkan sheetData & enable generate
+  const mode=document.getElementById("shiftInput").value.trim().toUpperCase();
+  if(mode==="IDX"){
+    if(csvData.length){
+      sheetData=buildUniqueNamesFromCSV(csvData);
+      document.getElementById("generateBtn").disabled = sheetData.length===0;
+      document.getElementById("modeNote").textContent = sheetData.length
+        ? `(Mode Index) ${sheetData.length} nama diambil dari CSV.`
+        : `(Mode Index) Tidak ada nama pada kolom "Diambil oleh".`;
+    }else{
+      document.getElementById("generateBtn").disabled = true;
+    }
+  }else{
+    document.getElementById("generateBtn").disabled = true; // menunggu ambil nama GSheet
+  }
+});
 document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </script>
 
