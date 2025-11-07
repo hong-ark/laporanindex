@@ -28,7 +28,7 @@
 <body>
 <div class="container">
   <h4><b>Laporan Index Shift</b></h4>
-  <p>Input shift → Ambil nama dari GSheet → Upload CSV → Generate Tabel</p>
+  <p>Input shift → Ambil nama dari GSheet → Upload CSV → Hitung index</p>
 
   <div class="mb-3 row">
     <div class="col-md-2">
@@ -45,14 +45,6 @@
     <div class="col-md-4">
       <label class="form-label">&nbsp;</label><br />
       <button id="ambilNamaBtn" class="btn btn-primary">Ambil Nama dari GSheet</button>
-
-      <!-- Toggle Siang ≥ 14:00 (auto-disable kecuali Shift S) -->
-      <div class="form-check mt-2">
-        <input class="form-check-input" type="checkbox" id="toggleSiang14" checked>
-        <label class="form-check-label" for="toggleSiang14" id="labelToggleSiang14">
-          Hitung Siang mulai ≥ 14:00
-        </label>
-      </div>
     </div>
 
     <div class="col-md-6 text-end">
@@ -68,10 +60,19 @@
     <input type="file" id="csvFile" class="form-control" accept=".csv" />
   </div>
 
-  <button id="generateBtn" class="btn btn-success mb-3" disabled>Generate Tabel</button>
+  <button id="generateBtn" class="btn btn-success mb-1" disabled>Hitung index</button>
   <span id="statusText" class="ms-2 text-muted"></span>
 
-  <div id="judulLaporan"></div>
+  <!-- ⬇️ Toggle dipindah ke bawah tombol Generate -->
+  <div class="form-check mt-2">
+    <input class="form-check-input" type="checkbox" id="toggleSiang14" checked>
+    <label class="form-check-label" for="toggleSiang14" id="labelToggleSiang14">
+      Hitung Siang mulai 14:00
+    </label>
+  </div>
+  <!-- ⬆️ End Toggle -->
+
+  <div id="judulLaporan" class="mt-2"></div>
 
   <div id="resultArea" class="mt-2">
     <table id="resultTable" class="table table-bordered table-striped">
@@ -145,7 +146,7 @@ function jamMenitDariTanggal(s){
 // Filter khusus Shift S (Siang) berbasis "Tanggal diambil" & toggle
 function lolosFilterShiftSiangByTanggalDiambil(record){
   const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
-  if(shift !== "S") return true; // hanya berlaku untuk Siang
+  if(shift !== "S") return true; // hanya untuk Siang
 
   // Jika toggle dimatikan, jangan filter jam (semua lolos)
   const useSiang14 = document.getElementById("toggleSiang14")?.checked;
@@ -307,7 +308,7 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
   link.click();
 });
 
-// === UI Enhancement: auto enable/disable toggle Siang berdasarkan Shift ===
+// === UI: Auto enable/disable toggle Siang berdasarkan Shift ===
 function updateToggleSiangAvailability(){
   const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
   const cb = document.getElementById("toggleSiang14");
@@ -316,7 +317,7 @@ function updateToggleSiangAvailability(){
 
   cb.disabled = !isSiang;
   if(!isSiang){
-    cb.checked = false;               // biar jelas kalau tidak berlaku
+    cb.checked = false;               // non-aktif jelas saat bukan S
     label.classList.add("text-muted");
     cb.title = "Tidak berlaku untuk shift selain Siang (S)";
   }else{
