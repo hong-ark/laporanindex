@@ -13,6 +13,7 @@
     .container { max-width: 1100px; background: white; border-radius: 10px; padding: 25px;
                  box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
     #judulLaporan { font-weight: 700; font-size: 18px; text-align: center; margin-bottom: 15px; color:#000000; }
+    #judulLaporan.is-history { color: #8e24aa; } /* ungu saat history */
     #copyright { text-align: center; font-size: 14px; color: #000; margin-top: 40px; margin-bottom: 10px; font-weight: 600; }
     #resultTable.table thead tr th {
       background-color: #1976d2 !important; color: white !important; text-align: center;
@@ -31,7 +32,6 @@
   <p>Pilih shift → Generate Jadwal → Upload CSV → Hitung Index</p>
 
   <div class="mb-3 row align-items-end">
-    <!-- Dropdown proporsional -->
     <div class="col-auto">
       <label class="form-label">Mode</label><br />
       <select id="shiftInput" class="form-select w-auto d-inline-block">
@@ -66,7 +66,6 @@
   <button id="generateBtn" class="btn btn-success mb-1" disabled>Hitung Index</button>
   <span id="statusText" class="ms-2 text-muted"></span>
 
-  <!-- Toggle di bawah tombol Generate -->
   <div class="form-check mt-2">
     <input class="form-check-input" type="checkbox" id="toggleSiang14" checked>
     <label class="form-check-label" for="toggleSiang14" id="labelToggleSiang14">
@@ -95,14 +94,13 @@
     </table>
   </div>
 
-  <!-- Baris tombol Download + History -->
   <div class="d-flex justify-content-end gap-2 mt-3">
     <button id="historyBtn" class="btn btn-secondary">History</button>
     <button id="downloadBtn" class="btn btn-outline-primary">Download JPG</button>
   </div>
 </div>
 
-<!-- Modal History -->
+<!-- Modal History (klik item → langsung load) -->
 <div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -121,20 +119,38 @@
   </div>
 </div>
 
-<!-- Bootstrap JS (untuk modal) -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-// === URLs (Jadwal & History) ===
-const GAS_URL = "https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFMrU-NNqxMW2ZtSCRIpESCpC4Nz7VzdKRmt-Zx1rJXjnRd-g/exec"; // jadwal (lama)
-const HISTORY_GAS_URL = "https://script.google.com/macros/s/AKfycbwrXZlIB4nyiQtb-MM79c8rm1rDuoVyEZRxdk4-yTHaM_teOWR-XxC_BK50RsVlmo-P/exec";   // GAS History (baru)
+// === URLs ===
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFMrU-NNqxMW2ZtSCRIpESCpC4Nz7VzdKRmt-Zx1rJXjnRd-g/exec";
+const HISTORY_GAS_URL = "https://script.google.com/macros/s/AKfycbwrXZlIB4nyiQtb-MM79c8rm1rDuoVyEZRxdk4-yTHaM_teOWR-XxC_BK50RsVlmo-P/exec";
 
 let sheetData=[], csvData=[], lastResults=[];
 let shiftLabel="";
 
-// ====== History (REMOTE via GAS) ======
+// ===== Utils Tanggal =====
+function prettyTanggalLabel(value){
+  // Jika terlihat seperti ISO (ada 'T'), coba parse ke Date dan tampilkan id-ID
+  if(typeof value === "string" && value.includes("T")){
+    const d = new Date(value);
+    if(!isNaN(d)) return d.toLocaleDateString("id-ID",{day:"2-digit",month:"short",year:"numeric"});
+  }
+  // Jika angka (timestamp)
+  if(typeof value === "number"){
+    const d = new Date(value);
+    if(!isNaN(d)) return d.toLocaleDateString("id-ID",{day:"2-digit",month:"short",year:"numeric"});
+  }
+  // Kalau sudah string tanggal normal, biarkan
+  return String(value||"");
+}
+function prettyDateTime(ts){
+  const d=new Date(ts);
+  return d.toLocaleString("id-ID",{ day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
+}
+
+// ===== History (remote) =====
 async function saveHistoryEntry(entry){
-  // ringkas payload agar kecil
   const compactResults = (entry.results || []).map(x => ({
     k: { nama: x.k?.nama || "", shift: x.k?.shift || "" },
     res:{
@@ -146,26 +162,22 @@ async function saveHistoryEntry(entry){
       relasiResolved: x.res?.relasiResolved ?? 0
     }
   }));
-
   const payload = {
     action: "saveHistory",
     data: {
       ts: entry.ts,
       mode: entry.mode,
       shiftLabel: entry.shiftLabel,
-      tanggal: entry.tanggal,
+      tanggal: entry.tanggal, // string dari judul (sudah lokal)
       toggleSiang14: entry.toggleSiang14,
       results: compactResults
     }
   };
-
-  // simple request -> tidak kena preflight CORS
   const res = await fetch(HISTORY_GAS_URL, {
     method: "POST",
-    headers: { "Content-Type":"text/plain;charset=utf-8" },
+    headers: { "Content-Type":"text/plain;charset=utf-8" }, // simple request (tanpa preflight)
     body: JSON.stringify(payload)
   });
-
   const text = await res.text();
   let json; try { json = JSON.parse(text); } catch { json = null; }
   if(!res.ok || !json || !json.ok){
@@ -183,9 +195,8 @@ async function loadHistory(){
     ts: h.ts,
     mode: h.mode,
     shiftLabel: h.shiftLabel,
-    tanggal: h.tanggal,
+    tanggal: h.tanggal,             // sudah rapi dari GAS
     toggleSiang14: h.toggleSiang14,
-    // rekonstruksi minimal untuk renderTable
     results: (h.rows||[]).map(r => ({
       k: { nama: r.nama, shift: r.shift },
       res: {
@@ -206,66 +217,15 @@ async function clearHistory(){
   if(!json.ok) throw new Error(json.error||"clearHistory failed");
 }
 
-function formatTs(ts){
-  const d=new Date(ts);
-  return d.toLocaleString("id-ID",{ day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
-}
-
-async function renderHistoryList(){
-  const list = document.getElementById("historyList");
-  list.innerHTML = '<div class="text-muted">Memuat...</div>';
-  try{
-    const arr = await loadHistory();
-    if(!arr.length){
-      list.innerHTML = '<div class="text-muted">Belum ada history.</div>';
-      return;
-    }
-    list.innerHTML = "";
-    arr.forEach(h=>{
-      const btn = document.createElement("button");
-      btn.type="button";
-      btn.className="list-group-item list-group-item-action";
-      const modeLabel = (h.mode==="IDX") ? "Index hari ini" : h.shiftLabel;
-      btn.innerHTML = `
-        <div class="d-flex w-100 justify-content-between">
-          <h6 class="mb-1">${modeLabel}</h6>
-          <small>${formatTs(h.ts)}</small>
-        </div>
-        <div class="mb-1">Tanggal: ${h.tanggal} • Baris: ${h.results?.length||0} • Siang≥14: ${h.toggleSiang14 ? "ON":"OFF"}</div>
-      `;
-      btn.addEventListener("click", ()=>{
-        lastResults = h.results || [];
-        renderTable(lastResults);
-        document.getElementById("judulLaporan").textContent =
-          (h.mode==="IDX")
-            ? `[HISTORY] Laporan Index CO — Index Hari Ini — Tanggal ${h.tanggal}`
-            : `[HISTORY] Laporan Index CO ${h.shiftLabel} — Tanggal ${h.tanggal}`;
-        document.getElementById("statusText").textContent = `Ditampilkan dari history (${formatTs(h.ts)}).`;
-        const modalEl = document.getElementById("historyModal");
-        bootstrap.Modal.getInstance(modalEl)?.hide();
-      });
-      list.appendChild(btn);
-    });
-  }catch(err){
-    list.innerHTML = `<div class="text-danger">Gagal memuat history: ${err.message}</div>`;
-  }
-}
-
-function showHistoryModal(){
-  renderHistoryList();
-  const modal = new bootstrap.Modal(document.getElementById("historyModal"));
-  modal.show();
-}
-
-// === Status Sort ===
+// ===== Status Sort =====
 let sortAscNama=true,sortAscLastCO=false,sortAscIndexCO=false,sortAscTotalCO=true,
     sortAscSLA=false,sortAscInProgress=false,sortAscRelasiResolved=false;
 
-// === AUTO TANGGAL ===
+// ===== AUTO TANGGAL =====
 document.getElementById("tanggalCek").textContent=
   new Date().toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});
 
-// === FUNGSI BANTU ===
+// ===== FUNGSI BANTU =====
 function normKey(s){return(s||"").toString().toLowerCase().replace(/[^a-z0-9]/g,'');}
 function normalizeName(s){return(s||"").toString().toLowerCase().replace(/\s+/g,' ').replace(/[^\w\s]/g,'').trim();}
 function durasiKeDetik(v){if(!v)return 0;const s=v.toString().trim();
@@ -288,18 +248,14 @@ function similarity(a,b){a=normalizeName(a);b=normalizeName(b);if(!a||!b)return 
   const d=levenshtein(a,b);return 1-d/Math.max(a.length,b.length);}
 function ambilJamDariTanggal(s){if(!s)return"-";const m=s.match(/(\d{1,2}):(\d{2})/);
   return m?`${m[1].padStart(2,'0')}:${m[2]}`:"-";}
-
-// Helper ambil HH:MM
 function jamMenitDariTanggal(s){
   const m = (s||"").match(/(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?/);
   if(!m) return null;
   return { h: parseInt(m[1],10), m: parseInt(m[2],10) };
 }
-
-// Filter khusus Shift S (Siang) berbasis "Tanggal diambil" & toggle
 function lolosFilterShiftSiangByTanggalDiambil(record){
   const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
-  if(shift !== "S") return true; // hanya untuk Siang
+  if(shift !== "S") return true;
   const useSiang14 = document.getElementById("toggleSiang14")?.checked;
   if(!useSiang14) return true;
   const sumber = record.tanggalDiambil || "";
@@ -310,7 +266,7 @@ function lolosFilterShiftSiangByTanggalDiambil(record){
   return false;
 }
 
-// === Ambil data dari GSheet atau Mode Index ===
+// === Ambil data dari GSheet / Mode Index ===
 document.getElementById("ambilNamaBtn").addEventListener("click",async()=>{
   const shiftInput=document.getElementById("shiftInput").value.trim().toUpperCase();
   const note=document.getElementById("modeNote");
@@ -414,29 +370,22 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
 
 // === Perhitungan ===
 function computeC(r){return r.waktuSlaDetik>0?r.durasiDetik/r.waktuSlaDetik:0;}
-
 function rataRata_byName(nama,thr=0.85){
   const matches=[];
   const keyNama=normalizeName(nama);
-
   for(const r of csvData){
     if(!isAcceptedStatus(r.statusNorm))continue;
     if(r.tipeLokasi && r.tipeLokasi.trim().toLowerCase()==="branch")continue;
-
     if(!lolosFilterShiftSiangByTanggalDiambil(r)) continue;
-
     const currentShift=document.getElementById("shiftInput").value.trim().toUpperCase();
     if(currentShift==="IDX"){
       if(normalizeName(r.diambilOleh)!==keyNama) continue;
     }else{
       if(similarity(nama,r.diambilOleh)<thr) continue;
     }
-
     matches.push(r);
   }
-
   if(!matches.length)return{avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0,relasiResolved:0};
-
   const sum=matches.reduce((a,b)=>a+computeC(b),0);
   const latest=matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
   return{
@@ -466,7 +415,6 @@ document.getElementById("generateBtn").addEventListener("click", async ()=>{
 
   let results=sheetData.map(k=>({k,res:rataRata_byName(k.nama)}));
 
-  // Autosort khusus Mode "Index hari ini" (desc: terbesar → terkecil)
   if(mode==="IDX"){
     const val = (x)=> (x.res.avg==null ? -Infinity : x.res.avg);
     results.sort((a,b)=> val(b) - val(a));
@@ -479,14 +427,14 @@ document.getElementById("generateBtn").addEventListener("click", async ()=>{
   renderTable(results);
 
   const tgl=document.getElementById("tanggalCek").textContent;
-  document.getElementById("judulLaporan").textContent=
-    (mode==="IDX")
+  const judul=document.getElementById("judulLaporan");
+  judul.classList.remove("is-history");
+  judul.textContent=(mode==="IDX")
       ? `Laporan Index CO — Index Hari Ini — Tanggal ${tgl}`
       : `Laporan Index CO ${shiftLabel} — Tanggal ${tgl}`;
 
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 
-  // === SIMPAN KE HISTORY (REMOTE) ===
   try{
     await saveHistoryEntry({
       ts: Date.now(),
@@ -549,7 +497,7 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
   link.click();
 });
 
-// === UI: Auto enable/disable toggle Siang + tombol GSheet berdasarkan mode ===
+// === UI: Toggle Siang & tombol GSheet ===
 function updateToggleSiangAvailability(){
   const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
   const cb = document.getElementById("toggleSiang14");
@@ -582,7 +530,55 @@ function updateToggleSiangAvailability(){
   }
 }
 
-// Event tombol History
+// === Modal History ===
+async function renderHistoryList(){
+  const list = document.getElementById("historyList");
+  list.innerHTML = '<div class="text-muted">Memuat...</div>';
+  try{
+    const arr = await loadHistory();
+    if(!arr.length){
+      list.innerHTML = '<div class="text-muted">Belum ada history.</div>';
+      return;
+    }
+    list.innerHTML = "";
+    arr.forEach(h=>{
+      const btn = document.createElement("button");
+      btn.type="button";
+      btn.className="list-group-item list-group-item-action";
+      const modeLabel = (h.mode==="IDX") ? "Index hari ini" : h.shiftLabel;
+      btn.innerHTML = `
+        <div class="d-flex w-100 justify-content-between">
+          <h6 class="mb-1">${modeLabel}</h6>
+          <small>${prettyDateTime(h.ts)}</small>
+        </div>
+        <div class="mb-1">Tanggal: ${prettyTanggalLabel(h.tanggal)} • Baris: ${h.results?.length||0} • Siang≥14: ${h.toggleSiang14 ? "ON":"OFF"}</div>
+      `;
+      btn.addEventListener("click", ()=>{
+        lastResults = h.results || [];
+        renderTable(lastResults);
+        const judul = document.getElementById("judulLaporan");
+        judul.classList.add("is-history"); // warna ungu saat dari history
+        judul.textContent =
+          (h.mode==="IDX")
+            ? `[HISTORY] Laporan Index CO — Index Hari Ini — Tanggal ${prettyTanggalLabel(h.tanggal)}`
+            : `[HISTORY] Laporan Index CO ${h.shiftLabel} — Tanggal ${prettyTanggalLabel(h.tanggal)}`;
+        document.getElementById("statusText").textContent = `Ditampilkan dari history (${prettyDateTime(h.ts)}).`;
+        bootstrap.Modal.getInstance(document.getElementById("historyModal"))?.hide();
+      });
+      list.appendChild(btn);
+    });
+  }catch(err){
+    list.innerHTML = `<div class="text-danger">Gagal memuat history: ${err.message}</div>`;
+  }
+}
+
+function showHistoryModal(){
+  renderHistoryList();
+  const modal = new bootstrap.Modal(document.getElementById("historyModal"));
+  modal.show();
+}
+
+// Event tombol History & Clear
 document.getElementById("historyBtn").addEventListener("click", showHistoryModal);
 document.getElementById("clearHistoryBtn").addEventListener("click", async ()=>{
   if(!confirm("Hapus semua history?")) return;
@@ -594,7 +590,7 @@ document.getElementById("clearHistoryBtn").addEventListener("click", async ()=>{
   }
 });
 
-// panggil saat mode berubah & saat halaman dibuka
+// Mode change init
 document.getElementById("shiftInput").addEventListener("change", ()=>{
   updateToggleSiangAvailability();
   const mode=document.getElementById("shiftInput").value.trim().toUpperCase();
@@ -610,32 +606,10 @@ document.getElementById("shiftInput").addEventListener("change", ()=>{
   }
 });
 document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
-
-// (opsional) helper debug manual
-window.__testHistoryPost = async function(){
-  try{
-    await saveHistoryEntry({
-      ts: Date.now(),
-      mode: 'DEBUG',
-      shiftLabel: 'Debug Manual',
-      tanggal: new Date().toLocaleDateString('id-ID'),
-      toggleSiang14: false,
-      results:[{
-        k:{nama:'Debug User',shift:'-'},
-        res:{avg:2.34,count:5,lastTime:'10:10',slaCount:0,inProgressCount:1,relasiResolved:0}
-      }]
-    });
-    console.log('✅ History: OK tersimpan');
-  }catch(e){
-    console.error('❌ History ERROR:', e);
-  }
-};
 </script>
 
-<!-- ===== COPYRIGHT SECTION ===== -->
 <div id="copyright">
   © 2025 EDP Fai
 </div>
-
 </body>
 </html>
