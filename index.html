@@ -31,7 +31,7 @@
   <p>Pilih shift → Generate Jadwal → Upload CSV → Hitung Index</p>
 
   <div class="mb-3 row align-items-end">
-    <!-- Dropdown proporsional: col-auto + w-auto -->
+    <!-- Dropdown proporsional -->
     <div class="col-auto">
       <label class="form-label">Mode</label><br />
       <select id="shiftInput" class="form-select w-auto d-inline-block">
@@ -42,7 +42,6 @@
         <option value="M">M (Malam)</option>
         <option value="MH1">M H-1 (Malam H-1)</option>
       </select>
-      <!-- Dibiarkan kosong agar tampilan rapi -->
       <div id="modeNote" class="form-text text-muted mt-1"></div>
     </div>
 
@@ -127,15 +126,15 @@
 
 <script>
 // === URLs (Jadwal & History) ===
-const GAS_URL = "https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFMrU-NNqxMW2ZtSCRIpESCpC4Nz7VzdKRmt-Zx1rJXjnRd-g/exec"; // jadwal lama
-const HISTORY_GAS_URL = "https://script.google.com/macros/s/AKfycbwrXZlIB4nyiQtb-MM79c8rm1rDuoVyEZRxdk4-yTHaM_teOWR-XxC_BK50RsVlmo-P/exec";   // GAS History baru
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFMrU-NNqxMW2ZtSCRIpESCpC4Nz7VzdKRmt-Zx1rJXjnRd-g/exec"; // jadwal (lama)
+const HISTORY_GAS_URL = "https://script.google.com/macros/s/AKfycbwrXZlIB4nyiQtb-MM79c8rm1rDuoVyEZRxdk4-yTHaM_teOWR-XxC_BK50RsVlmo-P/exec";   // GAS History (baru)
 
 let sheetData=[], csvData=[], lastResults=[];
 let shiftLabel="";
 
-// === History (REMOTE via GAS) ===
+// ====== History (REMOTE via GAS) ======
 async function saveHistoryEntry(entry){
-  // ringkas data biar payload kecil
+  // ringkas payload agar kecil
   const compactResults = (entry.results || []).map(x => ({
     k: { nama: x.k?.nama || "", shift: x.k?.shift || "" },
     res:{
@@ -160,9 +159,10 @@ async function saveHistoryEntry(entry){
     }
   };
 
+  // simple request -> tidak kena preflight CORS
   const res = await fetch(HISTORY_GAS_URL, {
     method: "POST",
-    headers: { "Content-Type":"text/plain;charset=utf-8" }, // ⬅️ simple request (tanpa preflight)
+    headers: { "Content-Type":"text/plain;charset=utf-8" },
     body: JSON.stringify(payload)
   });
 
@@ -185,6 +185,7 @@ async function loadHistory(){
     shiftLabel: h.shiftLabel,
     tanggal: h.tanggal,
     toggleSiang14: h.toggleSiang14,
+    // rekonstruksi minimal untuk renderTable
     results: (h.rows||[]).map(r => ({
       k: { nama: r.nama, shift: r.shift },
       res: {
@@ -198,7 +199,7 @@ async function loadHistory(){
 async function clearHistory(){
   const res = await fetch(HISTORY_GAS_URL, {
     method:"POST",
-    headers: {"Content-Type":"application/json"},
+    headers: {"Content-Type":"text/plain;charset=utf-8"},
     body: JSON.stringify({ action:"clearHistory" })
   });
   const json = await res.json();
@@ -288,7 +289,7 @@ function similarity(a,b){a=normalizeName(a);b=normalizeName(b);if(!a||!b)return 
 function ambilJamDariTanggal(s){if(!s)return"-";const m=s.match(/(\d{1,2}):(\d{2})/);
   return m?`${m[1].padStart(2,'0')}:${m[2]}`:"-";}
 
-// Helper ambil HH:MM robust (untuk filter Siang)
+// Helper ambil HH:MM
 function jamMenitDariTanggal(s){
   const m = (s||"").match(/(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?/);
   if(!m) return null;
@@ -487,16 +488,18 @@ document.getElementById("generateBtn").addEventListener("click", async ()=>{
 
   // === SIMPAN KE HISTORY (REMOTE) ===
   try{
-    const entry = {
+    await saveHistoryEntry({
       ts: Date.now(),
       mode,
       shiftLabel,
       tanggal: tgl,
       toggleSiang14: document.getElementById("toggleSiang14").checked,
       results: results
-    };
-    await saveHistoryEntry(entry);
-  }catch(e){ console.warn("Gagal simpan history:", e.message||e); }
+    });
+  }catch(e){
+    console.warn("Gagal simpan history:", e);
+    document.getElementById("statusText").textContent = "⚠️ Gagal simpan history: " + e.message;
+  }
 });
 
 // === Render Tabel ===
@@ -555,7 +558,6 @@ function updateToggleSiangAvailability(){
   const note = document.getElementById("modeNote");
   const isSiang = (shift === "S");
 
-  // Toggle Siang
   cb.disabled = !isSiang;
   if(!isSiang){
     cb.checked = false;
@@ -569,7 +571,6 @@ function updateToggleSiangAvailability(){
     cb.title = "Aktifkan untuk hitung mulai jam 14:00";
   }
 
-  // Disable tombol GSheet saat IDX
   if(shift==="IDX"){
     btnGsheet.disabled = true;
     btnGsheet.title = "Mode Index: tidak perlu ambil dari GSheet";
@@ -609,44 +610,26 @@ document.getElementById("shiftInput").addEventListener("change", ()=>{
   }
 });
 document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
-  // === Fungsi Test Manual Simpan History (untuk debug) ===
-window.__testHistoryPost = async function(){
-  try{
-    await saveHistoryEntry({
-      ts: Date.now(),
-      mode: 'DEBUG',
-      shiftLabel: 'Debug Manual',
-      tanggal: new Date().toLocaleDateString('id-ID'),
-      toggleSiang14: false,
-      results:[{
-        k:{nama:'Debug User',shift:'-'},
-        res:{avg:2.34,count:5,lastTime:'10:10',slaCount:0,inProgressCount:1,relasiResolved:0}
-      }]
-    });
-    console.log('✅ History: OK tersimpan');
-  }catch(e){
-    console.error('❌ History ERROR:', e);
-  }
-};
-window.__testHistoryPost = async function(){
-  try{
-    await saveHistoryEntry({
-      ts: Date.now(),
-      mode: 'DEBUG',
-      shiftLabel: 'Debug Manual',
-      tanggal: new Date().toLocaleDateString('id-ID'),
-      toggleSiang14: false,
-      results:[{
-        k:{nama:'Debug User',shift:'-'},
-        res:{avg:2.34,count:5,lastTime:'10:10',slaCount:0,inProgressCount:1,relasiResolved:0}
-      }]
-    });
-    console.log('✅ History: OK tersimpan');
-  }catch(e){
-    console.error('❌ History ERROR:', e);
-  }
-};
 
+// (opsional) helper debug manual
+window.__testHistoryPost = async function(){
+  try{
+    await saveHistoryEntry({
+      ts: Date.now(),
+      mode: 'DEBUG',
+      shiftLabel: 'Debug Manual',
+      tanggal: new Date().toLocaleDateString('id-ID'),
+      toggleSiang14: false,
+      results:[{
+        k:{nama:'Debug User',shift:'-'},
+        res:{avg:2.34,count:5,lastTime:'10:10',slaCount:0,inProgressCount:1,relasiResolved:0}
+      }]
+    });
+    console.log('✅ History: OK tersimpan');
+  }catch(e){
+    console.error('❌ History ERROR:', e);
+  }
+};
 </script>
 
 <!-- ===== COPYRIGHT SECTION ===== -->
@@ -656,5 +639,3 @@ window.__testHistoryPost = async function(){
 
 </body>
 </html>
-
-
