@@ -590,6 +590,26 @@ document.getElementById("shiftInput").addEventListener("change", ()=>{
   }
 });
 document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
+  // === Fungsi Test Manual Simpan History (untuk debug) ===
+window.__testHistoryPost = async function(){
+  try{
+    await saveHistoryEntry({
+      ts: Date.now(),
+      mode: 'DEBUG',
+      shiftLabel: 'Debug Manual',
+      tanggal: new Date().toLocaleDateString('id-ID'),
+      toggleSiang14: false,
+      results:[{
+        k:{nama:'Debug User',shift:'-'},
+        res:{avg:2.34,count:5,lastTime:'10:10',slaCount:0,inProgressCount:1,relasiResolved:0}
+      }]
+    });
+    console.log('✅ History: OK tersimpan');
+  }catch(e){
+    console.error('❌ History ERROR:', e);
+  }
+};
+
 </script>
 
 <!-- ===== COPYRIGHT SECTION ===== -->
@@ -599,3 +619,4 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 
 </body>
 </html>
+
