@@ -102,7 +102,7 @@
   </div>
 </div>
 
-<!-- Modal History (pilih dulu → Load ke Tabel) -->
+<!-- Modal History -->
 <div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -114,8 +114,6 @@
         <div id="historyList" class="list-group"></div>
       </div>
       <div class="modal-footer">
-        <span id="selectedHistoryInfo" class="text-muted me-auto"></span>
-        <button id="loadHistoryBtn" type="button" class="btn btn-success" disabled>Load ke Tabel</button>
         <button id="clearHistoryBtn" type="button" class="btn btn-outline-danger">Clear</button>
         <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Tutup</button>
       </div>
@@ -128,15 +126,15 @@
 
 <script>
 // === URLs (Jadwal & History) ===
-const GAS_URL = "https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFMrU-NNqxMW2ZtSCRIpESCpC4Nz7VzdKRmt-Zx1rJXjnRd-g/exec"; // jadwal
-const HISTORY_GAS_URL = "https://script.google.com/macros/s/AKfycbwrXZlIB4nyiQtb-MM79c8rm1rDuoVyEZRxdk4-yTHaM_teOWR-XxC_BK50RsVlmo-P/exec";   // history
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFMrU-NNqxMW2ZtSCRIpESCpC4Nz7VzdKRmt-Zx1rJXjnRd-g/exec"; // jadwal (lama)
+const HISTORY_GAS_URL = "https://script.google.com/macros/s/AKfycbwrXZlIB4nyiQtb-MM79c8rm1rDuoVyEZRxdk4-yTHaM_teOWR-XxC_BK50RsVlmo-P/exec";   // GAS History (baru)
 
 let sheetData=[], csvData=[], lastResults=[];
 let shiftLabel="";
-let selectedHistory=null; // state pilihan di modal history
 
 // ====== History (REMOTE via GAS) ======
 async function saveHistoryEntry(entry){
+  // ringkas payload agar kecil
   const compactResults = (entry.results || []).map(x => ({
     k: { nama: x.k?.nama || "", shift: x.k?.shift || "" },
     res:{
@@ -148,6 +146,7 @@ async function saveHistoryEntry(entry){
       relasiResolved: x.res?.relasiResolved ?? 0
     }
   }));
+
   const payload = {
     action: "saveHistory",
     data: {
@@ -159,11 +158,14 @@ async function saveHistoryEntry(entry){
       results: compactResults
     }
   };
+
+  // simple request -> tidak kena preflight CORS
   const res = await fetch(HISTORY_GAS_URL, {
     method: "POST",
-    headers: { "Content-Type":"text/plain;charset=utf-8" }, // simple request (tanpa preflight)
+    headers: { "Content-Type":"text/plain;charset=utf-8" },
     body: JSON.stringify(payload)
   });
+
   const text = await res.text();
   let json; try { json = JSON.parse(text); } catch { json = null; }
   if(!res.ok || !json || !json.ok){
@@ -183,6 +185,7 @@ async function loadHistory(){
     shiftLabel: h.shiftLabel,
     tanggal: h.tanggal,
     toggleSiang14: h.toggleSiang14,
+    // rekonstruksi minimal untuk renderTable
     results: (h.rows||[]).map(r => ({
       k: { nama: r.nama, shift: r.shift },
       res: {
@@ -210,11 +213,6 @@ function formatTs(ts){
 
 async function renderHistoryList(){
   const list = document.getElementById("historyList");
-  const loadBtn = document.getElementById("loadHistoryBtn");
-  const selInfo = document.getElementById("selectedHistoryInfo");
-  selectedHistory = null;
-  loadBtn.disabled = true;
-  selInfo.textContent = "";
   list.innerHTML = '<div class="text-muted">Memuat...</div>';
   try{
     const arr = await loadHistory();
@@ -224,26 +222,29 @@ async function renderHistoryList(){
     }
     list.innerHTML = "";
     arr.forEach(h=>{
-      const item = document.createElement("button");
-      item.type="button";
-      item.className="list-group-item list-group-item-action";
+      const btn = document.createElement("button");
+      btn.type="button";
+      btn.className="list-group-item list-group-item-action";
       const modeLabel = (h.mode==="IDX") ? "Index hari ini" : h.shiftLabel;
-      item.innerHTML = `
+      btn.innerHTML = `
         <div class="d-flex w-100 justify-content-between">
           <h6 class="mb-1">${modeLabel}</h6>
           <small>${formatTs(h.ts)}</small>
         </div>
         <div class="mb-1">Tanggal: ${h.tanggal} • Baris: ${h.results?.length||0} • Siang≥14: ${h.toggleSiang14 ? "ON":"OFF"}</div>
       `;
-      item.addEventListener("click", ()=>{
-        // set aktif
-        document.querySelectorAll("#historyList .list-group-item").forEach(el=>el.classList.remove("active"));
-        item.classList.add("active");
-        selectedHistory = h;
-        loadBtn.disabled = false;
-        selInfo.textContent = `Terpilih: ${modeLabel} — ${formatTs(h.ts)}`;
+      btn.addEventListener("click", ()=>{
+        lastResults = h.results || [];
+        renderTable(lastResults);
+        document.getElementById("judulLaporan").textContent =
+          (h.mode==="IDX")
+            ? `[HISTORY] Laporan Index CO — Index Hari Ini — Tanggal ${h.tanggal}`
+            : `[HISTORY] Laporan Index CO ${h.shiftLabel} — Tanggal ${h.tanggal}`;
+        document.getElementById("statusText").textContent = `Ditampilkan dari history (${formatTs(h.ts)}).`;
+        const modalEl = document.getElementById("historyModal");
+        bootstrap.Modal.getInstance(modalEl)?.hide();
       });
-      list.appendChild(item);
+      list.appendChild(btn);
     });
   }catch(err){
     list.innerHTML = `<div class="text-danger">Gagal memuat history: ${err.message}</div>`;
@@ -430,6 +431,7 @@ function rataRata_byName(nama,thr=0.85){
     }else{
       if(similarity(nama,r.diambilOleh)<thr) continue;
     }
+
     matches.push(r);
   }
 
@@ -582,17 +584,6 @@ function updateToggleSiangAvailability(){
 
 // Event tombol History
 document.getElementById("historyBtn").addEventListener("click", showHistoryModal);
-document.getElementById("loadHistoryBtn").addEventListener("click", ()=>{
-  if(!selectedHistory) return;
-  lastResults = selectedHistory.results || [];
-  renderTable(lastResults);
-  document.getElementById("judulLaporan").textContent =
-    (selectedHistory.mode==="IDX")
-      ? `[HISTORY] Laporan Index CO — Index Hari Ini — Tanggal ${selectedHistory.tanggal}`
-      : `[HISTORY] Laporan Index CO ${selectedHistory.shiftLabel} — Tanggal ${selectedHistory.tanggal}`;
-  document.getElementById("statusText").textContent = `Ditampilkan dari history (${formatTs(selectedHistory.ts)}).`;
-  bootstrap.Modal.getInstance(document.getElementById("historyModal"))?.hide();
-});
 document.getElementById("clearHistoryBtn").addEventListener("click", async ()=>{
   if(!confirm("Hapus semua history?")) return;
   try{
@@ -629,11 +620,15 @@ window.__testHistoryPost = async function(){
       shiftLabel: 'Debug Manual',
       tanggal: new Date().toLocaleDateString('id-ID'),
       toggleSiang14: false,
-      results:[{ k:{nama:'Debug User',shift:'-'},
-        res:{avg:2.34,count:5,lastTime:'10:10',slaCount:0,inProgressCount:1,relasiResolved:0} }]
+      results:[{
+        k:{nama:'Debug User',shift:'-'},
+        res:{avg:2.34,count:5,lastTime:'10:10',slaCount:0,inProgressCount:1,relasiResolved:0}
+      }]
     });
     console.log('✅ History: OK tersimpan');
-  }catch(e){ console.error('❌ History ERROR:', e); }
+  }catch(e){
+    console.error('❌ History ERROR:', e);
+  }
 };
 </script>
 
