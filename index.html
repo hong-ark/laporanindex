@@ -13,7 +13,7 @@
     .container { max-width: 1100px; background: white; border-radius: 10px; padding: 25px;
                  box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
     #judulLaporan { font-weight: 700; font-size: 18px; text-align: center; margin-bottom: 15px; color:#000; }
-    #judulLaporan.is-history { color: #8e24aa; } /* ubah di sini kalau mau merah/oranye */
+    #judulLaporan.is-history { color: #8e24aa; } /* ubah bila mau merah/oranye */
     #copyright { text-align: center; font-size: 14px; color: #000; margin-top: 40px; margin-bottom: 10px; font-weight: 600; }
 
     /* Header default biru */
@@ -94,6 +94,7 @@
           <th id="sortNama">Nama Karyawan</th>
           <th>Shift/Mode</th>
           <th id="sortLastCO">LastCO</th>
+          <th id="sortIntervalAmbilCO">IntervalAmbilCO</th><!-- NEW -->
           <th id="sortIndexCO">IndexCO</th>
           <th id="sortTotalCO">TotalCO</th>
           <th id="sortSLA">SLA</th>
@@ -140,7 +141,7 @@ let sheetData=[], csvData=[], lastResults=[];
 let shiftLabel="";
 
 /* ====== SORT STATE ====== */
-let sortAscNama=true,sortAscLastCO=false,sortAscIndexCO=false,sortAscTotalCO=true,
+let sortAscNama=true,sortAscLastCO=false,sortAscIntervalAmbilCO=false,sortAscIndexCO=false,sortAscTotalCO=true,
     sortAscSLA=false,sortAscInProgress=false,sortAscRelasiResolved=false;
 
 /* ====== INIT TANGGAL ====== */
@@ -191,6 +192,41 @@ function prettyDateTime(ts){
   return d.toLocaleString("id-ID",{ day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
 }
 
+/* ====== NEW: helper untuk hitung rata-rata interval dari "Tanggal diambil" ====== */
+// Parse "07-Nov-2025 01:07:23.385" atau "07-Nov-2025 01:07:23"
+function parseTanggalDiambilToDate(s){
+  if(!s) return null;
+  const m = String(s).trim().match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d+))?$/);
+  if(!m) return null;
+  const day = +m[1], monStr = m[2].toLowerCase(), year = +m[3];
+  const hh = +m[4], mm = +m[5], ss = +m[6], ms = m[7] ? +m[7] : 0;
+  const monMap = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11,
+                  mei:4,agu:7,okt:9,nop:10,des:11}; // dukung ID/EN
+  const month = monMap[monStr];
+  if(month==null) return null;
+  return new Date(year, month, day, hh, mm, ss, ms);
+}
+// Hitung rata-rata gap menit antar tanggal (array Date terurut)
+function averageGapMinutes(dates){
+  if(!dates || dates.length < 2) return null;
+  let sum = 0, count = 0;
+  for(let i=1;i<dates.length;i++){
+    const delta = dates[i] - dates[i-1];
+    if(Number.isFinite(delta) && delta >= 0){ sum += delta; count++; }
+  }
+  if(!count) return null;
+  return Math.round((sum / count) / 60000); // menit
+}
+// Format menit → "Xj Ym" atau "Xm"
+function formatGapMinutes(min){
+  if(min == null) return "-";
+  const h = Math.floor(min/60);
+  const m = min % 60;
+  if(h>0 && m>0) return `${h}j ${m}m`;
+  if(h>0) return `${h}j`;
+  return `${m}m`;
+}
+
 /* ====== FILTER SIANG >=14:00 (hanya saat S + toggle ON) ====== */
 function lolosFilterShiftSiangByTanggalDiambil(record){
   const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
@@ -215,7 +251,8 @@ async function saveHistoryEntry(entry){
       lastTime: x.res?.lastTime ?? "-",
       slaCount: x.res?.slaCount ?? 0,
       inProgressCount: x.res?.inProgressCount ?? 0,
-      relasiResolved: x.res?.relasiResolved ?? 0
+      relasiResolved: x.res?.relasiResolved ?? 0,
+      avgGapMin: x.res?.avgGapMin ?? null
     }
   }));
   const payload = {
@@ -250,7 +287,8 @@ async function loadHistory(){
       k: { nama: r.nama, shift: r.shift },
       res: {
         avg: r.avg, count: r.count, lastTime: r.lastTime,
-        slaCount: r.slaCount, inProgressCount: r.inProgressCount, relasiResolved: r.relasiResolved
+        slaCount: r.slaCount, inProgressCount: r.inProgressCount, relasiResolved: r.relasiResolved,
+        avgGapMin: r.avgGapMin ?? null
       }
     }))
   }));
@@ -339,6 +377,7 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
         sheetData = buildUniqueNamesFromCSV(csvData);
         document.getElementById("generateBtn").disabled = sheetData.length===0;
         document.getElementById("modeNote").textContent = sheetData.length
+          ? "(Mode Index) Klik 'Hitung Index' untuk menghitung dari daftar CSV."
           : "(Mode Index) Tidak ada nama pada kolom 'Diambil oleh'.";
       }
       document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
@@ -363,7 +402,6 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
   if(!shiftInput){ alert("Pilih mode dulu!"); return; }
 
   if(shiftInput==="IDX"){
-    // Sesuai permintaan: di mode IDX tombol ini memang DINONAKTIFKAN, tapi kalau kepencet:
     document.getElementById("statusText").textContent="Mode Index: upload CSV lalu langsung 'Hitung Index'.";
     return;
   }
@@ -378,7 +416,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
     document.getElementById("tanggalCek").textContent=tanggalLabel;
 
     let shifts=[shiftInput];
-    if(shiftInput==="P")shifts=["P","P1"]; // aturan lama
+    if(shiftInput==="P")shifts=["P","P1"];
 
     const shiftMap={P:"Shift 1",S:"Shift 2",M:"Shift 3",MH1:"Shift 3"};
     shiftLabel=shiftMap[shiftInput]||shiftInput;
@@ -392,10 +430,8 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
       const list=(data.karyawan||[]).map(k=>({nama:(k.nama||"").trim(),nik:(k.nik||"").trim(),shift:(k.shift||"").trim()}));
       sheetData=sheetData.concat(list);
     }
-    // unikkan nama
     sheetData=sheetData.filter((obj,idx,arr)=>idx===arr.findIndex(t=>t.nama===obj.nama));
 
-    // sukses → enable Hitung Index
     document.getElementById("generateBtn").disabled=false;
     document.getElementById("statusText").textContent=`✅ ${sheetData.length} nama berhasil diambil (${shiftLabel}).`;
   }catch(err){
@@ -425,17 +461,28 @@ function rataRata_byName(nama,thr=0.85){
     matches.push(r);
   }
 
-  if(!matches.length)return{avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0,relasiResolved:0};
+  if(!matches.length)return{
+    avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0,relasiResolved:0,avgGapMin:null
+  };
 
   const sum=matches.reduce((a,b)=>a+computeC(b),0);
   const latest=matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
+
+  // NEW: hitung rata-rata jeda antar "Tanggal diambil"
+  const dateList = matches
+    .map(r=>parseTanggalDiambilToDate(r.tanggalDiambil))
+    .filter(d => d instanceof Date && !isNaN(d))
+    .sort((a,b)=>a-b);
+  const avgGapMin = averageGapMinutes(dateList);
+
   return{
     avg:sum/matches.length,
     count:matches.length,
     lastTime:ambilJamDariTanggal(latest),
     slaCount:matches.filter(r=>r.statusSLA&&r.statusSLA.toLowerCase().includes("lewat")).length,
     inProgressCount:matches.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length,
-    relasiResolved:matches.filter(r=>r.statusNorm.includes("pending")).length
+    relasiResolved:matches.filter(r=>r.statusNorm.includes("pending")).length,
+    avgGapMin
   };
 }
 
@@ -497,14 +544,16 @@ document.getElementById("generateBtn").addEventListener("click", async ()=>{
 function renderTable(results){
   const tbody=document.querySelector("#resultTable tbody");tbody.innerHTML="";
   results.forEach((item,index)=>{
-    const {k,res}=item;const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
+    const {k,res}=item;
+    const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
+    const gapText = formatGapMinutes(res.avgGapMin); // NEW
     const tr=document.createElement("tr");if(res.slaCount>0)tr.className="table-danger";
     tr.innerHTML=`<td>${index+1}</td><td>${k.nama}</td><td>${k.shift||'-'}</td>
-      <td>${res.lastTime}</td><td>${avg}</td><td>${res.count||0}</td>
+      <td>${res.lastTime}</td><td>${gapText}</td><td>${avg}</td><td>${res.count||0}</td>
       <td>${res.slaCount||0}</td><td>${res.inProgressCount||0}</td><td>${res.relasiResolved||0}</td>`;
     tbody.appendChild(tr);
   });
-  ["Nama","LastCO","IndexCO","TotalCO","SLA","InProgress","RelasiResolved"].forEach(k=>{
+  ["Nama","LastCO","IntervalAmbilCO","IndexCO","TotalCO","SLA","InProgress","RelasiResolved"].forEach(k=>{
     const el=document.getElementById(`sort${k}`);
     if(el)el.onclick=()=>sortColumn(k);
   });
@@ -517,6 +566,11 @@ function sortColumn(key){
   switch(key){
     case"Nama":asc=sortAscNama;valFunc=r=>(r.k.nama||"").toLowerCase();sortAscNama=!sortAscNama;break;
     case"LastCO":asc=sortAscLastCO;valFunc=r=>r.res.lastTime==="-"?0:parseInt(r.res.lastTime.replace(":",""));sortAscLastCO=!sortAscLastCO;break;
+    case"IntervalAmbilCO": // NEW
+      asc=sortAscIntervalAmbilCO;
+      valFunc=r=> (r.res.avgGapMin==null ? Number.NEGATIVE_INFINITY : r.res.avgGapMin);
+      sortAscIntervalAmbilCO=!sortAscIntervalAmbilCO;
+      break;
     case"IndexCO":asc=sortAscIndexCO;valFunc=r=>r.res.avg||0;sortAscIndexCO=!sortAscIndexCO;break;
     case"TotalCO":asc=sortAscTotalCO;valFunc=r=>r.res.count||0;sortAscTotalCO=!sortAscTotalCO;break;
     case"SLA":asc=sortAscSLA;valFunc=r=>r.res.slaCount||0;sortAscSLA=!sortAscSLA;break;
@@ -561,6 +615,7 @@ function updateToggleSiangAvailability(){
   if(mode==="IDX"){
     btnGsheet.disabled = true;
     btnGsheet.title = "Mode Index: tidak perlu Generate Jadwal";
+    note.textContent = "(Mode Index) Upload CSV lalu langsung klik 'Hitung Index'.";
     document.getElementById("generateBtn").disabled = sheetData.length===0; // aktif setelah CSV → build nama
   }else if(mode){
     btnGsheet.disabled = false;
@@ -601,5 +656,3 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
-
-
