@@ -339,7 +339,7 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
         sheetData = buildUniqueNamesFromCSV(csvData);
         document.getElementById("generateBtn").disabled = sheetData.length===0;
         document.getElementById("modeNote").textContent = sheetData.length
-          ? "(Mode Index) Klik 'Hitung Index' untuk menghitung dari daftar CSV."
+          ? " "
           : "(Mode Index) Tidak ada nama pada kolom 'Diambil oleh'.";
       }
       document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
@@ -562,7 +562,6 @@ function updateToggleSiangAvailability(){
   if(mode==="IDX"){
     btnGsheet.disabled = true;
     btnGsheet.title = "Mode Index: tidak perlu Generate Jadwal";
-    note.textContent = "(Mode Index) Upload CSV lalu langsung klik 'Hitung Index'.";
     document.getElementById("generateBtn").disabled = sheetData.length===0; // aktif setelah CSV → build nama
   }else if(mode){
     btnGsheet.disabled = false;
@@ -603,3 +602,4 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
+
