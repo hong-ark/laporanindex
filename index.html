@@ -230,18 +230,24 @@ function lolosFilterShiftSiangByTanggalDiambil(record){
 
 /* HISTORY */
 async function saveHistoryEntry(entry){
-  const compactResults = (entry.results || []).map(x => ({
-    k: { nama: x.k?.nama || "", shift: x.k?.shift || "" },
-    res:{
-      avg: x.res?.avg ?? null,
-      count: x.res?.count ?? 0,
-      lastTime: x.res?.lastTime ?? "-",
-      slaCount: x.res?.slaCount ?? 0,
-      inProgressCount: x.res?.inProgressCount ?? 0,
-      RelasiRslvd: x.res?.RelasiRslvd ?? 0,
-      avgGapMin: x.res?.avgGapMin ?? null
-    }
-  }));
+  const compactResults = (entry.results || []).map(x => {
+    const gap = x.res?.avgGapMin ?? null; // menit
+    return {
+      k: { nama: x.k?.nama || "", shift: x.k?.shift || "" },
+      res:{
+        avg: x.res?.avg ?? null,
+        count: x.res?.count ?? 0,
+        lastTime: x.res?.lastTime ?? "-",
+        slaCount: x.res?.slaCount ?? 0,
+        inProgressCount: x.res?.inProgressCount ?? 0,
+        RelasiRslvd: x.res?.RelasiRslvd ?? 0,
+        // simpan keduanya demi kompatibilitas:
+        avgGapMin: gap,
+        avgAmbilCO: gap
+      }
+    };
+  });
+
   const payload = {
     action: "saveHistory",
     data: {
@@ -260,10 +266,22 @@ async function saveHistoryEntry(entry){
   });
   await res.text();
 }
+
 async function loadHistory(){
   const url = `${HISTORY_GAS_URL}?action=getHistory`;
   const res = await fetch(url);
   const json = await res.json();
+
+  const pickGap = (r) => {
+    // ambil dari berbagai kemungkinan key
+    let v = r.avgGapMin ?? r.avgAmbilCO ?? r.intervalAmbilCO ?? r.IntervalAmbilCO
+          ?? r.avg_gap_min ?? r.avgGapMinutes ?? null;
+    if (v === "") return null;
+    if (v == null) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null; // paksa jadi number (menit)
+  };
+
   return (json.items||[]).map(h => ({
     ts: h.ts,
     mode: h.mode,
@@ -273,9 +291,13 @@ async function loadHistory(){
     results: (h.rows||[]).map(r => ({
       k: { nama: r.nama, shift: r.shift },
       res: {
-        avg: r.avg, count: r.count, lastTime: r.lastTime,
-        slaCount: r.slaCount, inProgressCount: r.inProgressCount, RelasiRslvd: r.RelasiRslvd,
-        avgGapMin: r.avgGapMin ?? null
+        avg: r.avg, 
+        count: r.count, 
+        lastTime: r.lastTime,
+        slaCount: r.slaCount, 
+        inProgressCount: r.inProgressCount, 
+        RelasiRslvd: r.RelasiRslvd,
+        avgGapMin: pickGap(r)  // <-- kunci perbaikan
       }
     }))
   }));
@@ -644,6 +666,7 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
+
 
 
 
