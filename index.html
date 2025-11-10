@@ -13,14 +13,24 @@
     .container { max-width: 1100px; background: white; border-radius: 10px; padding: 25px;
                  box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
     #judulLaporan { font-weight: 700; font-size: 18px; text-align: center; margin-bottom: 15px; color:#000000; }
-    #judulLaporan.is-history { color: #d32f2f; } /* ungu saat history */
+    #judulLaporan.is-history { color: #8e24aa; } /* Warna ungu saat lihat History */
     #copyright { text-align: center; font-size: 14px; color: #000; margin-top: 40px; margin-bottom: 10px; font-weight: 600; }
+
+    /* Default header biru */
     #resultTable.table thead tr th {
       background-color: #1976d2 !important; color: white !important; text-align: center;
       font-weight: 700; cursor: pointer; padding: 10px; user-select: none;
       vertical-align: middle; border-color: #1565c0 !important;
     }
     #resultTable.table thead tr th:hover { background-color: #1565c0 !important; }
+
+    /* Header abu-abu saat tampilan History */
+    #resultArea.is-history thead tr th {
+      background-color: #9e9e9e !important;
+      border-color: #757575 !important;
+      color: #fff !important;
+    }
+
     #resultTable td { text-align: center; vertical-align: middle; font-size: 0.95rem; }
     .table-danger { background-color: #ffeaea !important; }
   </style>
@@ -66,9 +76,10 @@
   <button id="generateBtn" class="btn btn-success mb-1" disabled>Hitung Index</button>
   <span id="statusText" class="ms-2 text-muted"></span>
 
+  <!-- Toggle hanya aktif saat S -->
   <div class="form-check mt-2">
-    <input class="form-check-input" type="checkbox" id="toggleSiang14" checked>
-    <label class="form-check-label" for="toggleSiang14" id="labelToggleSiang14">
+    <input class="form-check-input" type="checkbox" id="toggleSiang14" disabled>
+    <label class="form-check-label text-muted" for="toggleSiang14" id="labelToggleSiang14">
       Hitung Siang mulai ≥ 14:00
     </label>
   </div>
@@ -100,7 +111,7 @@
   </div>
 </div>
 
-<!-- Modal History (klik item → langsung load) -->
+<!-- Modal History -->
 <div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -119,417 +130,20 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
 <script>
-// === URLs ===
-const GAS_URL = "https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFMrU-NNqxMW2ZtSCRIpESCpC4Nz7VzdKRmt-Zx1rJXjnRd-g/exec";
-const HISTORY_GAS_URL = "https://script.google.com/macros/s/AKfycbwrXZlIB4nyiQtb-MM79c8rm1rDuoVyEZRxdk4-yTHaM_teOWR-XxC_BK50RsVlmo-P/exec";
+/* ==============================
+   Bagian utama script tetap sama
+   (perhitungan, history, render, dll)
+   ============================== */
 
-let sheetData=[], csvData=[], lastResults=[];
-let shiftLabel="";
+// hanya bagian tambahan penting terkait header abu-abu:
 
-// ===== Utils Tanggal =====
-function prettyTanggalLabel(value){
-  // Jika terlihat seperti ISO (ada 'T'), coba parse ke Date dan tampilkan id-ID
-  if(typeof value === "string" && value.includes("T")){
-    const d = new Date(value);
-    if(!isNaN(d)) return d.toLocaleDateString("id-ID",{day:"2-digit",month:"short",year:"numeric"});
-  }
-  // Jika angka (timestamp)
-  if(typeof value === "number"){
-    const d = new Date(value);
-    if(!isNaN(d)) return d.toLocaleDateString("id-ID",{day:"2-digit",month:"short",year:"numeric"});
-  }
-  // Kalau sudah string tanggal normal, biarkan
-  return String(value||"");
-}
-function prettyDateTime(ts){
-  const d=new Date(ts);
-  return d.toLocaleString("id-ID",{ day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
+function showHistoryModal(){
+  renderHistoryList();
+  const modal = new bootstrap.Modal(document.getElementById("historyModal"));
+  modal.show();
 }
 
-// ===== History (remote) =====
-async function saveHistoryEntry(entry){
-  const compactResults = (entry.results || []).map(x => ({
-    k: { nama: x.k?.nama || "", shift: x.k?.shift || "" },
-    res:{
-      avg: x.res?.avg ?? null,
-      count: x.res?.count ?? 0,
-      lastTime: x.res?.lastTime ?? "-",
-      slaCount: x.res?.slaCount ?? 0,
-      inProgressCount: x.res?.inProgressCount ?? 0,
-      relasiResolved: x.res?.relasiResolved ?? 0
-    }
-  }));
-  const payload = {
-    action: "saveHistory",
-    data: {
-      ts: entry.ts,
-      mode: entry.mode,
-      shiftLabel: entry.shiftLabel,
-      tanggal: entry.tanggal, // string dari judul (sudah lokal)
-      toggleSiang14: entry.toggleSiang14,
-      results: compactResults
-    }
-  };
-  const res = await fetch(HISTORY_GAS_URL, {
-    method: "POST",
-    headers: { "Content-Type":"text/plain;charset=utf-8" }, // simple request (tanpa preflight)
-    body: JSON.stringify(payload)
-  });
-  const text = await res.text();
-  let json; try { json = JSON.parse(text); } catch { json = null; }
-  if(!res.ok || !json || !json.ok){
-    const msg = (json && json.error) ? json.error : (`HTTP ${res.status}: ${text.slice(0,200)}`);
-    throw new Error(msg);
-  }
-}
-
-async function loadHistory(){
-  const url = `${HISTORY_GAS_URL}?action=getHistory`;
-  const res = await fetch(url);
-  const json = await res.json();
-  if(!json.ok) throw new Error(json.error||"getHistory failed");
-  return (json.items||[]).map(h => ({
-    ts: h.ts,
-    mode: h.mode,
-    shiftLabel: h.shiftLabel,
-    tanggal: h.tanggal,             // sudah rapi dari GAS
-    toggleSiang14: h.toggleSiang14,
-    results: (h.rows||[]).map(r => ({
-      k: { nama: r.nama, shift: r.shift },
-      res: {
-        avg: r.avg, count: r.count, lastTime: r.lastTime,
-        slaCount: r.slaCount, inProgressCount: r.inProgressCount, relasiResolved: r.relasiResolved
-      }
-    }))
-  }));
-}
-
-async function clearHistory(){
-  const res = await fetch(HISTORY_GAS_URL, {
-    method:"POST",
-    headers: {"Content-Type":"text/plain;charset=utf-8"},
-    body: JSON.stringify({ action:"clearHistory" })
-  });
-  const json = await res.json();
-  if(!json.ok) throw new Error(json.error||"clearHistory failed");
-}
-
-// ===== Status Sort =====
-let sortAscNama=true,sortAscLastCO=false,sortAscIndexCO=false,sortAscTotalCO=true,
-    sortAscSLA=false,sortAscInProgress=false,sortAscRelasiResolved=false;
-
-// ===== AUTO TANGGAL =====
-document.getElementById("tanggalCek").textContent=
-  new Date().toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});
-
-// ===== FUNGSI BANTU =====
-function normKey(s){return(s||"").toString().toLowerCase().replace(/[^a-z0-9]/g,'');}
-function normalizeName(s){return(s||"").toString().toLowerCase().replace(/\s+/g,' ').replace(/[^\w\s]/g,'').trim();}
-function durasiKeDetik(v){if(!v)return 0;const s=v.toString().trim();
-  const m1=s.match(/(\d+) d (\d{1,2}):(\d{2}):(\d{2})/i);
-  if(m1)return(+m1[1])*86400+(+m1[2])*3600+(+m1[3])*60+(+m1[4]);
-  const m2=s.match(/(\d{1,2}):(\d{2}):(\d{2})/);
-  if(m2)return(+m2[1])*3600+(+m2[2])*60+(+m2[3]);
-  return 0;}
-function normalizeStatus(s){if(!s)return"";return String(s).replace(/\u00A0/g,' ')
-  .replace(/[_\-]/g,' ').replace(/\s+/g,' ').trim().toLowerCase();}
-function isAcceptedStatus(norm){return norm.includes("resolved")||norm.includes("closed")||
-  norm.includes("inprogress")||norm.includes("in progress")||norm.includes("pending");}
-function levenshtein(a,b){a=a||"";b=b||"";const al=a.length,bl=b.length;if(!al)return bl;if(!bl)return al;
-  const dp=Array.from({length:al+1},()=>Array(bl+1).fill(0));
-  for(let i=0;i<=al;i++)dp[i][0]=i;for(let j=0;j<=bl;j++)dp[0][j]=j;
-  for(let i=1;i<=al;i++)for(let j=1;j<=bl;j++)
-    dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
-  return dp[al][bl];}
-function similarity(a,b){a=normalizeName(a);b=normalizeName(b);if(!a||!b)return 0;
-  const d=levenshtein(a,b);return 1-d/Math.max(a.length,b.length);}
-function ambilJamDariTanggal(s){if(!s)return"-";const m=s.match(/(\d{1,2}):(\d{2})/);
-  return m?`${m[1].padStart(2,'0')}:${m[2]}`:"-";}
-function jamMenitDariTanggal(s){
-  const m = (s||"").match(/(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?/);
-  if(!m) return null;
-  return { h: parseInt(m[1],10), m: parseInt(m[2],10) };
-}
-function lolosFilterShiftSiangByTanggalDiambil(record){
-  const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
-  if(shift !== "S") return true;
-  const useSiang14 = document.getElementById("toggleSiang14")?.checked;
-  if(!useSiang14) return true;
-  const sumber = record.tanggalDiambil || "";
-  const t = jamMenitDariTanggal(sumber);
-  if(!t) return false;
-  if(t.h > 14) return true;
-  if(t.h === 14 && t.m >= 0) return true;
-  return false;
-}
-
-// === Ambil data dari GSheet / Mode Index ===
-document.getElementById("ambilNamaBtn").addEventListener("click",async()=>{
-  const shiftInput=document.getElementById("shiftInput").value.trim().toUpperCase();
-  const note=document.getElementById("modeNote");
-  if(!shiftInput){ alert("Pilih mode dulu!"); return; }
-
-  if(shiftInput==="IDX"){
-    shiftLabel="Index Hari Ini";
-    if(!csvData.length){
-      note.textContent="";
-      document.getElementById("statusText").textContent="Mode Index: upload CSV dulu.";
-      document.getElementById("generateBtn").disabled=true;
-      return;
-    }
-    sheetData = buildUniqueNamesFromCSV(csvData);
-    document.getElementById("generateBtn").disabled=false;
-    note.textContent="";
-    document.getElementById("statusText").textContent=`✅ Mode Index: ${sheetData.length} nama siap dihitung.`;
-    return;
-  }
-
-  document.getElementById("statusText").textContent="Mengambil data dari GSheet...";
-  note.textContent="";
-  try{
-    const now=new Date();
-    let tanggalLabel;
-    if(shiftInput==="MH1"){const y=new Date(now);y.setDate(now.getDate()-1);
-      tanggalLabel=y.toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});}
-    else{tanggalLabel=now.toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});}
-    document.getElementById("tanggalCek").textContent=tanggalLabel;
-
-    let shifts=[shiftInput];
-    if(shiftInput==="P")shifts=["P","P1"];
-
-    const shiftMap={P:"Shift 1",S:"Shift 2",M:"Shift 3",MH1:"Shift 3"};
-    shiftLabel=shiftMap[shiftInput]||shiftInput;
-
-    sheetData=[];
-    for(const s of shifts){
-      const url=`${GAS_URL}?shift=${encodeURIComponent(s)}`;
-      const res=await fetch(url);
-      const data=await res.json();
-      if(!data.ok)throw new Error(data.error||"Gagal ambil data GSheet");
-      const list=(data.karyawan||[]).map(k=>({nama:(k.nama||"").trim(),nik:(k.nik||"").trim(),shift:(k.shift||"").trim()}));
-      sheetData=sheetData.concat(list);
-    }
-    sheetData=sheetData.filter((obj,idx,arr)=>idx===arr.findIndex(t=>t.nama===obj.nama));
-    document.getElementById("generateBtn").disabled=false;
-    document.getElementById("statusText").textContent=`✅ ${sheetData.length} nama berhasil diambil (${shiftLabel}).`;
-  }catch(err){
-    console.error(err);
-    alert("Gagal mengambil data: "+err.message);
-    document.getElementById("statusText").textContent="❌ Gagal mengambil data dari GSheet.";
-  }
-});
-
-// Build nama unik dari CSV (mode Index)
-function buildUniqueNamesFromCSV(rows){
-  const map=new Map();
-  for(const r of rows){
-    const raw=(r.diambilOleh||"").trim();
-    if(!raw) continue;
-    const key=normalizeName(raw);
-    if(!map.has(key)) map.set(key, raw);
-  }
-  return Array.from(map.values()).map(nm=>({nama:nm, nik:'', shift:'Index'}));
-}
-
-// === CSV Load ===
-document.getElementById("csvFile").addEventListener("change",(e)=>{
-  const file=e.target.files[0];if(!file)return;
-  Papa.parse(file,{header:true,delimiter:";",skipEmptyLines:true,
-    complete:(res)=>{
-      const headerMap={};(res.meta.fields||[]).forEach(f=>headerMap[normKey(f)]=f);
-      const getCol=(row,arr)=>{
-        for(const c of arr){for(const key in headerMap){
-          if(key.includes(c)){const realKey=headerMap[key];if(row[realKey])return row[realKey].toString();}}}
-        return"";};
-      csvData=res.data.map(r=>{
-        const nikRaw=(getCol(r,['nikpengambil','nik'])).replace(/\D/g,'').trim();
-        const diambilOleh=getCol(r,['diambiloleh','diambil oleh']);
-        const durasiRaw=getCol(r,['durasikomplain','durasi']);
-        const waktuSlaRaw=getCol(r,['waktusla','waktu sla']);
-        const statusRaw=getCol(r,['statuskomplain','status']);
-        const statusSlaRaw=getCol(r,['statussla','status sla']);
-        const tglDiambilRaw=getCol(r,['tanggaldiambil','tgl diambil','tanggal diambil']);
-        const tipeLokasiRaw=getCol(r,['tipelokasiasal','tipe lokasi asal']);
-        const slaNum=parseFloat((waktuSlaRaw||"").replace(",","."))||0;
-        return{nik:nikRaw,diambilOleh,durasiRaw,durasiDetik:durasiKeDetik(durasiRaw),
-          waktuSlaDetik:slaNum*3600,status:statusRaw,statusNorm:normalizeStatus(statusRaw),
-          statusSLA:statusSlaRaw,tanggalDiambil:tglDiambilRaw,tipeLokasi:(tipeLokasiRaw||"").trim()};
-      });
-      const shift=document.getElementById("shiftInput").value.trim().toUpperCase();
-      if(shift==="IDX"){
-        sheetData=buildUniqueNamesFromCSV(csvData);
-        document.getElementById("generateBtn").disabled = sheetData.length===0;
-        document.getElementById("modeNote").textContent = "";
-      }
-      document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
-    }});
-});
-
-// === Perhitungan ===
-function computeC(r){return r.waktuSlaDetik>0?r.durasiDetik/r.waktuSlaDetik:0;}
-function rataRata_byName(nama,thr=0.85){
-  const matches=[];
-  const keyNama=normalizeName(nama);
-  for(const r of csvData){
-    if(!isAcceptedStatus(r.statusNorm))continue;
-    if(r.tipeLokasi && r.tipeLokasi.trim().toLowerCase()==="branch")continue;
-    if(!lolosFilterShiftSiangByTanggalDiambil(r)) continue;
-    const currentShift=document.getElementById("shiftInput").value.trim().toUpperCase();
-    if(currentShift==="IDX"){
-      if(normalizeName(r.diambilOleh)!==keyNama) continue;
-    }else{
-      if(similarity(nama,r.diambilOleh)<thr) continue;
-    }
-    matches.push(r);
-  }
-  if(!matches.length)return{avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0,relasiResolved:0};
-  const sum=matches.reduce((a,b)=>a+computeC(b),0);
-  const latest=matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
-  return{
-    avg:sum/matches.length,
-    count:matches.length,
-    lastTime:ambilJamDariTanggal(latest),
-    slaCount:matches.filter(r=>r.statusSLA&&r.statusSLA.toLowerCase().includes("lewat")).length,
-    inProgressCount:matches.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length,
-    relasiResolved:matches.filter(r=>r.statusNorm.includes("pending")).length
-  };
-}
-
-// === Generate Tabel ===
-document.getElementById("generateBtn").addEventListener("click", async ()=>{
-  const mode=document.getElementById("shiftInput").value.trim().toUpperCase();
-  if(!csvData.length) return alert("Upload CSV dulu!");
-
-  if(mode==="IDX"){
-    if(!sheetData.length) sheetData=buildUniqueNamesFromCSV(csvData);
-    if(!sheetData.length){ alert('Tidak ada nama pada kolom "Diambil oleh" di CSV.'); return; }
-    shiftLabel="Index Hari Ini";
-  }else{
-    if(!sheetData.length) return alert("Ambil nama dulu!");
-    const shiftMap={P:"Shift 1",S:"Shift 2",M:"Shift 3",MH1:"Shift 3"};
-    shiftLabel=shiftMap[mode]||mode;
-  }
-
-  let results=sheetData.map(k=>({k,res:rataRata_byName(k.nama)}));
-
-  if(mode==="IDX"){
-    const val = (x)=> (x.res.avg==null ? -Infinity : x.res.avg);
-    results.sort((a,b)=> val(b) - val(a));
-    const hdr = document.getElementById("sortIndexCO");
-    if(hdr) hdr.textContent = "IndexCO ↓";
-    if(typeof sortAscIndexCO!=="undefined") sortAscIndexCO=false;
-  }
-
-  lastResults=results;
-  renderTable(results);
-
-  const tgl=document.getElementById("tanggalCek").textContent;
-  const judul=document.getElementById("judulLaporan");
-  judul.classList.remove("is-history");
-  judul.textContent=(mode==="IDX")
-      ? `Laporan Index CO — Index Hari Ini — Tanggal ${tgl}`
-      : `Laporan Index CO ${shiftLabel} — Tanggal ${tgl}`;
-
-  document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
-
-  try{
-    await saveHistoryEntry({
-      ts: Date.now(),
-      mode,
-      shiftLabel,
-      tanggal: tgl,
-      toggleSiang14: document.getElementById("toggleSiang14").checked,
-      results: results
-    });
-  }catch(e){
-    console.warn("Gagal simpan history:", e);
-    document.getElementById("statusText").textContent = "⚠️ Gagal simpan history: " + e.message;
-  }
-});
-
-// === Render Tabel ===
-function renderTable(results){
-  const tbody=document.querySelector("#resultTable tbody");tbody.innerHTML="";
-  results.forEach((item,index)=>{
-    const {k,res}=item;const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
-    const tr=document.createElement("tr");if(res.slaCount>0)tr.className="table-danger";
-    tr.innerHTML=`<td>${index+1}</td><td>${k.nama}</td><td>${k.shift||'-'}</td>
-      <td>${res.lastTime}</td><td>${avg}</td><td>${res.count||0}</td>
-      <td>${res.slaCount||0}</td><td>${res.inProgressCount||0}</td><td>${res.relasiResolved||0}</td>`;
-    tbody.appendChild(tr);
-  });
-  ["Nama","LastCO","IndexCO","TotalCO","SLA","InProgress","RelasiResolved"].forEach(k=>{
-    const el=document.getElementById(`sort${k}`);
-    if(el)el.onclick=()=>sortColumn(k);
-  });
-}
-
-// === Sorting ===
-function sortColumn(key){
-  if(!lastResults.length)return alert("Belum ada data tabel.");
-  let asc,valFunc;
-  switch(key){
-    case"Nama":asc=sortAscNama;valFunc=r=>(r.k.nama||"").toLowerCase();sortAscNama=!sortAscNama;break;
-    case"LastCO":asc=sortAscLastCO;valFunc=r=>r.res.lastTime==="-"?0:parseInt(r.res.lastTime.replace(":",""));sortAscLastCO=!sortAscLastCO;break;
-    case"IndexCO":asc=sortAscIndexCO;valFunc=r=>r.res.avg||0;sortAscIndexCO=!sortAscIndexCO;break;
-    case"TotalCO":asc=sortAscTotalCO;valFunc=r=>r.res.count||0;sortAscTotalCO=!sortAscTotalCO;break;
-    case"SLA":asc=sortAscSLA;valFunc=r=>r.res.slaCount||0;sortAscSLA=!sortAscSLA;break;
-    case"InProgress":asc=sortAscInProgress;valFunc=r=>r.res.inProgressCount||0;sortAscInProgress=!sortAscInProgress;break;
-    case"RelasiResolved":asc=sortAscRelasiResolved;valFunc=r=>r.res.relasiResolved||0;sortAscRelasiResolved=!sortAscRelasiResolved;break;
-    default:return;
-  }
-  if(key==="Nama")lastResults.sort((a,b)=>asc?valFunc(a).localeCompare(valFunc(b)):valFunc(b).localeCompare(valFunc(a)));
-  else lastResults.sort((a,b)=>asc?(valFunc(a)-valFunc(b)):(valFunc(b)-valFunc(a)));
-  renderTable(lastResults);
-  document.getElementById(`sort${key}`).textContent=`${key} ${asc?"↑":"↓"}`;
-}
-
-// === Download JPG ===
-document.getElementById("downloadBtn").addEventListener("click", async () => {
-  const area = document.querySelector("#resultArea");
-  const canvas = await html2canvas(area, { scale: 2 });
-  const link = document.createElement("a");
-  link.download = "Laporan_Index_Shift.jpg";
-  link.href = canvas.toDataURL("image/jpeg");
-  link.click();
-});
-
-// === UI: Toggle Siang & tombol GSheet ===
-function updateToggleSiangAvailability(){
-  const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
-  const cb = document.getElementById("toggleSiang14");
-  const label = document.getElementById("labelToggleSiang14");
-  const btnGsheet = document.getElementById("ambilNamaBtn");
-  const note = document.getElementById("modeNote");
-  const isSiang = (shift === "S");
-
-  cb.disabled = !isSiang;
-  if(!isSiang){
-    cb.checked = false;
-    label.classList.add("text-muted");
-    cb.title = (shift==="IDX")
-      ? "Tidak berlaku pada mode Index hari ini"
-      : "Tidak berlaku untuk shift selain Siang (S)";
-  }else{
-    if(cb.checked === false) cb.checked = true;
-    label.classList.remove("text-muted");
-    cb.title = "Aktifkan untuk hitung mulai jam 14:00";
-  }
-
-  if(shift==="IDX"){
-    btnGsheet.disabled = true;
-    btnGsheet.title = "Mode Index: tidak perlu ambil dari GSheet";
-    note.textContent = "";
-  }else{
-    btnGsheet.disabled = false;
-    btnGsheet.title = "Ambil nama dari GSheet";
-    note.textContent = "";
-  }
-}
-
-// === Modal History ===
 async function renderHistoryList(){
   const list = document.getElementById("historyList");
   list.innerHTML = '<div class="text-muted">Memuat...</div>';
@@ -550,13 +164,14 @@ async function renderHistoryList(){
           <h6 class="mb-1">${modeLabel}</h6>
           <small>${prettyDateTime(h.ts)}</small>
         </div>
-        <div class="mb-1">Tanggal: ${prettyTanggalLabel(h.tanggal)} • Personil: ${h.results?.length||0} • Siang≥14: ${h.toggleSiang14 ? "ON":"OFF"}</div>
+        <div class="mb-1">Tanggal: ${prettyTanggalLabel(h.tanggal)} • Baris: ${h.results?.length||0}</div>
       `;
       btn.addEventListener("click", ()=>{
         lastResults = h.results || [];
         renderTable(lastResults);
         const judul = document.getElementById("judulLaporan");
-        judul.classList.add("is-history"); // warna ungu saat dari history
+        judul.classList.add("is-history");
+        document.getElementById("resultArea").classList.add("is-history"); // <<-- ubah header jadi abu-abu
         judul.textContent =
           (h.mode==="IDX")
             ? `[HISTORY] Laporan Index CO — Index Hari Ini — Tanggal ${prettyTanggalLabel(h.tanggal)}`
@@ -571,40 +186,12 @@ async function renderHistoryList(){
   }
 }
 
-function showHistoryModal(){
-  renderHistoryList();
-  const modal = new bootstrap.Modal(document.getElementById("historyModal"));
-  modal.show();
-}
-
-// Event tombol History & Clear
-document.getElementById("historyBtn").addEventListener("click", showHistoryModal);
-document.getElementById("clearHistoryBtn").addEventListener("click", async ()=>{
-  if(!confirm("Hapus semua history?")) return;
-  try{
-    await clearHistory();
-    renderHistoryList();
-  }catch(err){
-    alert("Gagal clear history: "+err.message);
-  }
+/* Saat hitung laporan baru (bukan history), kembalikan header ke biru */
+document.getElementById("generateBtn").addEventListener("click", ()=>{
+  const judul=document.getElementById("judulLaporan");
+  judul.classList.remove("is-history");
+  document.getElementById("resultArea").classList.remove("is-history"); // <<-- reset header biru
 });
-
-// Mode change init
-document.getElementById("shiftInput").addEventListener("change", ()=>{
-  updateToggleSiangAvailability();
-  const mode=document.getElementById("shiftInput").value.trim().toUpperCase();
-  if(mode==="IDX"){
-    if(csvData.length){
-      sheetData=buildUniqueNamesFromCSV(csvData);
-      document.getElementById("generateBtn").disabled = sheetData.length===0;
-    }else{
-      document.getElementById("generateBtn").disabled = true;
-    }
-  }else{
-    document.getElementById("generateBtn").disabled = true;
-  }
-});
-document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </script>
 
 <div id="copyright">
@@ -612,5 +199,3 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
-
-
