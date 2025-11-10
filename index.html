@@ -12,8 +12,8 @@
     body { background: #f6f7fb; padding: 20px; }
     .container { max-width: 1100px; background: white; border-radius: 10px; padding: 25px;
                  box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
-    #judulLaporan { font-weight: 700; font-size: 18px; text-align: center; margin-bottom: 15px; color:#000000; }
-    #judulLaporan.is-history { color: #8e24aa; } /* warna judul saat History */
+    #judulLaporan { font-weight: 700; font-size: 18px; text-align: center; margin-bottom: 15px; color:#000; }
+    #judulLaporan.is-history { color: #8e24aa; } /* ubah di sini kalau mau merah/oranye */
     #copyright { text-align: center; font-size: 14px; color: #000; margin-top: 40px; margin-bottom: 10px; font-weight: 600; }
 
     /* Header default biru */
@@ -24,7 +24,7 @@
     }
     #resultTable.table thead tr th:hover { background-color: #1565c0 !important; }
 
-    /* Header abu-abu saat History */
+    /* Header abu-abu saat lihat HISTORY */
     #resultArea.is-history thead tr th {
       background-color: #9e9e9e !important;
       border-color: #757575 !important;
@@ -76,6 +76,7 @@
   <button id="generateBtn" class="btn btn-success mb-1" disabled>Hitung Index</button>
   <span id="statusText" class="ms-2 text-muted"></span>
 
+  <!-- Toggle hanya aktif saat S -->
   <div class="form-check mt-2">
     <input class="form-check-input" type="checkbox" id="toggleSiang14" disabled>
     <label class="form-check-label text-muted" for="toggleSiang14" id="labelToggleSiang14">
@@ -131,112 +132,474 @@
 <!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+/* ====== KONFIG ====== */
 const GAS_URL="https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFMrU-NNqxMW2ZtSCRIpESCpC4Nz7VzdKRmt-Zx1rJXjnRd-g/exec";
 const HISTORY_GAS_URL="https://script.google.com/macros/s/AKfycbwrXZlIB4nyiQtb-MM79c8rm1rDuoVyEZRxdk4-yTHaM_teOWR-XxC_BK50RsVlmo-P/exec";
 
-let sheetData=[],csvData=[],lastResults=[];
+let sheetData=[], csvData=[], lastResults=[];
 let shiftLabel="";
 
-// ========== Fungsi bantu (tanggal, normalisasi, dst.) ==========
-function prettyTanggalLabel(value){
-  if(typeof value==="string"&&value.includes("T")){const d=new Date(value);if(!isNaN(d))return d.toLocaleDateString("id-ID",{day:"2-digit",month:"short",year:"numeric"});}
-  return String(value||"");
-}
-function prettyDateTime(ts){const d=new Date(ts);return d.toLocaleString("id-ID",{ day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });}
+/* ====== SORT STATE ====== */
+let sortAscNama=true,sortAscLastCO=false,sortAscIndexCO=false,sortAscTotalCO=true,
+    sortAscSLA=false,sortAscInProgress=false,sortAscRelasiResolved=false;
+
+/* ====== INIT TANGGAL ====== */
+document.getElementById("tanggalCek").textContent=
+  new Date().toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});
+
+/* ====== UTIL ====== */
 function normKey(s){return(s||"").toString().toLowerCase().replace(/[^a-z0-9]/g,'');}
 function normalizeName(s){return(s||"").toString().toLowerCase().replace(/\s+/g,' ').replace(/[^\w\s]/g,'').trim();}
-function durasiKeDetik(v){if(!v)return 0;const s=v.toString().trim();const m2=s.match(/(\d{1,2}):(\d{2}):(\d{2})/);if(m2)return(+m2[1])*3600+(+m2[2])*60+(+m2[3]);return 0;}
-function normalizeStatus(s){return String(s||"").replace(/\u00A0/g,' ').replace(/[_\-]/g,' ').replace(/\s+/g,' ').trim().toLowerCase();}
-function isAcceptedStatus(n){return n.includes("resolved")||n.includes("closed")||n.includes("inprogress")||n.includes("pending");}
-function similarity(a,b){a=normalizeName(a);b=normalizeName(b);const d=Math.abs(a.length-b.length);return 1-(d/Math.max(a.length,b.length));}
-function ambilJamDariTanggal(s){const m=s.match(/(\d{1,2}):(\d{2})/);return m?`${m[1].padStart(2,'0')}:${m[2]}`:"-";}
-function jamMenitDariTanggal(s){const m=(s||"").match(/(\d{1,2}):(\d{2})/);if(!m)return null;return{h:+m[1],m:+m[2]};}
-function lolosFilterShiftSiangByTanggalDiambil(r){const sh=document.getElementById("shiftInput").value.toUpperCase();if(sh!=="S")return true;const ck=document.getElementById("toggleSiang14").checked;if(!ck)return true;const t=jamMenitDariTanggal(r.tanggalDiambil);if(!t)return false;return t.h>14||(t.h===14&&t.m>=0);}
+function durasiKeDetik(v){if(!v)return 0;const s=v.toString().trim();
+  const m1=s.match(/(\d+) d (\d{1,2}):(\d{2}):(\d{2})/i);
+  if(m1)return(+m1[1])*86400+(+m1[2])*3600+(+m1[3])*60+(+m1[4]);
+  const m2=s.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+  if(m2)return(+m2[1])*3600+(+m2[2])*60+(+m2[3]);
+  return 0;}
+function normalizeStatus(s){if(!s)return"";return String(s).replace(/\u00A0/g,' ')
+  .replace(/[_\-]/g,' ').replace(/\s+/g,' ').trim().toLowerCase();}
+function isAcceptedStatus(norm){return norm.includes("resolved")||norm.includes("closed")||
+  norm.includes("inprogress")||norm.includes("in progress")||norm.includes("pending");}
+function levenshtein(a,b){a=a||"";b=b||"";const al=a.length,bl=b.length;if(!al)return bl;if(!bl)return al;
+  const dp=Array.from({length:al+1},()=>Array(bl+1).fill(0));
+  for(let i=0;i<=al;i++)dp[i][0]=i;for(let j=0;j<=bl;j++)dp[0][j]=j;
+  for(let i=1;i<=al;i++)for(let j=1;j<=bl;j++)
+    dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+  return dp[al][bl];}
+function similarity(a,b){a=normalizeName(a);b=normalizeName(b);if(!a||!b)return 0;
+  const d=levenshtein(a,b);return 1-d/Math.max(a.length,b.length);}
+function ambilJamDariTanggal(s){if(!s)return"-";const m=s.match(/(\d{1,2}):(\d{2})/);
+  return m?`${m[1].padStart(2,'0')}:${m[2]}`:"-";}
+function jamMenitDariTanggal(s){
+  const m = (s||"").match(/(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?/);
+  if(!m) return null;
+  return { h: parseInt(m[1],10), m: parseInt(m[2],10) };
+}
+function prettyTanggalLabel(value){
+  if(typeof value === "string" && value.includes("T")){
+    const d = new Date(value);
+    if(!isNaN(d)) return d.toLocaleDateString("id-ID",{day:"2-digit",month:"short",year:"numeric"});
+  }
+  if(typeof value === "number"){
+    const d = new Date(value);
+    if(!isNaN(d)) return d.toLocaleDateString("id-ID",{day:"2-digit",month:"short",year:"numeric"});
+  }
+  return String(value||"");
+}
+function prettyDateTime(ts){
+  const d=new Date(ts);
+  return d.toLocaleString("id-ID",{ day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
+}
 
-// ========== History API ==========
+/* ====== FILTER SIANG >=14:00 (hanya saat S + toggle ON) ====== */
+function lolosFilterShiftSiangByTanggalDiambil(record){
+  const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
+  if(shift !== "S") return true;
+  const useSiang14 = document.getElementById("toggleSiang14")?.checked;
+  if(!useSiang14) return true;
+  const sumber = record.tanggalDiambil || "";
+  const t = jamMenitDariTanggal(sumber);
+  if(!t) return false;
+  if(t.h > 14) return true;
+  if(t.h === 14 && t.m >= 0) return true;
+  return false;
+}
+
+/* ====== HISTORY API ====== */
 async function saveHistoryEntry(entry){
-  const compactResults=(entry.results||[]).map(x=>({k:{nama:x.k?.nama||"",shift:x.k?.shift||""},res:x.res}));
-  const res=await fetch(HISTORY_GAS_URL,{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({action:"saveHistory",data:{...entry,results:compactResults}})});
+  const compactResults = (entry.results || []).map(x => ({
+    k: { nama: x.k?.nama || "", shift: x.k?.shift || "" },
+    res:{
+      avg: x.res?.avg ?? null,
+      count: x.res?.count ?? 0,
+      lastTime: x.res?.lastTime ?? "-",
+      slaCount: x.res?.slaCount ?? 0,
+      inProgressCount: x.res?.inProgressCount ?? 0,
+      relasiResolved: x.res?.relasiResolved ?? 0
+    }
+  }));
+  const payload = {
+    action: "saveHistory",
+    data: {
+      ts: entry.ts,
+      mode: entry.mode,
+      shiftLabel: entry.shiftLabel,
+      tanggal: entry.tanggal,
+      toggleSiang14: entry.toggleSiang14,
+      results: compactResults
+    }
+  };
+  const res = await fetch(HISTORY_GAS_URL, {
+    method: "POST",
+    headers: { "Content-Type":"text/plain;charset=utf-8" },
+    body: JSON.stringify(payload)
+  });
   await res.text();
 }
-async function loadHistory(){const r=await fetch(`${HISTORY_GAS_URL}?action=getHistory`);return(await r.json()).items||[];}
-function showHistoryModal(){renderHistoryList();new bootstrap.Modal(document.getElementById("historyModal")).show();}
+async function loadHistory(){
+  const url = `${HISTORY_GAS_URL}?action=getHistory`;
+  const res = await fetch(url);
+  const json = await res.json();
+  return (json.items||[]).map(h => ({
+    ts: h.ts,
+    mode: h.mode,
+    shiftLabel: h.shiftLabel,
+    tanggal: h.tanggal,
+    toggleSiang14: h.toggleSiang14,
+    results: (h.rows||[]).map(r => ({
+      k: { nama: r.nama, shift: r.shift },
+      res: {
+        avg: r.avg, count: r.count, lastTime: r.lastTime,
+        slaCount: r.slaCount, inProgressCount: r.inProgressCount, relasiResolved: r.relasiResolved
+      }
+    }))
+  }));
+}
+function showHistoryModal(){
+  renderHistoryList();
+  const modal = new bootstrap.Modal(document.getElementById("historyModal"));
+  modal.show();
+}
 async function renderHistoryList(){
-  const list=document.getElementById("historyList");list.innerHTML='<div class="text-muted">Memuat...</div>';
+  const list = document.getElementById("historyList");
+  list.innerHTML = '<div class="text-muted">Memuat...</div>';
   try{
-    const arr=await loadHistory();if(!arr.length){list.innerHTML='<div class="text-muted">Belum ada history.</div>';return;}
-    list.innerHTML="";arr.forEach(h=>{
-      const btn=document.createElement("button");btn.className="list-group-item list-group-item-action";
-      btn.innerHTML=`<div class="d-flex justify-content-between"><h6>${h.shiftLabel||h.mode}</h6><small>${prettyDateTime(h.ts)}</small></div>`;
-      btn.onclick=()=>{
-        lastResults=h.results||[];
+    const arr = await loadHistory();
+    if(!arr.length){
+      list.innerHTML = '<div class="text-muted">Belum ada history.</div>';
+      return;
+    }
+    list.innerHTML = "";
+    arr.forEach(h=>{
+      const btn = document.createElement("button");
+      btn.type="button";
+      btn.className="list-group-item list-group-item-action";
+      const modeLabel = (h.mode==="IDX") ? "Index hari ini" : h.shiftLabel;
+      btn.innerHTML = `
+        <div class="d-flex w-100 justify-content-between">
+          <h6 class="mb-1">${modeLabel}</h6>
+          <small>${prettyDateTime(h.ts)}</small>
+        </div>
+        <div class="mb-1">Tanggal: ${prettyTanggalLabel(h.tanggal)} • Baris: ${h.results?.length||0} • Siang≥14: ${h.toggleSiang14 ? "ON":"OFF"}</div>
+      `;
+      btn.addEventListener("click", ()=>{
+        lastResults = h.results || [];
         renderTable(lastResults);
-        document.getElementById("judulLaporan").classList.add("is-history");
+        const judul = document.getElementById("judulLaporan");
+        judul.classList.add("is-history");
         document.getElementById("resultArea").classList.add("is-history");
-        document.getElementById("judulLaporan").textContent=`[HISTORY] Laporan ${h.shiftLabel||h.mode} — ${prettyTanggalLabel(h.tanggal)}`;
+        judul.textContent =
+          (h.mode==="IDX")
+            ? `[HISTORY] Laporan Index CO — Index Hari Ini — Tanggal ${prettyTanggalLabel(h.tanggal)}`
+            : `[HISTORY] Laporan Index CO ${h.shiftLabel} — Tanggal ${prettyTanggalLabel(h.tanggal)}`;
+        document.getElementById("statusText").textContent = `Ditampilkan dari history (${prettyDateTime(h.ts)}).`;
         bootstrap.Modal.getInstance(document.getElementById("historyModal"))?.hide();
-      };
+      });
       list.appendChild(btn);
     });
-  }catch(e){list.innerHTML=`<div class='text-danger'>${e.message}</div>`;}
+  }catch(err){
+    list.innerHTML = `<div class="text-danger">Gagal memuat history: ${err.message}</div>`;
+  }
 }
 
-// ========== Event utama ==========
-document.getElementById("tanggalCek").textContent=new Date().toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});
+/* ====== CSV LOAD ====== */
+document.getElementById("csvFile").addEventListener("change",(e)=>{
+  const file=e.target.files[0];if(!file)return;
+  Papa.parse(file,{header:true,delimiter:";",skipEmptyLines:true,
+    complete:(res)=>{
+      const headerMap={};(res.meta.fields||[]).forEach(f=>headerMap[normKey(f)]=f);
+      const getCol=(row,arr)=>{
+        for(const c of arr){for(const key in headerMap){
+          if(key.includes(c)){const realKey=headerMap[key];if(row[realKey])return row[realKey].toString();}}}
+        return"";};
+      csvData=res.data.map(r=>{
+        const diambilOleh=getCol(r,['diambiloleh','diambil oleh']);
+        const durasiRaw=getCol(r,['durasikomplain','durasi']);
+        const waktuSlaRaw=getCol(r,['waktusla','waktu sla']);
+        const statusRaw=getCol(r,['statuskomplain','status']);
+        const statusSlaRaw=getCol(r,['statussla','status sla']);
+        const tglDiambilRaw=getCol(r,['tanggaldiambil','tgl diambil','tanggal diambil']);
+        const tipeLokasiRaw=getCol(r,['tipelokasiasal','tipe lokasi asal']);
+        const slaNum=parseFloat((waktuSlaRaw||"").replace(",","."))||0;
+        return{
+          diambilOleh,
+          durasiRaw,
+          durasiDetik:durasiKeDetik(durasiRaw),
+          waktuSlaDetik:slaNum*3600,
+          status:statusRaw,
+          statusNorm:normalizeStatus(statusRaw),
+          statusSLA:statusSlaRaw,
+          tanggalDiambil:tglDiambilRaw,
+          tipeLokasi:(tipeLokasiRaw||"").trim()
+        };
+      });
 
-document.getElementById("shiftInput").addEventListener("change",()=>{
-  const mode=document.getElementById("shiftInput").value.toUpperCase();
-  const cb=document.getElementById("toggleSiang14"),lbl=document.getElementById("labelToggleSiang14");
-  const btn=document.getElementById("ambilNamaBtn");
-  const isS=(mode==="S");
-  cb.disabled=!isS;cb.checked=isS;lbl.classList.toggle("text-muted",!isS);
-  btn.disabled=(mode==="IDX");
-  document.getElementById("modeNote").textContent=(mode==="IDX")?"(Mode Index) Upload CSV lalu klik Hitung Index.":"";
-  document.getElementById("generateBtn").disabled=true;
+      const mode=document.getElementById("shiftInput").value.trim().toUpperCase();
+      if(mode==="IDX"){
+        sheetData = buildUniqueNamesFromCSV(csvData);
+        document.getElementById("generateBtn").disabled = sheetData.length===0;
+        document.getElementById("modeNote").textContent = sheetData.length
+          ? "(Mode Index) Klik 'Hitung Index' untuk menghitung dari daftar CSV."
+          : "(Mode Index) Tidak ada nama pada kolom 'Diambil oleh'.";
+      }
+      document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
+    }});
 });
 
-document.getElementById("csvFile").addEventListener("change",e=>{
-  const f=e.target.files[0];if(!f)return;
-  Papa.parse(f,{header:true,delimiter:";",skipEmptyLines:true,complete:r=>{
-    const h=r.meta.fields.reduce((a,f)=>(a[normKey(f)]=f,a),{});const get=(o,keys)=>{for(const k of keys)for(const hk in h)if(hk.includes(k)&&o[h[hk]])return o[h[hk]];return"";};
-    csvData=r.data.map(x=>({diambilOleh:get(x,['diambiloleh','oleh']),statusNorm:normalizeStatus(get(x,['status'])),tanggalDiambil:get(x,['tanggaldiambil','tgl diambil'])}));
-    const m=document.getElementById("shiftInput").value.toUpperCase();
-    if(m==="IDX"){sheetData=[...new Set(csvData.map(x=>x.diambilOleh))].map(n=>({nama:n,shift:"Index"}));document.getElementById("generateBtn").disabled=false;}
-  }});
+/* ====== BUILD NAMA (MODE IDX) ====== */
+function buildUniqueNamesFromCSV(rows){
+  const map=new Map();
+  for(const r of rows){
+    const raw=(r.diambilOleh||"").trim();
+    if(!raw) continue;
+    const key=normalizeName(raw);
+    if(!map.has(key)) map.set(key, raw);
+  }
+  return Array.from(map.values()).map(nm=>({nama:nm, nik:'', shift:'Index'}));
+}
+
+/* ====== AMBIL NAMA DARI GSHEET (Generate Jadwal untuk P/S/M/MH1) ====== */
+document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
+  const shiftInput=document.getElementById("shiftInput").value.trim().toUpperCase();
+  if(!shiftInput){ alert("Pilih mode dulu!"); return; }
+
+  if(shiftInput==="IDX"){
+    // Sesuai permintaan: di mode IDX tombol ini memang DINONAKTIFKAN, tapi kalau kepencet:
+    document.getElementById("statusText").textContent="Mode Index: upload CSV lalu langsung 'Hitung Index'.";
+    return;
+  }
+
+  document.getElementById("statusText").textContent="Mengambil data dari GSheet...";
+  try{
+    const now=new Date();
+    let tanggalLabel;
+    if(shiftInput==="MH1"){const y=new Date(now);y.setDate(now.getDate()-1);
+      tanggalLabel=y.toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});}
+    else{tanggalLabel=now.toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});}
+    document.getElementById("tanggalCek").textContent=tanggalLabel;
+
+    let shifts=[shiftInput];
+    if(shiftInput==="P")shifts=["P","P1"]; // aturan lama
+
+    const shiftMap={P:"Shift 1",S:"Shift 2",M:"Shift 3",MH1:"Shift 3"};
+    shiftLabel=shiftMap[shiftInput]||shiftInput;
+
+    sheetData=[];
+    for(const s of shifts){
+      const url=`${GAS_URL}?shift=${encodeURIComponent(s)}`;
+      const res=await fetch(url);
+      const data=await res.json();
+      if(!data.ok)throw new Error(data.error||"Gagal ambil data GSheet");
+      const list=(data.karyawan||[]).map(k=>({nama:(k.nama||"").trim(),nik:(k.nik||"").trim(),shift:(k.shift||"").trim()}));
+      sheetData=sheetData.concat(list);
+    }
+    // unikkan nama
+    sheetData=sheetData.filter((obj,idx,arr)=>idx===arr.findIndex(t=>t.nama===obj.nama));
+
+    // sukses → enable Hitung Index
+    document.getElementById("generateBtn").disabled=false;
+    document.getElementById("statusText").textContent=`✅ ${sheetData.length} nama berhasil diambil (${shiftLabel}).`;
+  }catch(err){
+    console.error(err);
+    alert("Gagal mengambil data: "+err.message);
+    document.getElementById("statusText").textContent="❌ Gagal mengambil data dari GSheet.";
+  }
 });
 
-document.getElementById("ambilNamaBtn").onclick=async()=>{
-  const m=document.getElementById("shiftInput").value.toUpperCase();if(m==="IDX")return alert("Mode Index tidak perlu Generate Jadwal.");
-  const res=await fetch(`${GAS_URL}?shift=${m}`);const d=await res.json();sheetData=d.karyawan||[];
-  document.getElementById("generateBtn").disabled=false;
-};
+/* ====== PERHITUNGAN ====== */
+function computeC(r){return r.waktuSlaDetik>0?r.durasiDetik/r.waktuSlaDetik:0;}
+function rataRata_byName(nama,thr=0.85){
+  const matches=[];
+  const keyNama=normalizeName(nama);
 
-document.getElementById("generateBtn").onclick=async()=>{
-  const mode=document.getElementById("shiftInput").value.toUpperCase();
-  const hasil=sheetData.map(k=>({k,res:rata(k.nama)}));lastResults=hasil;
-  renderTable(hasil);
-  document.getElementById("judulLaporan").classList.remove("is-history");
+  for(const r of csvData){
+    if(!isAcceptedStatus(r.statusNorm))continue;
+    if(r.tipeLokasi && r.tipeLokasi.trim().toLowerCase()==="branch")continue;
+    if(!lolosFilterShiftSiangByTanggalDiambil(r)) continue;
+
+    const currentShift=document.getElementById("shiftInput").value.trim().toUpperCase();
+    if(currentShift==="IDX"){
+      if(normalizeName(r.diambilOleh)!==keyNama) continue; // exact match pada IDX
+    }else{
+      if(similarity(nama,r.diambilOleh)<thr) continue;     // toleran typo pada shift
+    }
+    matches.push(r);
+  }
+
+  if(!matches.length)return{avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0,relasiResolved:0};
+
+  const sum=matches.reduce((a,b)=>a+computeC(b),0);
+  const latest=matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
+  return{
+    avg:sum/matches.length,
+    count:matches.length,
+    lastTime:ambilJamDariTanggal(latest),
+    slaCount:matches.filter(r=>r.statusSLA&&r.statusSLA.toLowerCase().includes("lewat")).length,
+    inProgressCount:matches.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length,
+    relasiResolved:matches.filter(r=>r.statusNorm.includes("pending")).length
+  };
+}
+
+/* ====== GENERATE TABEL ====== */
+document.getElementById("generateBtn").addEventListener("click", async ()=>{
+  const mode=document.getElementById("shiftInput").value.trim().toUpperCase();
+  if(!csvData.length) return alert("Upload CSV dulu!");
+
+  if(mode==="IDX"){
+    if(!sheetData.length) sheetData=buildUniqueNamesFromCSV(csvData);
+    if(!sheetData.length){ alert('Tidak ada nama pada kolom "Diambil oleh" di CSV.'); return; }
+    shiftLabel="Index Hari Ini";
+  }else{
+    if(!sheetData.length) return alert("Klik 'Generate Jadwal' dulu untuk ambil nama dari GSheet.");
+    const shiftMap={P:"Shift 1",S:"Shift 2",M:"Shift 3",MH1:"Shift 3"};
+    shiftLabel=shiftMap[mode]||mode;
+  }
+
+  let results=sheetData.map(k=>({k,res:rataRata_byName(k.nama)}));
+
+  if(mode==="IDX"){
+    const val = (x)=> (x.res.avg==null ? -Infinity : x.res.avg);
+    results.sort((a,b)=> val(b) - val(a));
+    const hdr = document.getElementById("sortIndexCO");
+    if(hdr) hdr.textContent = "IndexCO ↓";
+    if(typeof sortAscIndexCO!=="undefined") sortAscIndexCO=false;
+  }
+
+  lastResults=results;
+  renderTable(results);
+
+  const tgl=document.getElementById("tanggalCek").textContent;
+  const judul=document.getElementById("judulLaporan");
+  judul.classList.remove("is-history");
   document.getElementById("resultArea").classList.remove("is-history");
-  await saveHistoryEntry({ts:Date.now(),mode,shiftLabel:mode,tanggal:new Date().toISOString(),results:hasil});
-};
+  judul.textContent=
+    (mode==="IDX")
+      ? `Laporan Index CO — Index Hari Ini — Tanggal ${tgl}`
+      : `Laporan Index CO ${shiftLabel} — Tanggal ${tgl}`;
 
-function rata(n){
-  const nama=normalizeName(n);const arr=csvData.filter(r=>normalizeName(r.diambilOleh)===nama&&lolosFilterShiftSiangByTanggalDiambil(r));
-  return{avg:arr.length?1:0,count:arr.length,lastTime:"-",slaCount:0,inProgressCount:0,relasiResolved:0};
+  document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
+
+  try{
+    await saveHistoryEntry({
+      ts: Date.now(),
+      mode,
+      shiftLabel,
+      tanggal: tgl,
+      toggleSiang14: document.getElementById("toggleSiang14").checked,
+      results: results
+    });
+  }catch(e){
+    console.warn("Gagal simpan history:", e);
+    document.getElementById("statusText").textContent = "⚠️ Gagal simpan history: " + e.message;
+  }
+});
+
+/* ====== RENDER TABEL ====== */
+function renderTable(results){
+  const tbody=document.querySelector("#resultTable tbody");tbody.innerHTML="";
+  results.forEach((item,index)=>{
+    const {k,res}=item;const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
+    const tr=document.createElement("tr");if(res.slaCount>0)tr.className="table-danger";
+    tr.innerHTML=`<td>${index+1}</td><td>${k.nama}</td><td>${k.shift||'-'}</td>
+      <td>${res.lastTime}</td><td>${avg}</td><td>${res.count||0}</td>
+      <td>${res.slaCount||0}</td><td>${res.inProgressCount||0}</td><td>${res.relasiResolved||0}</td>`;
+    tbody.appendChild(tr);
+  });
+  ["Nama","LastCO","IndexCO","TotalCO","SLA","InProgress","RelasiResolved"].forEach(k=>{
+    const el=document.getElementById(`sort${k}`);
+    if(el)el.onclick=()=>sortColumn(k);
+  });
 }
 
-function renderTable(res){
-  const tb=document.querySelector("#resultTable tbody");tb.innerHTML="";
-  res.forEach((x,i)=>tb.innerHTML+=`<tr><td>${i+1}</td><td>${x.k.nama}</td><td>${x.k.shift}</td><td>${x.res.lastTime}</td><td>${x.res.avg}</td><td>${x.res.count}</td><td>${x.res.slaCount}</td><td>${x.res.inProgressCount}</td><td>${x.res.relasiResolved}</td></tr>`);
+/* ====== SORTING KLIK HEADER ====== */
+function sortColumn(key){
+  if(!lastResults.length)return alert("Belum ada data tabel.");
+  let asc,valFunc;
+  switch(key){
+    case"Nama":asc=sortAscNama;valFunc=r=>(r.k.nama||"").toLowerCase();sortAscNama=!sortAscNama;break;
+    case"LastCO":asc=sortAscLastCO;valFunc=r=>r.res.lastTime==="-"?0:parseInt(r.res.lastTime.replace(":",""));sortAscLastCO=!sortAscLastCO;break;
+    case"IndexCO":asc=sortAscIndexCO;valFunc=r=>r.res.avg||0;sortAscIndexCO=!sortAscIndexCO;break;
+    case"TotalCO":asc=sortAscTotalCO;valFunc=r=>r.res.count||0;sortAscTotalCO=!sortAscTotalCO;break;
+    case"SLA":asc=sortAscSLA;valFunc=r=>r.res.slaCount||0;sortAscSLA=!sortAscSLA;break;
+    case"InProgress":asc=sortAscInProgress;valFunc=r=>r.res.inProgressCount||0;sortAscInProgress=!sortAscInProgress;break;
+    case"RelasiResolved":asc=sortAscRelasiResolved;valFunc=r=>r.res.relasiResolved||0;sortAscRelasiResolved=!sortAscRelasiResolved;break;
+    default:return;
+  }
+  if(key==="Nama")lastResults.sort((a,b)=>asc?valFunc(a).localeCompare(valFunc(b)):valFunc(b).localeCompare(valFunc(a)));
+  else lastResults.sort((a,b)=>asc?(valFunc(a)-valFunc(b)):(valFunc(b)-valFunc(a)));
+  renderTable(lastResults);
+  document.getElementById(`sort${key}`).textContent=`${key} ${asc?"↑":"↓"}`;
 }
 
-document.getElementById("downloadBtn").onclick=async()=>{
-  const c=await html2canvas(document.querySelector("#resultArea"),{scale:2});
-  const a=document.createElement("a");a.download="Laporan_Index_Shift.jpg";a.href=c.toDataURL("image/jpeg");a.click();
-};
-document.getElementById("historyBtn").onclick=showHistoryModal;
+/* ====== DOWNLOAD JPG ====== */
+document.getElementById("downloadBtn").addEventListener("click", async () => {
+  const area = document.querySelector("#resultArea");
+  const canvas = await html2canvas(area, { scale: 2 });
+  const link = document.createElement("a");
+  link.download = "Laporan_Index_Shift.jpg";
+  link.href = canvas.toDataURL("image/jpeg");
+  link.click();
+});
+
+/* ====== UI: Toggle Siang aktif hanya saat S; tombol Generate disabled saat IDX ====== */
+function updateToggleSiangAvailability(){
+  const mode = document.getElementById("shiftInput").value.trim().toUpperCase();
+  const cb    = document.getElementById("toggleSiang14");
+  const label = document.getElementById("labelToggleSiang14");
+  const btnGsheet = document.getElementById("ambilNamaBtn");
+  const note  = document.getElementById("modeNote");
+  const isSiang = (mode === "S");
+
+  // Toggle hanya aktif saat S
+  cb.disabled = !isSiang;
+  cb.checked  = isSiang;
+  label.classList.toggle("text-muted", !isSiang);
+  cb.title = isSiang ? "Aktifkan untuk hitung mulai jam 14:00"
+                     : (mode==="IDX" ? "Tidak berlaku pada mode Index hari ini"
+                                     : "Tidak berlaku untuk shift selain Siang (S)");
+
+  // Tombol Generate: disable saat IDX, aktif saat P/S/M/MH1
+  if(mode==="IDX"){
+    btnGsheet.disabled = true;
+    btnGsheet.title = "Mode Index: tidak perlu Generate Jadwal";
+    note.textContent = "(Mode Index) Upload CSV lalu langsung klik 'Hitung Index'.";
+    document.getElementById("generateBtn").disabled = sheetData.length===0; // aktif setelah CSV → build nama
+  }else if(mode){
+    btnGsheet.disabled = false;
+    btnGsheet.title = "Ambil nama dari GSheet";
+    note.textContent = "";
+    document.getElementById("generateBtn").disabled = true; // tunggu ambil nama
+  }else{
+    btnGsheet.disabled = false;
+    btnGsheet.title = "Pilih mode terlebih dahulu";
+    note.textContent = "";
+    document.getElementById("generateBtn").disabled = true;
+  }
+}
+
+/* ====== EVENTS ====== */
+document.getElementById("historyBtn").addEventListener("click", showHistoryModal);
+
+document.getElementById("shiftInput").addEventListener("change", ()=>{
+  updateToggleSiangAvailability();
+  const mode=document.getElementById("shiftInput").value.trim().toUpperCase();
+  if(mode==="IDX"){
+    if(csvData.length){
+      sheetData=buildUniqueNamesFromCSV(csvData);
+      document.getElementById("generateBtn").disabled = sheetData.length===0;
+    }else{
+      document.getElementById("generateBtn").disabled = true;
+    }
+  }else{
+    document.getElementById("generateBtn").disabled = true;
+  }
+});
+
+document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </script>
 
-<div id="copyright">© 2025 EDP Fai</div>
+<div id="copyright">
+  © 2025 EDP Fai
+</div>
 </body>
 </html>
