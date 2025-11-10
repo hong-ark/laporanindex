@@ -13,10 +13,9 @@
     .container { max-width: 1100px; background: white; border-radius: 10px; padding: 25px;
                  box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
     #judulLaporan { font-weight: 700; font-size: 18px; text-align: center; margin-bottom: 15px; color:#000; }
-    #judulLaporan.is-history { color: #8e24aa; } /* ubah bila mau merah/oranye */
+    #judulLaporan.is-history { color: #8e24aa; }
     #copyright { text-align: center; font-size: 14px; color: #000; margin-top: 40px; margin-bottom: 10px; font-weight: 600; }
 
-    /* Header default biru */
     #resultTable.table thead tr th {
       background-color: #1976d2 !important; color: white !important; text-align: center;
       font-weight: 700; cursor: pointer; padding: 10px; user-select: none;
@@ -24,7 +23,6 @@
     }
     #resultTable.table thead tr th:hover { background-color: #1565c0 !important; }
 
-    /* Header abu-abu saat lihat HISTORY */
     #resultArea.is-history thead tr th {
       background-color: #9e9e9e !important;
       border-color: #757575 !important;
@@ -76,7 +74,6 @@
   <button id="generateBtn" class="btn btn-success mb-1" disabled>Hitung Index</button>
   <span id="statusText" class="ms-2 text-muted"></span>
 
-  <!-- Toggle hanya aktif saat S -->
   <div class="form-check mt-2">
     <input class="form-check-input" type="checkbox" id="toggleSiang14" disabled>
     <label class="form-check-label text-muted" for="toggleSiang14" id="labelToggleSiang14">
@@ -94,7 +91,7 @@
           <th id="sortNama">Nama Karyawan</th>
           <th>Shift/Mode</th>
           <th id="sortLastCO">LastCO</th>
-          <th id="sortIntervalAmbilCO">IntrvlAmbilCO</th><!-- NEW -->
+          <th id="sortIntervalAmbilCO">AvgAmbilCO</th>
           <th id="sortIndexCO">IndexCO</th>
           <th id="sortTotalCO">TotalCO</th>
           <th id="sortSLA">SLA</th>
@@ -112,7 +109,6 @@
   </div>
 </div>
 
-<!-- Modal History -->
 <div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -130,25 +126,20 @@
   </div>
 </div>
 
-<!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-/* ====== KONFIG ====== */
 const GAS_URL="https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFMrU-NNqxMW2ZtSCRIpESCpC4Nz7VzdKRmt-Zx1rJXjnRd-g/exec";
 const HISTORY_GAS_URL="https://script.google.com/macros/s/AKfycbwrXZlIB4nyiQtb-MM79c8rm1rDuoVyEZRxdk4-yTHaM_teOWR-XxC_BK50RsVlmo-P/exec";
 
 let sheetData=[], csvData=[], lastResults=[];
 let shiftLabel="";
 
-/* ====== SORT STATE ====== */
 let sortAscNama=true,sortAscLastCO=false,sortAscIntervalAmbilCO=false,sortAscIndexCO=false,sortAscTotalCO=true,
     sortAscSLA=false,sortAscInProgress=false,sortAscRelasiResolved=false;
 
-/* ====== INIT TANGGAL ====== */
 document.getElementById("tanggalCek").textContent=
   new Date().toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});
 
-/* ====== UTIL ====== */
 function normKey(s){return(s||"").toString().toLowerCase().replace(/[^a-z0-9]/g,'');}
 function normalizeName(s){return(s||"").toString().toLowerCase().replace(/\s+/g,' ').replace(/[^\w\s]/g,'').trim();}
 function durasiKeDetik(v){if(!v)return 0;const s=v.toString().trim();
@@ -192,8 +183,7 @@ function prettyDateTime(ts){
   return d.toLocaleString("id-ID",{ day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
 }
 
-/* ====== NEW: helper untuk hitung rata-rata interval dari "Tanggal diambil" ====== */
-// Parse "07-Nov-2025 01:07:23.385" atau "07-Nov-2025 01:07:23"
+/* Interval dari Tanggal diambil */
 function parseTanggalDiambilToDate(s){
   if(!s) return null;
   const m = String(s).trim().match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d+))?$/);
@@ -201,12 +191,11 @@ function parseTanggalDiambilToDate(s){
   const day = +m[1], monStr = m[2].toLowerCase(), year = +m[3];
   const hh = +m[4], mm = +m[5], ss = +m[6], ms = m[7] ? +m[7] : 0;
   const monMap = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11,
-                  mei:4,agu:7,okt:9,nop:10,des:11}; // dukung ID/EN
+                  mei:4,agu:7,okt:9,nop:10,des:11};
   const month = monMap[monStr];
   if(month==null) return null;
   return new Date(year, month, day, hh, mm, ss, ms);
 }
-// Hitung rata-rata gap menit antar tanggal (array Date terurut)
 function averageGapMinutes(dates){
   if(!dates || dates.length < 2) return null;
   let sum = 0, count = 0;
@@ -215,9 +204,8 @@ function averageGapMinutes(dates){
     if(Number.isFinite(delta) && delta >= 0){ sum += delta; count++; }
   }
   if(!count) return null;
-  return Math.round((sum / count) / 60000); // menit
+  return Math.round((sum / count) / 60000);
 }
-// Format menit → "Xj Ym" atau "Xm"
 function formatGapMinutes(min){
   if(min == null) return "-";
   const h = Math.floor(min/60);
@@ -227,7 +215,6 @@ function formatGapMinutes(min){
   return `${m}m`;
 }
 
-/* ====== FILTER SIANG >=14:00 (hanya saat S + toggle ON) ====== */
 function lolosFilterShiftSiangByTanggalDiambil(record){
   const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
   if(shift !== "S") return true;
@@ -241,7 +228,7 @@ function lolosFilterShiftSiangByTanggalDiambil(record){
   return false;
 }
 
-/* ====== HISTORY API ====== */
+/* HISTORY */
 async function saveHistoryEntry(entry){
   const compactResults = (entry.results || []).map(x => ({
     k: { nama: x.k?.nama || "", shift: x.k?.shift || "" },
@@ -340,7 +327,7 @@ async function renderHistoryList(){
   }
 }
 
-/* ====== CSV LOAD ====== */
+/* CSV LOAD */
 document.getElementById("csvFile").addEventListener("change",(e)=>{
   const file=e.target.files[0];if(!file)return;
   Papa.parse(file,{header:true,delimiter:";",skipEmptyLines:true,
@@ -377,13 +364,13 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
         sheetData = buildUniqueNamesFromCSV(csvData);
         document.getElementById("generateBtn").disabled = sheetData.length===0;
         document.getElementById("modeNote").textContent = sheetData.length
-         : "(Mode Index) Tidak ada nama pada kolom 'Diambil oleh'.";
+        : "(Mode Index) Tidak ada nama pada kolom 'Diambil oleh'.";
       }
       document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
     }});
 });
 
-/* ====== BUILD NAMA (MODE IDX) ====== */
+/* BUILD NAMA (MODE IDX) */
 function buildUniqueNamesFromCSV(rows){
   const map=new Map();
   for(const r of rows){
@@ -395,7 +382,7 @@ function buildUniqueNamesFromCSV(rows){
   return Array.from(map.values()).map(nm=>({nama:nm, nik:'', shift:'Index'}));
 }
 
-/* ====== AMBIL NAMA DARI GSHEET (Generate Jadwal untuk P/S/M/MH1) ====== */
+/* AMBIL NAMA DARI GSHEET */
 document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
   const shiftInput=document.getElementById("shiftInput").value.trim().toUpperCase();
   if(!shiftInput){ alert("Pilih mode dulu!"); return; }
@@ -440,7 +427,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
   }
 });
 
-/* ====== PERHITUNGAN ====== */
+/* PERHITUNGAN */
 function computeC(r){return r.waktuSlaDetik>0?r.durasiDetik/r.waktuSlaDetik:0;}
 function rataRata_byName(nama,thr=0.85){
   const matches=[];
@@ -453,9 +440,9 @@ function rataRata_byName(nama,thr=0.85){
 
     const currentShift=document.getElementById("shiftInput").value.trim().toUpperCase();
     if(currentShift==="IDX"){
-      if(normalizeName(r.diambilOleh)!==keyNama) continue; // exact match pada IDX
+      if(normalizeName(r.diambilOleh)!==keyNama) continue;
     }else{
-      if(similarity(nama,r.diambilOleh)<thr) continue;     // toleran typo pada shift
+      if(similarity(nama,r.diambilOleh)<thr) continue;
     }
     matches.push(r);
   }
@@ -467,7 +454,6 @@ function rataRata_byName(nama,thr=0.85){
   const sum=matches.reduce((a,b)=>a+computeC(b),0);
   const latest=matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
 
-  // NEW: hitung rata-rata jeda antar "Tanggal diambil"
   const dateList = matches
     .map(r=>parseTanggalDiambilToDate(r.tanggalDiambil))
     .filter(d => d instanceof Date && !isNaN(d))
@@ -485,7 +471,7 @@ function rataRata_byName(nama,thr=0.85){
   };
 }
 
-/* ====== GENERATE TABEL ====== */
+/* GENERATE TABEL */
 document.getElementById("generateBtn").addEventListener("click", async ()=>{
   const mode=document.getElementById("shiftInput").value.trim().toUpperCase();
   if(!csvData.length) return alert("Upload CSV dulu!");
@@ -539,13 +525,13 @@ document.getElementById("generateBtn").addEventListener("click", async ()=>{
   }
 });
 
-/* ====== RENDER TABEL ====== */
+/* RENDER TABEL */
 function renderTable(results){
   const tbody=document.querySelector("#resultTable tbody");tbody.innerHTML="";
   results.forEach((item,index)=>{
     const {k,res}=item;
     const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
-    const gapText = formatGapMinutes(res.avgGapMin); // NEW
+    const gapText = formatGapMinutes(res.avgGapMin);
     const tr=document.createElement("tr");if(res.slaCount>0)tr.className="table-danger";
     tr.innerHTML=`<td>${index+1}</td><td>${k.nama}</td><td>${k.shift||'-'}</td>
       <td>${res.lastTime}</td><td>${gapText}</td><td>${avg}</td><td>${res.count||0}</td>
@@ -558,14 +544,14 @@ function renderTable(results){
   });
 }
 
-/* ====== SORTING KLIK HEADER ====== */
+/* SORTING */
 function sortColumn(key){
   if(!lastResults.length)return alert("Belum ada data tabel.");
   let asc,valFunc;
   switch(key){
     case"Nama":asc=sortAscNama;valFunc=r=>(r.k.nama||"").toLowerCase();sortAscNama=!sortAscNama;break;
     case"LastCO":asc=sortAscLastCO;valFunc=r=>r.res.lastTime==="-"?0:parseInt(r.res.lastTime.replace(":",""));sortAscLastCO=!sortAscLastCO;break;
-    case"IntervalAmbilCO": // NEW
+    case"IntervalAmbilCO":
       asc=sortAscIntervalAmbilCO;
       valFunc=r=> (r.res.avgGapMin==null ? Number.NEGATIVE_INFINITY : r.res.avgGapMin);
       sortAscIntervalAmbilCO=!sortAscIntervalAmbilCO;
@@ -583,7 +569,7 @@ function sortColumn(key){
   document.getElementById(`sort${key}`).textContent=`${key} ${asc?"↑":"↓"}`;
 }
 
-/* ====== DOWNLOAD JPG ====== */
+/* DOWNLOAD JPG */
 document.getElementById("downloadBtn").addEventListener("click", async () => {
   const area = document.querySelector("#resultArea");
   const canvas = await html2canvas(area, { scale: 2 });
@@ -593,7 +579,7 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
   link.click();
 });
 
-/* ====== UI: Toggle Siang aktif hanya saat S; tombol Generate disabled saat IDX ====== */
+/* UI: Toggle Siang & tombol Generate */
 function updateToggleSiangAvailability(){
   const mode = document.getElementById("shiftInput").value.trim().toUpperCase();
   const cb    = document.getElementById("toggleSiang14");
@@ -602,7 +588,6 @@ function updateToggleSiangAvailability(){
   const note  = document.getElementById("modeNote");
   const isSiang = (mode === "S");
 
-  // Toggle hanya aktif saat S
   cb.disabled = !isSiang;
   cb.checked  = isSiang;
   label.classList.toggle("text-muted", !isSiang);
@@ -610,16 +595,15 @@ function updateToggleSiangAvailability(){
                      : (mode==="IDX" ? "Tidak berlaku pada mode Index hari ini"
                                      : "Tidak berlaku untuk shift selain Siang (S)");
 
-  // Tombol Generate: disable saat IDX, aktif saat P/S/M/MH1
   if(mode==="IDX"){
     btnGsheet.disabled = true;
     btnGsheet.title = "Mode Index: tidak perlu Generate Jadwal";
-    document.getElementById("generateBtn").disabled = sheetData.length===0; // aktif setelah CSV → build nama
+    document.getElementById("generateBtn").disabled = sheetData.length===0;
   }else if(mode){
     btnGsheet.disabled = false;
     btnGsheet.title = "Ambil nama dari GSheet";
     note.textContent = "";
-    document.getElementById("generateBtn").disabled = true; // tunggu ambil nama
+    document.getElementById("generateBtn").disabled = true;
   }else{
     btnGsheet.disabled = false;
     btnGsheet.title = "Pilih mode terlebih dahulu";
@@ -628,7 +612,7 @@ function updateToggleSiangAvailability(){
   }
 }
 
-/* ====== EVENTS ====== */
+/* EVENTS */
 document.getElementById("historyBtn").addEventListener("click", showHistoryModal);
 
 document.getElementById("shiftInput").addEventListener("change", ()=>{
@@ -654,5 +638,3 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
-
-
