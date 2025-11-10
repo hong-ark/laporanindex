@@ -339,7 +339,6 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
         sheetData = buildUniqueNamesFromCSV(csvData);
         document.getElementById("generateBtn").disabled = sheetData.length===0;
         document.getElementById("modeNote").textContent = sheetData.length
-          ? "(Mode Index) Klik 'Hitung Index' untuk menghitung dari daftar CSV."
           : "(Mode Index) Tidak ada nama pada kolom 'Diambil oleh'.";
       }
       document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
@@ -602,4 +601,5 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
+
 
