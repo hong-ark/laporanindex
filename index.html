@@ -91,8 +91,8 @@
           <th id="sortNama">Nama Karyawan</th>
           <th>Shift</th>
           <th id="sortLastCO">LastCO</th>
-          <th id="sortAvgAmbilCO">AvgAmbilCO</th>
           <th id="sortIndexCO">IndexCO</th>
+          <th id="sortAvgAmbilCO">AvgAmbilCO</th>
           <th id="sortTotalCO">TotalCO</th>
           <th id="sortSLA">SLA</th>
           <th id="sortInProgress">InProgress</th>
@@ -536,7 +536,7 @@ function renderTable(results){
       <td>${res.slaCount||0}</td><td>${res.inProgressCount||0}</td><td>${res.RelasiRslvd||0}</td>`;
     tbody.appendChild(tr);
   });
-  ["Nama","LastCO","AvgAmbilCO","IndexCO","TotalCO","SLA","InProgress","RelasiRslvd"].forEach(k=>{
+  ["Nama","LastCO","IndexCO","AvgAmbilCO","TotalCO","SLA","InProgress","RelasiRslvd"].forEach(k=>{
     const el=document.getElementById(`sort${k}`);
     if(el)el.onclick=()=>sortColumn(k);
   });
@@ -549,12 +549,12 @@ function sortColumn(key){
   switch(key){
     case"Nama":asc=sortAscNama;valFunc=r=>(r.k.nama||"").toLowerCase();sortAscNama=!sortAscNama;break;
     case"LastCO":asc=sortAscLastCO;valFunc=r=>r.res.lastTime==="-"?0:parseInt(r.res.lastTime.replace(":",""));sortAscLastCO=!sortAscLastCO;break;
+    case"IndexCO":asc=sortAscIndexCO;valFunc=r=>r.res.avg||0;sortAscIndexCO=!sortAscIndexCO;break;
     case"AvgAmbilCO":
       asc=sortAscAvgAmbilCO;
       valFunc=r=> (r.res.avgGapMin==null ? Number.NEGATIVE_INFINITY : r.res.avgGapMin);
       sortAscAvgAmbilCO=!sortAscAvgAmbilCO;
       break;
-    case"IndexCO":asc=sortAscIndexCO;valFunc=r=>r.res.avg||0;sortAscIndexCO=!sortAscIndexCO;break;
     case"TotalCO":asc=sortAscTotalCO;valFunc=r=>r.res.count||0;sortAscTotalCO=!sortAscTotalCO;break;
     case"SLA":asc=sortAscSLA;valFunc=r=>r.res.slaCount||0;sortAscSLA=!sortAscSLA;break;
     case"InProgress":asc=sortAscInProgress;valFunc=r=>r.res.inProgressCount||0;sortAscInProgress=!sortAscInProgress;break;
@@ -634,6 +634,7 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
+
 
 
 
