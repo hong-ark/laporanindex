@@ -94,7 +94,7 @@
           <th id="sortNama">Nama Karyawan</th>
           <th>Shift/Mode</th>
           <th id="sortLastCO">LastCO</th>
-          <th id="sortIntervalAmbilCO">IntervalAmbilCO</th><!-- NEW -->
+          <th id="sortIntervalAmbilCO">IntrvlAmbilCO</th><!-- NEW -->
           <th id="sortIndexCO">IndexCO</th>
           <th id="sortTotalCO">TotalCO</th>
           <th id="sortSLA">SLA</th>
@@ -615,7 +615,6 @@ function updateToggleSiangAvailability(){
   if(mode==="IDX"){
     btnGsheet.disabled = true;
     btnGsheet.title = "Mode Index: tidak perlu Generate Jadwal";
-    note.textContent = "(Mode Index) Upload CSV lalu langsung klik 'Hitung Index'.";
     document.getElementById("generateBtn").disabled = sheetData.length===0; // aktif setelah CSV → build nama
   }else if(mode){
     btnGsheet.disabled = false;
@@ -656,3 +655,4 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
+
