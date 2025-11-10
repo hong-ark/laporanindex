@@ -91,7 +91,7 @@
           <th id="sortNama">Nama Karyawan</th>
           <th>Shift/Mode</th>
           <th id="sortLastCO">LastCO</th>
-          <th id="sortIntervalAmbilCO">AvgAmbilCO</th>
+          <th id="sortAvgAmbilCO">AvgAmbilCO</th>
           <th id="sortIndexCO">IndexCO</th>
           <th id="sortTotalCO">TotalCO</th>
           <th id="sortSLA">SLA</th>
@@ -134,7 +134,7 @@ const HISTORY_GAS_URL="https://script.google.com/macros/s/AKfycbwrXZlIB4nyiQtb-M
 let sheetData=[], csvData=[], lastResults=[];
 let shiftLabel="";
 
-let sortAscNama=true,sortAscLastCO=false,sortAscIntervalAmbilCO=false,sortAscIndexCO=false,sortAscTotalCO=true,
+let sortAscNama=true,sortAscLastCO=false,sortAscAvgAmbilCO=false,sortAscIndexCO=false,sortAscTotalCO=true,
     sortAscSLA=false,sortAscInProgress=false,sortAscRelasiResolved=false;
 
 document.getElementById("tanggalCek").textContent=
@@ -536,7 +536,7 @@ function renderTable(results){
       <td>${res.slaCount||0}</td><td>${res.inProgressCount||0}</td><td>${res.relasiResolved||0}</td>`;
     tbody.appendChild(tr);
   });
-  ["Nama","LastCO","IntervalAmbilCO","IndexCO","TotalCO","SLA","InProgress","RelasiResolved"].forEach(k=>{
+  ["Nama","LastCO","AvgAmbilCO","IndexCO","TotalCO","SLA","InProgress","RelasiResolved"].forEach(k=>{
     const el=document.getElementById(`sort${k}`);
     if(el)el.onclick=()=>sortColumn(k);
   });
@@ -549,10 +549,10 @@ function sortColumn(key){
   switch(key){
     case"Nama":asc=sortAscNama;valFunc=r=>(r.k.nama||"").toLowerCase();sortAscNama=!sortAscNama;break;
     case"LastCO":asc=sortAscLastCO;valFunc=r=>r.res.lastTime==="-"?0:parseInt(r.res.lastTime.replace(":",""));sortAscLastCO=!sortAscLastCO;break;
-    case"IntervalAmbilCO":
-      asc=sortAscIntervalAmbilCO;
+    case"AvgAmbilCO":
+      asc=sortAscAvgAmbilCO;
       valFunc=r=> (r.res.avgGapMin==null ? Number.NEGATIVE_INFINITY : r.res.avgGapMin);
-      sortAscIntervalAmbilCO=!sortAscIntervalAmbilCO;
+      sortAscAvgAmbilCO=!sortAscAvgAmbilCO;
       break;
     case"IndexCO":asc=sortAscIndexCO;valFunc=r=>r.res.avg||0;sortAscIndexCO=!sortAscIndexCO;break;
     case"TotalCO":asc=sortAscTotalCO;valFunc=r=>r.res.count||0;sortAscTotalCO=!sortAscTotalCO;break;
@@ -634,4 +634,5 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
+
 
