@@ -360,13 +360,11 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
       });
 
       const mode=document.getElementById("shiftInput").value.trim().toUpperCase();
-      if(mode==="IDX"){
-        sheetData = buildUniqueNamesFromCSV(csvData);
-        document.getElementById("generateBtn").disabled = sheetData.length===0;
-        document.getElementById("modeNote").textContent = sheetData.length
-        : "(Mode Index) Tidak ada nama pada kolom 'Diambil oleh'.";
-      }
-      document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
+     if(mode==="IDX"){
+  sheetData = buildUniqueNamesFromCSV(csvData);
+  document.getElementById("generateBtn").disabled = sheetData.length===0;
+}
+    document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
     }});
 });
 
@@ -602,12 +600,10 @@ function updateToggleSiangAvailability(){
   }else if(mode){
     btnGsheet.disabled = false;
     btnGsheet.title = "Ambil nama dari GSheet";
-    note.textContent = "";
     document.getElementById("generateBtn").disabled = true;
   }else{
     btnGsheet.disabled = false;
     btnGsheet.title = "Pilih mode terlebih dahulu";
-    note.textContent = "";
     document.getElementById("generateBtn").disabled = true;
   }
 }
@@ -638,3 +634,4 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
+
