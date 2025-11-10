@@ -96,7 +96,7 @@
           <th id="sortTotalCO">TotalCO</th>
           <th id="sortSLA">SLA</th>
           <th id="sortInProgress">InProgress</th>
-          <th id="sortRelasiResolved">RelasiResolved</th>
+          <th id="sortRelasiRslvd">RelasiRslvd</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -135,7 +135,7 @@ let sheetData=[], csvData=[], lastResults=[];
 let shiftLabel="";
 
 let sortAscNama=true,sortAscLastCO=false,sortAscAvgAmbilCO=false,sortAscIndexCO=false,sortAscTotalCO=true,
-    sortAscSLA=false,sortAscInProgress=false,sortAscRelasiResolved=false;
+    sortAscSLA=false,sortAscInProgress=false,sortAscRelasiRslvd=false;
 
 document.getElementById("tanggalCek").textContent=
   new Date().toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});
@@ -238,7 +238,7 @@ async function saveHistoryEntry(entry){
       lastTime: x.res?.lastTime ?? "-",
       slaCount: x.res?.slaCount ?? 0,
       inProgressCount: x.res?.inProgressCount ?? 0,
-      relasiResolved: x.res?.relasiResolved ?? 0,
+      RelasiRslvd: x.res?.RelasiRslvd ?? 0,
       avgGapMin: x.res?.avgGapMin ?? null
     }
   }));
@@ -274,7 +274,7 @@ async function loadHistory(){
       k: { nama: r.nama, shift: r.shift },
       res: {
         avg: r.avg, count: r.count, lastTime: r.lastTime,
-        slaCount: r.slaCount, inProgressCount: r.inProgressCount, relasiResolved: r.relasiResolved,
+        slaCount: r.slaCount, inProgressCount: r.inProgressCount, RelasiRslvd: r.RelasiRslvd,
         avgGapMin: r.avgGapMin ?? null
       }
     }))
@@ -446,7 +446,7 @@ function rataRata_byName(nama,thr=0.85){
   }
 
   if(!matches.length)return{
-    avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0,relasiResolved:0,avgGapMin:null
+    avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0,RelasiRslvd:0,avgGapMin:null
   };
 
   const sum=matches.reduce((a,b)=>a+computeC(b),0);
@@ -464,7 +464,7 @@ function rataRata_byName(nama,thr=0.85){
     lastTime:ambilJamDariTanggal(latest),
     slaCount:matches.filter(r=>r.statusSLA&&r.statusSLA.toLowerCase().includes("lewat")).length,
     inProgressCount:matches.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length,
-    relasiResolved:matches.filter(r=>r.statusNorm.includes("pending")).length,
+    RelasiRslvd:matches.filter(r=>r.statusNorm.includes("pending")).length,
     avgGapMin
   };
 }
@@ -533,10 +533,10 @@ function renderTable(results){
     const tr=document.createElement("tr");if(res.slaCount>0)tr.className="table-danger";
     tr.innerHTML=`<td>${index+1}</td><td>${k.nama}</td><td>${k.shift||'-'}</td>
       <td>${res.lastTime}</td><td>${gapText}</td><td>${avg}</td><td>${res.count||0}</td>
-      <td>${res.slaCount||0}</td><td>${res.inProgressCount||0}</td><td>${res.relasiResolved||0}</td>`;
+      <td>${res.slaCount||0}</td><td>${res.inProgressCount||0}</td><td>${res.RelasiRslvd||0}</td>`;
     tbody.appendChild(tr);
   });
-  ["Nama","LastCO","AvgAmbilCO","IndexCO","TotalCO","SLA","InProgress","RelasiResolved"].forEach(k=>{
+  ["Nama","LastCO","AvgAmbilCO","IndexCO","TotalCO","SLA","InProgress","RelasiRslvd"].forEach(k=>{
     const el=document.getElementById(`sort${k}`);
     if(el)el.onclick=()=>sortColumn(k);
   });
@@ -558,7 +558,7 @@ function sortColumn(key){
     case"TotalCO":asc=sortAscTotalCO;valFunc=r=>r.res.count||0;sortAscTotalCO=!sortAscTotalCO;break;
     case"SLA":asc=sortAscSLA;valFunc=r=>r.res.slaCount||0;sortAscSLA=!sortAscSLA;break;
     case"InProgress":asc=sortAscInProgress;valFunc=r=>r.res.inProgressCount||0;sortAscInProgress=!sortAscInProgress;break;
-    case"RelasiResolved":asc=sortAscRelasiResolved;valFunc=r=>r.res.relasiResolved||0;sortAscRelasiResolved=!sortAscRelasiResolved;break;
+    case"RelasiRslvd":asc=sortAscRelasiRslvd;valFunc=r=>r.res.RelasiRslvd||0;sortAscRelasiRslvd=!sortAscRelasiRslvd;break;
     default:return;
   }
   if(key==="Nama")lastResults.sort((a,b)=>asc?valFunc(a).localeCompare(valFunc(b)):valFunc(b).localeCompare(valFunc(a)));
@@ -634,5 +634,6 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
+
 
 
