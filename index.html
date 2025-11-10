@@ -272,15 +272,39 @@ async function loadHistory(){
   const res = await fetch(url);
   const json = await res.json();
 
-  const pickGap = (r) => {
-    // ambil dari berbagai kemungkinan key
-    let v = r.avgGapMin ?? r.avgAmbilCO ?? r.intervalAmbilCO ?? r.IntervalAmbilCO
-          ?? r.avg_gap_min ?? r.avgGapMinutes ?? null;
-    if (v === "") return null;
-    if (v == null) return null;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null; // paksa jadi number (menit)
+  const parseGapAny = (val) => {
+    if (val == null || val === "") return null;
+    if (typeof val === "string") {
+      const s = val.trim().toLowerCase();
+      const mHy = s.match(/^(\d+)\s*j(?:am)?\s*(\d+)\s*m/); // "xj ym"
+      if (mHy) return Number(mHy[1]) * 60 + Number(mHy[2]);
+      const mH = s.match(/^(\d+)\s*j(?:am)?$/);            // "xj"
+      if (mH) return Number(mH[1]) * 60;
+      const mM = s.match(/^(\d+)\s*m/);                    // "ym"
+      if (mM) return Number(mM[1]);
+      const n = Number(s.replace(',', '.'));               // "90" / "90,5"
+      if (Number.isFinite(n)) return n;
+      return null;
+    }
+    const n = Number(val);
+    return Number.isFinite(n) ? n : null;
   };
+
+  const pickGap = (r) => {
+    const candidates = [
+      'avgGapMin','avgAmbilCO','AvgAmbilCO','intervalAmbilCO','IntervalAmbilCO',
+      'avg_gap_min','avg_gap_minutes','avgGapMinutes','avg_ambil_co','avgAmbilCo','avg_ambilCO'
+    ];
+    for (const k of candidates) {
+      if (k in r) {
+        const got = parseGapAny(r[k]);
+        if (got != null) return got;
+      }
+    }
+    return null;
+  };
+
+  // console.log('Sampel kolom HISTORY:', (json.items?.[0]?.rows?.[0]) || {}); // debug opsional
 
   return (json.items||[]).map(h => ({
     ts: h.ts,
@@ -297,7 +321,7 @@ async function loadHistory(){
         slaCount: r.slaCount, 
         inProgressCount: r.inProgressCount, 
         RelasiRslvd: r.RelasiRslvd,
-        avgGapMin: pickGap(r)  // <-- kunci perbaikan
+        avgGapMin: pickGap(r)
       }
     }))
   }));
@@ -382,11 +406,11 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
       });
 
       const mode=document.getElementById("shiftInput").value.trim().toUpperCase();
-     if(mode==="IDX"){
-  sheetData = buildUniqueNamesFromCSV(csvData);
-  document.getElementById("generateBtn").disabled = sheetData.length===0;
-}
-    document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
+      if(mode==="IDX"){
+        sheetData = buildUniqueNamesFromCSV(csvData);
+        document.getElementById("generateBtn").disabled = sheetData.length===0;
+      }
+      document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
     }});
 });
 
@@ -565,7 +589,6 @@ function renderTable(results){
   <td>${res.inProgressCount||0}</td>
   <td>${res.RelasiRslvd||0}</td>
 `;
-
     tbody.appendChild(tr);
   });
   ["Nama","LastCO","IndexCO","AvgAmbilCO","TotalCO","SLA","InProgress","RelasiRslvd"].forEach(k=>{
@@ -666,10 +689,3 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
-
-
-
-
-
-
-
