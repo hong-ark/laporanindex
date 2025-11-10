@@ -531,9 +531,19 @@ function renderTable(results){
     const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
     const gapText = formatGapMinutes(res.avgGapMin);
     const tr=document.createElement("tr");if(res.slaCount>0)tr.className="table-danger";
-    tr.innerHTML=`<td>${index+1}</td><td>${k.nama}</td><td>${k.shift||'-'}</td>
-      <td>${res.lastTime}</td><td>${gapText}</td><td>${avg}</td><td>${res.count||0}</td>
-      <td>${res.slaCount||0}</td><td>${res.inProgressCount||0}</td><td>${res.RelasiRslvd||0}</td>`;
+    tr.innerHTML = `
+  <td>${index+1}</td>
+  <td>${k.nama}</td>
+  <td>${k.shift||'-'}</td>
+  <td>${res.lastTime}</td>
+  <td>${avg}</td>           <!-- IndexCO (lebih dulu) -->
+  <td>${gapText}</td>       <!-- AvgAmbilCO (sesudah IndexCO) -->
+  <td>${res.count||0}</td>
+  <td>${res.slaCount||0}</td>
+  <td>${res.inProgressCount||0}</td>
+  <td>${res.RelasiRslvd||0}</td>
+`;
+
     tbody.appendChild(tr);
   });
   ["Nama","LastCO","IndexCO","AvgAmbilCO","TotalCO","SLA","InProgress","RelasiRslvd"].forEach(k=>{
@@ -634,6 +644,7 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
+
 
 
 
