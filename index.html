@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
@@ -204,7 +204,7 @@ function lolosFilterShiftSiangByTanggalDiambil(record){
   return false;
 }
 
-/* ====== HISTORY API ====== */
+/* ====== HISTORY API (robust normalizing) ====== */
 async function saveHistoryEntry(entry){
   // compact only necessary fields (tidak menyertakan avgAmbil karena sudah dihapus)
   const compactResults = (entry.results || []).map(x => ({
@@ -215,7 +215,7 @@ async function saveHistoryEntry(entry){
     lastTime: x.res?.lastTime ?? "-",
     slaCount: x.res?.slaCount ?? 0,
     inProgressCount: x.res?.inProgressCount ?? 0,
-    relasiResolved: x.res?.RelasiRslvd ?? 0
+    relasiResolved: x.res?.RelasiRslvd ?? x.res?.relasiResolved ?? 0
   }));
   const payload = {
     action: "saveHistory",
@@ -235,34 +235,76 @@ async function saveHistoryEntry(entry){
   });
   await res.text();
 }
+
 async function loadHistory(){
   const url = `${HISTORY_GAS_URL}?action=getHistory`;
   const res = await fetch(url);
   const json = await res.json();
-  return (json.items||[]).map(h => ({
-    ts: h.ts,
-    mode: h.mode,
-    shiftLabel: h.shiftLabel,
-    tanggal: h.tanggal,
-    toggleSiang14: h.toggleSiang14,
-    results: (h.rows||[]).map(r => ({
-      k: { nama: r.nama, shift: r.shift },
-      res: {
-        avg: r.avg,
-        count: r.count,
-        lastTime: r.lastTime,
-        slaCount: r.slaCount,
-        inProgressCount: r.inProgressCount,
-        relasiResolved: r.relasiResolved || r.relasiResolved === 0 ? r.relasiResolved : (r.RelasiRslvd || 0)
+
+  // helpers untuk ambil nilai numerik aman
+  const pickNum = (v) => {
+    if (v == null || v === "") return 0;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const pickAvg = (v) => {
+    if (v == null || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  // memungkinkan berbagai nama tempat hasil: rows / results / data
+  return (json.items||[]).map(h => {
+    const rawRows = h.rows || h.results || h.data || [];
+    const normalizedRows = (rawRows || []).map(r => {
+      // beberapa format: flat (nama, shift, avg, ...) atau already nested {k:{},res:{}}
+      if (r && r.k && r.res) {
+        return {
+          k: { nama: r.k.nama ?? r.nama ?? "", shift: r.k.shift ?? r.shift ?? "" },
+          res: {
+            avg: pickAvg(r.res.avg ?? r.avg),
+            count: pickNum(r.res.count ?? r.count),
+            lastTime: r.res.lastTime ?? r.lastTime ?? "-",
+            slaCount: pickNum(r.res.slaCount ?? r.slaCount),
+            inProgressCount: pickNum(r.res.inProgressCount ?? r.inProgressCount),
+            relasiResolved: pickNum(r.res.relasiResolved ?? r.res.RelasiRslvd ?? r.relasiResolved ?? r.RelasiRslvd)
+          }
+        };
       }
-    }))
-  }));
+
+      // flat row mapping
+      const nama = r.nama ?? r.name ?? "";
+      const shift = r.shift ?? "";
+      return {
+        k: { nama: nama, shift: shift },
+        res: {
+          avg: pickAvg(r.avg),
+          count: pickNum(r.count),
+          lastTime: r.lastTime ?? "-",
+          slaCount: pickNum(r.slaCount ?? r.sla),
+          inProgressCount: pickNum(r.inProgressCount ?? r.in_progress),
+          relasiResolved: pickNum(r.relasiResolved ?? r.RelasiRslvd ?? r.relasiResolved)
+        }
+      };
+    });
+
+    return {
+      ts: h.ts,
+      mode: h.mode,
+      shiftLabel: h.shiftLabel,
+      tanggal: h.tanggal,
+      toggleSiang14: h.toggleSiang14,
+      results: normalizedRows
+    };
+  });
 }
+
 function showHistoryModal(){
   renderHistoryList();
   const modal = new bootstrap.Modal(document.getElementById("historyModal"));
   modal.show();
 }
+
 async function renderHistoryList(){
   const list = document.getElementById("historyList");
   list.innerHTML = '<div class="text-muted">Memuat...</div>';
@@ -277,24 +319,45 @@ async function renderHistoryList(){
       const btn = document.createElement("button");
       btn.type="button";
       btn.className="list-group-item list-group-item-action";
-      const modeLabel = (h.mode==="IDX") ? "Index hari ini" : h.shiftLabel;
+      // ringkas tampilan: "Shift X Tanggal: Y Personil: Z"
+      const shiftText = h.shiftLabel || (h.mode === "IDX" ? "Index" : (h.mode || ""));
       btn.innerHTML = `
         <div class="d-flex w-100 justify-content-between">
-          <h6 class="mb-1">${modeLabel}</h6>
+          <h6 class="mb-1">Shift ${shiftText}</h6>
           <small>${prettyDateTime(h.ts)}</small>
         </div>
         <div class="mb-1">Tanggal: ${prettyTanggalLabel(h.tanggal)} • Personil: ${h.results?.length||0}</div>
       `;
       btn.addEventListener("click", ()=>{
-        lastResults = h.results || [];
+        // lastResults diisi dengan bentuk yang renderTable harapkan
+        lastResults = (h.results || []).map(it => {
+          const k = it.k || { nama: "", shift: "" };
+          const res = it.res || {};
+          return {
+            k: { nama: k.nama ?? "", shift: k.shift ?? "" },
+            res: {
+              avg: (res.avg == null || res.avg === "") ? null : Number(res.avg),
+              count: Number.isFinite(Number(res.count)) ? Number(res.count) : (res.count ? Number(res.count) : 0),
+              lastTime: res.lastTime ?? "-",
+              slaCount: Number.isFinite(Number(res.slaCount)) ? Number(res.slaCount) : 0,
+              inProgressCount: Number.isFinite(Number(res.inProgressCount)) ? Number(res.inProgressCount) : 0,
+              RelasiRslvd: Number.isFinite(Number(res.relasiResolved ?? res.RelasiRslvd)) ? Number(res.relasiResolved ?? res.RelasiRslvd) : 0
+            }
+          };
+        });
+
+        // debug di console jika empty
+        if(!lastResults.length) console.warn("History item clicked — results kosong atau tak dikenali:", h);
+
         renderTable(lastResults);
+
         const judul = document.getElementById("judulLaporan");
         judul.classList.add("is-history");
         document.getElementById("resultArea").classList.add("is-history");
         judul.textContent =
           (h.mode==="IDX")
             ? `[HISTORY] Laporan Index CO — Index Hari Ini — Tanggal ${prettyTanggalLabel(h.tanggal)}`
-            : `[HISTORY] Laporan Index CO ${h.shiftLabel} — Tanggal ${prettyTanggalLabel(h.tanggal)}`;
+            : `[HISTORY] Laporan Index CO ${h.shiftLabel || h.mode} — Tanggal ${prettyTanggalLabel(h.tanggal)}`;
         document.getElementById("statusText").textContent = `Ditampilkan dari history (${prettyDateTime(h.ts)}).`;
         bootstrap.Modal.getInstance(document.getElementById("historyModal"))?.hide();
       });
@@ -343,7 +406,7 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
         document.getElementById("generateBtn").disabled = sheetData.length===0;
       }
       document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
-    }});
+    }}); 
 });
 
 /* ====== BUILD NAMA (MODE IDX) ====== */
@@ -537,7 +600,7 @@ function sortColumn(key){
     case"TotalCO":asc=sortAscTotalCO;valFunc=r=>r.res.count||0;sortAscTotalCO=!sortAscTotalCO;break;
     case"SLA":asc=sortAscSLA;valFunc=r=>r.res.slaCount||0;sortAscSLA=!sortAscSLA;break;
     case"InProgress":asc=sortAscInProgress;valFunc=r=>r.res.inProgressCount||0;sortAscInProgress=!sortAscInProgress;break;
-    case"RelasiRslvd":asc=sortAscRelasiRslvd;valFunc=r=>r.res.relasiResolved||0;sortAscRelasiRslvd=!sortAscRelasiRslvd;break;
+    case"RelasiRslvd":asc=sortAscRelasiRslvd;valFunc=r=>r.res.relasiResolved||r.res.RelasiRslvd||0;sortAscRelasiRslvd=!sortAscRelasiRslvd;break;
     default:return;
   }
   if(key==="Nama")lastResults.sort((a,b)=>asc?valFunc(a).localeCompare(valFunc(b)):valFunc(b).localeCompare(valFunc(a)));
@@ -618,4 +681,3 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
-
