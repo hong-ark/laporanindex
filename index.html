@@ -241,49 +241,66 @@ async function loadHistory(){
   const res = await fetch(url);
   const json = await res.json();
 
-  // helpers untuk ambil nilai numerik aman
-  const pickNum = (v) => {
-    if (v == null || v === "") return 0;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : 0;
-  };
-  const pickAvg = (v) => {
-    if (v == null || v === "") return null;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
+  // util: ambil field Rows dari berbagai kemungkinan
+  const extractRowsFromRecord = (h) => {
+    // kemungkinan nama kolom di GAS: rows, Rows, RowsJson, rowsjson, Rows_Json, Rows_JSON
+    if (Array.isArray(h.rows) && h.rows.length) return h.rows;
+    if (Array.isArray(h.Rows) && h.Rows.length) return h.Rows;
+
+    // cari properti string yang mungkin berisi JSON
+    const candidates = ['RowsJson','rowsJson','rowsjson','Rows_JSON','Rows_Json','rows_json','RowsJsonString','rowsJsonString'];
+    for (const key of candidates){
+      if (typeof h[key] === 'string' && h[key].trim()){
+        try {
+          const parsed = JSON.parse(h[key]);
+          if (Array.isArray(parsed)) return parsed;
+          // kadang server simpan objek { rows: [...] }
+          if (parsed && Array.isArray(parsed.rows)) return parsed.rows;
+        } catch(e){
+          // bukan JSON; coba split ter-escape semicolon/comma (last resort)
+          try {
+            // coba eval safe-ish (NOT recommended normally) - skip
+          } catch(e2){}
+        }
+      }
+    }
+
+    // fallback: jika ada kolom 'rows' kosong, kembalikan []
+    return [];
   };
 
-  // memungkinkan berbagai nama tempat hasil: rows / results / data
   return (json.items||[]).map(h => {
-    const rawRows = h.rows || h.results || h.data || [];
-    const normalizedRows = (rawRows || []).map(r => {
-      // beberapa format: flat (nama, shift, avg, ...) atau already nested {k:{},res:{}}
-      if (r && r.k && r.res) {
-        return {
-          k: { nama: r.k.nama ?? r.nama ?? "", shift: r.k.shift ?? r.shift ?? "" },
-          res: {
-            avg: pickAvg(r.res.avg ?? r.avg),
-            count: pickNum(r.res.count ?? r.count),
-            lastTime: r.res.lastTime ?? r.lastTime ?? "-",
-            slaCount: pickNum(r.res.slaCount ?? r.slaCount),
-            inProgressCount: pickNum(r.res.inProgressCount ?? r.inProgressCount),
-            relasiResolved: pickNum(r.res.relasiResolved ?? r.res.RelasiRslvd ?? r.relasiResolved ?? r.RelasiRslvd)
-          }
-        };
+    const rawRows = extractRowsFromRecord(h);
+
+    // map rows -> standar yang kita pakai (k and res)
+    const mappedRows = (rawRows||[]).map(r => {
+      // r bisa berbentuk objek dengan fields langsung, atau stringified JSON per-row
+      let rowObj = r;
+      if (typeof r === 'string') {
+        try { rowObj = JSON.parse(r); } catch(e){ rowObj = { nama: r }; }
       }
 
-      // flat row mapping
-      const nama = r.nama ?? r.name ?? "";
-      const shift = r.shift ?? "";
+      // toleransi nama field
+      const nama = rowObj.nama ?? rowObj.name ?? rowObj.Nama ?? "";
+      const shift = rowObj.shift ?? rowObj.Shift ?? rowObj.shiftLabel ?? "";
+
+      // coba ambil angka dari beragam nama
+      const avg = rowObj.avg ?? rowObj.Avg ?? rowObj.IndexCO ?? null;
+      const count = rowObj.count ?? rowObj.TotalCO ?? rowObj.total ?? 0;
+      const lastTime = rowObj.lastTime ?? rowObj.LastCO ?? rowObj.last ?? "-";
+      const slaCount = rowObj.slaCount ?? rowObj.SLA ?? 0;
+      const inProgressCount = rowObj.inProgressCount ?? rowObj.InProgress ?? 0;
+      const rel = rowObj.relasiResolved ?? rowObj.RelasiRslvd ?? rowObj.relasiResolved ?? 0;
+
       return {
         k: { nama: nama, shift: shift },
         res: {
-          avg: pickAvg(r.avg),
-          count: pickNum(r.count),
-          lastTime: r.lastTime ?? "-",
-          slaCount: pickNum(r.slaCount ?? r.sla),
-          inProgressCount: pickNum(r.inProgressCount ?? r.in_progress),
-          relasiResolved: pickNum(r.relasiResolved ?? r.RelasiRslvd ?? r.relasiResolved)
+          avg: avg,
+          count: count,
+          lastTime: lastTime,
+          slaCount: slaCount,
+          inProgressCount: inProgressCount,
+          relasiResolved: rel
         }
       };
     });
@@ -294,7 +311,7 @@ async function loadHistory(){
       shiftLabel: h.shiftLabel,
       tanggal: h.tanggal,
       toggleSiang14: h.toggleSiang14,
-      results: normalizedRows
+      results: mappedRows
     };
   });
 }
@@ -707,4 +724,5 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
+
 
