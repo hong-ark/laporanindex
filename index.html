@@ -23,7 +23,6 @@
     }
     #resultTable.table thead tr th:hover { background-color: #1565c0 !important; }
 
-    /* Header abu-abu saat lihat HISTORY */
     #resultArea.is-history thead tr th {
       background-color: #9e9e9e !important;
       border-color: #757575 !important;
@@ -127,26 +126,23 @@
   </div>
 </div>
 
-<!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-/* ====== KONFIG ====== */
+/* CONFIG */
 const GAS_URL="https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFMrU-NNqxMW2ZtSCRIpESCpC4Nz7VzdKRmt-Zx1rJXjnRd-g/exec";
 const HISTORY_GAS_URL="https://script.google.com/macros/s/AKfycbwrXZlIB4nyiQtb-MM79c8rm1rDuoVyEZRxdk4-yTHaM_teOWR-XxC_BK50RsVlmo-P/exec";
 
 let sheetData=[], csvData=[], lastResults=[];
 let shiftLabel="";
 
-/* ====== SORT STATE ====== */
-let sortAscNama=true, sortAscLastCO=false, sortAscIndexCO=false, sortAscTotalCO=true,
-    sortAscSLA=false, sortAscInProgress=false, sortAscRelasiRslvd=false;
+let sortAscNama=true,sortAscLastCO=false,sortAscIndexCO=false,sortAscTotalCO=true,
+    sortAscSLA=false,sortAscInProgress=false,sortAscRelasiRslvd=false;
 
-/* ====== INIT TANGGAL ====== */
 document.getElementById("tanggalCek").textContent =
   new Date().toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});
 
-/* ====== UTIL ====== */
+/* UTIL */
 function normKey(s){return(s||"").toString().toLowerCase().replace(/[^a-z0-9]/g,'');}
 function normalizeName(s){return(s||"").toString().toLowerCase().replace(/\s+/g,' ').replace(/[^\w\s]/g,'').trim();}
 function durasiKeDetik(v){if(!v)return 0;const s=v.toString().trim();
@@ -169,11 +165,6 @@ function similarity(a,b){a=normalizeName(a);b=normalizeName(b);if(!a||!b)return 
   const d=levenshtein(a,b);return 1-d/Math.max(a.length,b.length);}
 function ambilJamDariTanggal(s){if(!s)return"-";const m=s.match(/(\d{1,2}):(\d{2})/);
   return m?`${m[1].padStart(2,'0')}:${m[2]}`:"-";}
-function jamMenitDariTanggal(s){
-  const m = (s||"").match(/(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?/);
-  if(!m) return null;
-  return { h: parseInt(m[1],10), m: parseInt(m[2],10) };
-}
 function prettyTanggalLabel(value){
   if(typeof value === "string" && value.includes("T")){
     const d = new Date(value);
@@ -190,7 +181,12 @@ function prettyDateTime(ts){
   return d.toLocaleString("id-ID",{ day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
 }
 
-/* ====== FILTER SIANG >=14:00 (hanya saat S + toggle ON) ====== */
+/* FILTER SIANG >=14:00 */
+function jamMenitDariTanggal(s){
+  const m = (s||"").match(/(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?/);
+  if(!m) return null;
+  return { h: parseInt(m[1],10), m: parseInt(m[2],10) };
+}
 function lolosFilterShiftSiangByTanggalDiambil(record){
   const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
   if(shift !== "S") return true;
@@ -204,22 +200,18 @@ function lolosFilterShiftSiangByTanggalDiambil(record){
   return false;
 }
 
-/* ====== HISTORY API (robust normalizing) ====== */
+/* HISTORY: save in simple rows array (compatible with old loader) */
 async function saveHistoryEntry(entry){
-  // compact only necessary fields (simpan kedua varian relasi agar kompatibel)
-  const compactResults = (entry.results || []).map(x => (Object.assign({
+  const compactResults = (entry.results || []).map(x => ({
     nama: x.k?.nama || "",
     shift: x.k?.shift || "",
     avg: x.res?.avg ?? null,
     count: x.res?.count ?? 0,
     lastTime: x.res?.lastTime ?? "-",
     slaCount: x.res?.slaCount ?? 0,
-    inProgressCount: x.res?.inProgressCount ?? 0
-  }, {
-    // simpan keduanya
-    relasiResolved: x.res?.RelasiRslvd ?? x.res?.relasiResolved ?? 0,
-    RelasiRslvd: x.res?.RelasiRslvd ?? x.res?.relasiResolved ?? 0
-  })));
+    inProgressCount: x.res?.inProgressCount ?? 0,
+    relasiResolved: x.res?.RelasiRslvd ?? x.res?.relasiResolved ?? 0
+  }));
   const payload = {
     action: "saveHistory",
     data: {
@@ -239,80 +231,38 @@ async function saveHistoryEntry(entry){
   await res.text();
 }
 
+/* HISTORY: load — expect GAS returns { ok:true, items:[ { ts,mode,shiftLabel,tanggal,toggleSiang14, rows: [...] } ] }
+   This mirrors the old working loader. If GAS stores results in a different property name, adapt accordingly. */
 async function loadHistory(){
   const url = `${HISTORY_GAS_URL}?action=getHistory`;
   const res = await fetch(url);
   const json = await res.json();
   console.log("History raw response:", json);
-
-  // util: ambil field Rows dari berbagai kemungkinan
-  const extractRowsFromRecord = (h) => {
-    // kemungkinan nama kolom di GAS: rows, Rows, RowsJson, rowsjson, Rows_Json, Rows_JSON
-    if (Array.isArray(h.rows)) return h.rows;
-    if (Array.isArray(h.Rows)) return h.Rows;
-
-    // cari properti string yang mungkin berisi JSON
-    const candidates = ['RowsJson','rowsJson','rowsjson','Rows_JSON','Rows_Json','rows_json','RowsJsonString','rowsJsonString','Rows'];
-    for (const key of candidates){
-      if (typeof h[key] === 'string' && h[key].trim()){
-        try {
-          const parsed = JSON.parse(h[key]);
-          if (Array.isArray(parsed)) return parsed;
-          if (parsed && Array.isArray(parsed.rows)) return parsed.rows;
-        } catch(e){
-          // bukan JSON, lanjutkan
+  return (json.items||[]).map(h => ({
+    ts: h.ts,
+    mode: h.mode,
+    shiftLabel: h.shiftLabel,
+    tanggal: h.tanggal,
+    toggleSiang14: h.toggleSiang14,
+    // accept either h.rows (array) OR h.rowsJson (stringified array) OR h.Results etc.
+    results: (function(){
+      if (Array.isArray(h.rows) && h.rows.length) return h.rows;
+      if (Array.isArray(h.Results) && h.Results.length) return h.Results;
+      // try parsing common string fields:
+      const candidates = ['RowsJson','rowsJson','rows','Rows','ResultsJson','resultsJson'];
+      for (const key of candidates){
+        if (typeof h[key] === 'string' && h[key].trim()){
+          try {
+            const parsed = JSON.parse(h[key]);
+            if(Array.isArray(parsed)) return parsed;
+            if(parsed && Array.isArray(parsed.rows)) return parsed.rows;
+          } catch(e){}
         }
       }
-    }
-
-    // fallback: jika ada kolom 'rows' kosong, kembalikan []
-    return [];
-  };
-
-  return (json.items||[]).map(h => {
-    const rawRows = extractRowsFromRecord(h);
-    // jika tidak ada rawRows tapi ada kolom rows di spreadsheet sebagai string, coba parse h.rows juga:
-    if ((!rawRows || rawRows.length === 0) && typeof h.rows === 'string' && h.rows.trim()){
-      try { rawRows.push(...JSON.parse(h.rows)); } catch(e){}
-    }
-
-    // map rows -> standar yang kita pakai (k and res)
-    const mappedRows = (rawRows||[]).map(r => {
-      let rowObj = r;
-      if (typeof r === 'string') {
-        try { rowObj = JSON.parse(r); } catch(e){ rowObj = { nama: r }; }
-      }
-      const nama = rowObj.nama ?? rowObj.name ?? rowObj.NAMA ?? "";
-      const shift = rowObj.shift ?? rowObj.Shift ?? rowObj.shiftLabel ?? "";
-      const avg = rowObj.avg ?? rowObj.Avg ?? rowObj.IndexCO ?? null;
-      const count = rowObj.count ?? rowObj.TotalCO ?? rowObj.total ?? 0;
-      const lastTime = rowObj.lastTime ?? rowObj.LastCO ?? rowObj.last ?? "-";
-      const slaCount = rowObj.slaCount ?? rowObj.SLA ?? 0;
-      const inProgressCount = rowObj.inProgressCount ?? rowObj.InProgress ?? 0;
-      const rel = rowObj.RelasiRslvd ?? rowObj.relasiResolved ?? rowObj.relasi_resolved ?? 0;
-
-      return {
-        k: { nama: nama, shift: shift },
-        res: {
-          avg: (avg==="" ? null : (avg==null?null:Number(avg))),
-          count: Number.isFinite(Number(count)) ? Number(count) : 0,
-          lastTime: lastTime,
-          slaCount: Number.isFinite(Number(slaCount)) ? Number(slaCount) : 0,
-          inProgressCount: Number.isFinite(Number(inProgressCount)) ? Number(inProgressCount) : 0,
-          RelasiRslvd: Number.isFinite(Number(rel)) ? Number(rel) : 0
-        }
-      };
-    });
-
-    return {
-      ts: h.ts,
-      mode: h.mode,
-      shiftLabel: h.shiftLabel,
-      tanggal: h.tanggal,
-      toggleSiang14: h.toggleSiang14,
-      results: mappedRows
-    };
-  });
+      // fallback: if the server wrote individual columns (nama,..) then compose minimal rows
+      return [];
+    })()
+  }));
 }
 
 function showHistoryModal(){
@@ -331,11 +281,10 @@ async function renderHistoryList(){
       return;
     }
     list.innerHTML = "";
-    arr.forEach((h, idx)=>{
+    arr.forEach(h=>{
       const btn = document.createElement("button");
       btn.type="button";
       btn.className="list-group-item list-group-item-action";
-      // ringkas tampilan: "Shift X Tanggal: Y Personil: Z"
       const shiftText = h.shiftLabel || (h.mode === "IDX" ? "Index" : (h.mode || ""));
       btn.innerHTML = `
         <div class="d-flex w-100 justify-content-between">
@@ -346,38 +295,45 @@ async function renderHistoryList(){
       `;
       btn.addEventListener("click", ()=>{
         console.log("History item raw:", h);
-        // lastResults sudah dalam bentuk {k,res}
-        lastResults = (h.results || []).map(it=>{
-          // jika struktur sudah k/res
+
+        // Map to shape { k: {nama,shift}, res: {avg,count,lastTime,slaCount,inProgressCount,RelasiRslvd} }
+        lastResults = (h.results || []).map(it => {
+          // if it already in nested form (k/res)
           if(it && it.k && it.res){
+            const namaRaw = (it.k.nama ?? it.k.name ?? "").toString().trim();
+            const nama = namaRaw || "-";
+            const shift = (it.k.shift ?? it.k.Shift ?? "").toString().trim() || "-";
+            const res = it.res;
             return {
-              k: { nama: it.k.nama ?? it.k.name ?? "", shift: it.k.shift ?? "" },
+              k: { nama, shift },
               res: {
-                avg: (it.res.avg===""?null:(it.res.avg==null?null:Number(it.res.avg))),
-                count: Number.isFinite(Number(it.res.count)) ? Number(it.res.count) : 0,
-                lastTime: it.res.lastTime ?? it.res.last ?? "-",
-                slaCount: Number.isFinite(Number(it.res.slaCount ?? it.res.sla)) ? Number(it.res.slaCount ?? it.res.sla) : 0,
-                inProgressCount: Number.isFinite(Number(it.res.inProgressCount ?? it.res.inProgress)) ? Number(it.res.inProgressCount ?? it.res.inProgress) : 0,
-                RelasiRslvd: Number.isFinite(Number(it.res.RelasiRslvd ?? it.res.relasiResolved ?? it.res.relasi_resolved)) ? Number(it.res.RelasiRslvd ?? it.res.relasiResolved ?? it.res.relasi_resolved) : 0
+                avg: res.avg===""? null : (res.avg==null? null : Number(res.avg)),
+                count: Number.isFinite(Number(res.count)) ? Number(res.count) : 0,
+                lastTime: res.lastTime ?? res.last ?? "-",
+                slaCount: Number.isFinite(Number(res.slaCount ?? res.sla)) ? Number(res.slaCount ?? res.sla) : 0,
+                inProgressCount: Number.isFinite(Number(res.inProgressCount ?? res.inProgress)) ? Number(res.inProgressCount ?? res.inProgress) : 0,
+                RelasiRslvd: Number.isFinite(Number(res.relasiResolved ?? res.RelasiRslvd ?? 0)) ? Number(res.relasiResolved ?? res.RelasiRslvd ?? 0) : 0
               }
             };
           }
-          // fallback flat object
-          const nama = it.nama ?? it.name ?? it.NAMA ?? "";
-          const shift = it.shift ?? it.Shift ?? "";
-          const avg = it.avg ?? it.AVG ?? null;
-          const count = it.count ?? it.TotalCO ?? it.total ?? 0;
-          const lastTime = it.lastTime ?? it.last ?? "-";
-          const sla = it.slaCount ?? it.sla ?? 0;
-          const inProg = it.inProgressCount ?? it.inProgress ?? 0;
-          const rel = it.RelasiRslvd ?? it.relasiResolved ?? it.relasi_resolved ?? 0;
+
+          // if flat object (expected when saved by saveHistoryEntry above)
+          const namaRaw = (it.nama ?? it.name ?? "").toString().trim();
+          const nama = namaRaw || "-";
+          const shift = (it.shift ?? it.Shift ?? "").toString().trim() || "-";
+          const avg = it.avg ?? null;
+          const count = it.count ?? 0;
+          const lastTime = it.lastTime ?? "-";
+          const sla = it.slaCount ?? 0;
+          const inProg = it.inProgressCount ?? 0;
+          const rel = it.relasiResolved ?? it.RelasiRslvd ?? 0;
 
           return {
-            k: { nama: nama, shift: shift },
+            k: { nama, shift },
             res: {
-              avg: (avg===""?null:(avg==null?null:Number(avg))),
+              avg: (avg===""? null : (avg==null? null : Number(avg))),
               count: Number.isFinite(Number(count)) ? Number(count) : 0,
-              lastTime: lastTime,
+              lastTime: lastTime || "-",
               slaCount: Number.isFinite(Number(sla)) ? Number(sla) : 0,
               inProgressCount: Number.isFinite(Number(inProg)) ? Number(inProg) : 0,
               RelasiRslvd: Number.isFinite(Number(rel)) ? Number(rel) : 0
@@ -402,10 +358,11 @@ async function renderHistoryList(){
     });
   }catch(err){
     list.innerHTML = `<div class="text-danger">Gagal memuat history: ${err.message}</div>`;
+    console.error(err);
   }
 }
 
-/* ====== CSV LOAD ====== */
+/* CSV LOAD */
 document.getElementById("csvFile").addEventListener("change",(e)=>{
   const file=e.target.files[0];if(!file)return;
   Papa.parse(file,{header:true,delimiter:";",skipEmptyLines:true,
@@ -446,7 +403,7 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
     }});
 });
 
-/* ====== BUILD NAMA (MODE IDX) ====== */
+/* BUILD NAMA (MODE IDX) */
 function buildUniqueNamesFromCSV(rows){
   const map=new Map();
   for(const r of rows){
@@ -458,7 +415,7 @@ function buildUniqueNamesFromCSV(rows){
   return Array.from(map.values()).map(nm=>({nama:nm, nik:'', shift:'Index'}));
 }
 
-/* ====== AMBIL NAMA DARI GSHEET (Generate Jadwal untuk P/S/M/MH1) ====== */
+/* AMBIL NAMA DARI GSHEET */
 document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
   const shiftInput=document.getElementById("shiftInput").value.trim().toUpperCase();
   if(!shiftInput){ alert("Pilih mode dulu!"); return; }
@@ -503,7 +460,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
   }
 });
 
-/* ====== PERHITUNGAN ====== */
+/* PERHITUNGAN */
 function computeC(r){return r.waktuSlaDetik>0?r.durasiDetik/r.waktuSlaDetik:0;}
 function rataRata_byName(nama,thr=0.85){
   const matches=[];
@@ -516,16 +473,14 @@ function rataRata_byName(nama,thr=0.85){
 
     const currentShift=document.getElementById("shiftInput").value.trim().toUpperCase();
     if(currentShift==="IDX"){
-      if(normalizeName(r.diambilOleh)!==keyNama) continue; // exact match pada IDX
+      if(normalizeName(r.diambilOleh)!==keyNama) continue;
     }else{
-      if(similarity(nama,r.diambilOleh)<thr) continue;     // toleran typo pada shift
+      if(similarity(nama,r.diambilOleh)<thr) continue;
     }
     matches.push(r);
   }
 
-  if(!matches.length)return{
-    avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0,RelasiRslvd:0
-  };
+  if(!matches.length)return{avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0,RelasiRslvd:0};
 
   const sum=matches.reduce((a,b)=>a+computeC(b),0);
   const latest=matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
@@ -540,8 +495,7 @@ function rataRata_byName(nama,thr=0.85){
   };
 }
 
-/* ====== GENERATE TABEL ====== */
-/* History only saved when CSV was uploaded (csvData.length > 0) */
+/* GENERATE TABEL */
 document.getElementById("generateBtn").addEventListener("click", async ()=>{
   const mode=document.getElementById("shiftInput").value.trim().toUpperCase();
   if(!csvData.length) return alert("Upload CSV dulu!");
@@ -591,8 +545,6 @@ document.getElementById("generateBtn").addEventListener("click", async ()=>{
         toggleSiang14: document.getElementById("toggleSiang14").checked,
         results: results
       });
-    } else {
-      console.log("Perhitungan bukan berasal dari upload CSV — tidak menyimpan history.");
     }
   }catch(e){
     console.warn("Gagal simpan history:", e);
@@ -600,24 +552,32 @@ document.getElementById("generateBtn").addEventListener("click", async ()=>{
   }
 });
 
-/* ====== RENDER TABEL ====== */
+/* RENDER TABEL (aman — fallback bila nilai kosong) */
 function renderTable(results){
   const tbody=document.querySelector("#resultTable tbody");tbody.innerHTML="";
   results.forEach((item,index)=>{
     const {k,res}=item;
-    const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
-    const tr=document.createElement("tr");if(res.slaCount>0)tr.className="table-danger";
+    const nama = (k && k.nama) ? k.nama : "-";
+    const shift = (k && k.shift) ? k.shift : "-";
+    const lastTime = res && res.lastTime ? res.lastTime : "-";
+    const avg = (res && res.avg != null && !Number.isNaN(Number(res.avg))) ? (Math.round(Number(res.avg)*100)/100).toFixed(2) : "-";
+    const total = res && Number.isFinite(Number(res.count)) ? Number(res.count) : 0;
+    const sla = res && Number.isFinite(Number(res.slaCount)) ? Number(res.slaCount) : 0;
+    const inProg = res && Number.isFinite(Number(res.inProgressCount)) ? Number(res.inProgressCount) : 0;
+    const rel = res && Number.isFinite(Number(res.RelasiRslvd ?? res.relasiResolved)) ? Number(res.RelasiRslvd ?? res.relasiResolved) : 0;
+
+    const tr=document.createElement("tr");if(sla>0)tr.className="table-danger";
     tr.innerHTML = `
-  <td>${index+1}</td>
-  <td>${k.nama}</td>
-  <td>${k.shift||'-'}</td>
-  <td>${res.lastTime}</td>
-  <td>${avg}</td>
-  <td>${res.count||0}</td>
-  <td>${res.slaCount||0}</td>
-  <td>${res.inProgressCount||0}</td>
-  <td>${(res.RelasiRslvd||res.relasiResolved||res.Relasi_Rslvd||0)}</td>
-`;
+      <td>${index+1}</td>
+      <td>${nama}</td>
+      <td>${shift}</td>
+      <td>${lastTime}</td>
+      <td>${avg}</td>
+      <td>${total}</td>
+      <td>${sla}</td>
+      <td>${inProg}</td>
+      <td>${rel}</td>
+    `;
     tbody.appendChild(tr);
   });
   ["Nama","LastCO","IndexCO","TotalCO","SLA","InProgress","RelasiRslvd"].forEach(k=>{
@@ -626,7 +586,7 @@ function renderTable(results){
   });
 }
 
-/* ====== SORTING ====== */
+/* SORTING */
 function sortColumn(key){
   if(!lastResults.length)return alert("Belum ada data tabel.");
   let asc,valFunc;
@@ -647,7 +607,7 @@ function sortColumn(key){
   if(hdr) hdr.textContent = `${key} ${asc?"↑":"↓"}`;
 }
 
-/* ====== DOWNLOAD JPG ====== */
+/* DOWNLOAD JPG */
 document.getElementById("downloadBtn").addEventListener("click", async () => {
   const area = document.querySelector("#resultArea");
   const canvas = await html2canvas(area, { scale: 2 });
@@ -657,7 +617,7 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
   link.click();
 });
 
-/* ====== UI: Toggle Siang aktif hanya saat S; tombol Generate disabled saat IDX ====== */
+/* UI helpers */
 function updateToggleSiangAvailability(){
   const mode = document.getElementById("shiftInput").value.trim().toUpperCase();
   const cb    = document.getElementById("toggleSiang14");
@@ -666,7 +626,6 @@ function updateToggleSiangAvailability(){
   const note  = document.getElementById("modeNote");
   const isSiang = (mode === "S");
 
-  // Toggle hanya aktif saat S
   cb.disabled = !isSiang;
   cb.checked  = isSiang;
   label.classList.toggle("text-muted", !isSiang);
@@ -674,25 +633,22 @@ function updateToggleSiangAvailability(){
                      : (mode==="IDX" ? "Tidak berlaku pada mode Index hari ini"
                                      : "Tidak berlaku untuk shift selain Siang (S)");
 
-  // Tombol Generate GSheet: disable saat IDX, aktif saat P/S/M/MH1
   if(mode==="IDX"){
     btnGsheet.disabled = true;
     btnGsheet.title = "Mode Index: tidak perlu Generate Jadwal";
-    document.getElementById("generateBtn").disabled = sheetData.length===0; // aktif setelah CSV → build nama
+    document.getElementById("generateBtn").disabled = sheetData.length===0;
   }else if(mode){
     btnGsheet.disabled = false;
     btnGsheet.title = "Ambil nama dari GSheet";
-    note.textContent = "";
-    document.getElementById("generateBtn").disabled = true; // tunggu ambil nama
+    document.getElementById("generateBtn").disabled = true;
   }else{
     btnGsheet.disabled = false;
     btnGsheet.title = "Pilih mode terlebih dahulu";
-    note.textContent = "";
     document.getElementById("generateBtn").disabled = true;
   }
 }
 
-/* ====== EVENTS ====== */
+/* EVENTS */
 document.getElementById("historyBtn").addEventListener("click", showHistoryModal);
 
 document.getElementById("shiftInput").addEventListener("change", ()=>{
