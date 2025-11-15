@@ -329,38 +329,64 @@ async function renderHistoryList(){
         <div class="mb-1">Tanggal: ${prettyTanggalLabel(h.tanggal)} • Personil: ${h.results?.length||0}</div>
       `;
       btn.addEventListener("click", ()=>{
-        // lastResults diisi dengan bentuk yang renderTable harapkan
-        lastResults = (h.results || []).map(it => {
-          const k = it.k || { nama: "", shift: "" };
-          const res = it.res || {};
-          return {
-            k: { nama: k.nama ?? "", shift: k.shift ?? "" },
-            res: {
-              avg: (res.avg == null || res.avg === "") ? null : Number(res.avg),
-              count: Number.isFinite(Number(res.count)) ? Number(res.count) : (res.count ? Number(res.count) : 0),
-              lastTime: res.lastTime ?? "-",
-              slaCount: Number.isFinite(Number(res.slaCount)) ? Number(res.slaCount) : 0,
-              inProgressCount: Number.isFinite(Number(res.inProgressCount)) ? Number(res.inProgressCount) : 0,
-              RelasiRslvd: Number.isFinite(Number(res.relasiResolved ?? res.RelasiRslvd)) ? Number(res.relasiResolved ?? res.RelasiRslvd) : 0
-            }
-          };
-        });
+  console.log("History item raw:", h);
 
-        // debug di console jika empty
-        if(!lastResults.length) console.warn("History item clicked — results kosong atau tak dikenali:", h);
+  // Normalisasi dan mapping ke bentuk yang renderTable harapkan
+  lastResults = (h.results || []).map(it => {
+    // if already normalized (k,res)
+    if(it && it.k && it.res) {
+      const k = it.k;
+      const res = it.res;
+      return {
+        k: { nama: k.nama ?? k.name ?? "", shift: k.shift ?? "" },
+        res: {
+          avg: (res.avg == null || res.avg === "") ? null : Number(res.avg),
+          count: Number.isFinite(Number(res.count)) ? Number(res.count) : (res.count ? Number(res.count) : 0),
+          lastTime: res.lastTime ?? res.last_time ?? res.last ?? "-",
+          slaCount: Number.isFinite(Number(res.slaCount ?? res.sla)) ? Number(res.slaCount ?? res.sla) : 0,
+          inProgressCount: Number.isFinite(Number(res.inProgressCount ?? res.in_progress)) ? Number(res.inProgressCount ?? res.in_progress) : 0,
+          RelasiRslvd: Number.isFinite(Number(res.relasiResolved ?? res.RelasiRslvd ?? res.relasi_resolved)) ? Number(res.relasiResolved ?? res.RelasiRslvd ?? res.relasi_resolved) : 0
+        }
+      };
+    }
 
-        renderTable(lastResults);
+    // flat row fallback (common cases)
+    const nama = it.nama ?? it.name ?? it.NAMA ?? "";
+    const shift = it.shift ?? it.Shift ?? "";
+    const avg = it.avg ?? it.AVG ?? null;
+    const count = it.count ?? it.TotalCO ?? it.total ?? 0;
+    const lastTime = it.lastTime ?? it.last_time ?? it.last ?? "-";
+    const sla = it.slaCount ?? it.sla ?? 0;
+    const inProg = it.inProgressCount ?? it.in_progress ?? 0;
+    const rel = it.relasiResolved ?? it.RelasiRslvd ?? it.relasi_resolved ?? 0;
 
-        const judul = document.getElementById("judulLaporan");
-        judul.classList.add("is-history");
-        document.getElementById("resultArea").classList.add("is-history");
-        judul.textContent =
-          (h.mode==="IDX")
-            ? `[HISTORY] Laporan Index CO — Index Hari Ini — Tanggal ${prettyTanggalLabel(h.tanggal)}`
-            : `[HISTORY] Laporan Index CO ${h.shiftLabel || h.mode} — Tanggal ${prettyTanggalLabel(h.tanggal)}`;
-        document.getElementById("statusText").textContent = `Ditampilkan dari history (${prettyDateTime(h.ts)}).`;
-        bootstrap.Modal.getInstance(document.getElementById("historyModal"))?.hide();
-      });
+    return {
+      k: { nama: nama, shift: shift },
+      res: {
+        avg: (avg == null || avg === "") ? null : Number(avg),
+        count: Number.isFinite(Number(count)) ? Number(count) : 0,
+        lastTime: lastTime,
+        slaCount: Number.isFinite(Number(sla)) ? Number(sla) : 0,
+        inProgressCount: Number.isFinite(Number(inProg)) ? Number(inProg) : 0,
+        RelasiRslvd: Number.isFinite(Number(rel)) ? Number(rel) : 0
+      }
+    };
+  });
+
+  console.log("Mapped lastResults:", lastResults);
+  renderTable(lastResults);
+
+  const judul = document.getElementById("judulLaporan");
+  judul.classList.add("is-history");
+  document.getElementById("resultArea").classList.add("is-history");
+  judul.textContent =
+    (h.mode==="IDX")
+      ? `[HISTORY] Laporan Index CO — Index Hari Ini — Tanggal ${prettyTanggalLabel(h.tanggal)}`
+      : `[HISTORY] Laporan Index CO ${h.shiftLabel || h.mode} — Tanggal ${prettyTanggalLabel(h.tanggal)}`;
+  document.getElementById("statusText").textContent = `Ditampilkan dari history (${prettyDateTime(h.ts)}).`;
+  bootstrap.Modal.getInstance(document.getElementById("historyModal"))?.hide();
+});
+
       list.appendChild(btn);
     });
   }catch(err){
@@ -681,3 +707,4 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
+
