@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
@@ -206,17 +206,20 @@ function lolosFilterShiftSiangByTanggalDiambil(record){
 
 /* ====== HISTORY API (robust normalizing) ====== */
 async function saveHistoryEntry(entry){
-  // compact only necessary fields (tidak menyertakan avgAmbil karena sudah dihapus)
-  const compactResults = (entry.results || []).map(x => ({
+  // compact only necessary fields (simpan kedua varian relasi agar kompatibel)
+  const compactResults = (entry.results || []).map(x => (Object.assign({
     nama: x.k?.nama || "",
     shift: x.k?.shift || "",
     avg: x.res?.avg ?? null,
     count: x.res?.count ?? 0,
     lastTime: x.res?.lastTime ?? "-",
     slaCount: x.res?.slaCount ?? 0,
-    inProgressCount: x.res?.inProgressCount ?? 0,
-    relasiResolved: x.res?.RelasiRslvd ?? x.res?.relasiResolved ?? 0
-  }));
+    inProgressCount: x.res?.inProgressCount ?? 0
+  }, {
+    // simpan keduanya
+    relasiResolved: x.res?.RelasiRslvd ?? x.res?.relasiResolved ?? 0,
+    RelasiRslvd: x.res?.RelasiRslvd ?? x.res?.relasiResolved ?? 0
+  })));
   const payload = {
     action: "saveHistory",
     data: {
@@ -240,27 +243,24 @@ async function loadHistory(){
   const url = `${HISTORY_GAS_URL}?action=getHistory`;
   const res = await fetch(url);
   const json = await res.json();
+  console.log("History raw response:", json);
 
   // util: ambil field Rows dari berbagai kemungkinan
   const extractRowsFromRecord = (h) => {
     // kemungkinan nama kolom di GAS: rows, Rows, RowsJson, rowsjson, Rows_Json, Rows_JSON
-    if (Array.isArray(h.rows) && h.rows.length) return h.rows;
-    if (Array.isArray(h.Rows) && h.Rows.length) return h.Rows;
+    if (Array.isArray(h.rows)) return h.rows;
+    if (Array.isArray(h.Rows)) return h.Rows;
 
     // cari properti string yang mungkin berisi JSON
-    const candidates = ['RowsJson','rowsJson','rowsjson','Rows_JSON','Rows_Json','rows_json','RowsJsonString','rowsJsonString'];
+    const candidates = ['RowsJson','rowsJson','rowsjson','Rows_JSON','Rows_Json','rows_json','RowsJsonString','rowsJsonString','Rows'];
     for (const key of candidates){
       if (typeof h[key] === 'string' && h[key].trim()){
         try {
           const parsed = JSON.parse(h[key]);
           if (Array.isArray(parsed)) return parsed;
-          // kadang server simpan objek { rows: [...] }
           if (parsed && Array.isArray(parsed.rows)) return parsed.rows;
         } catch(e){
-          // bukan JSON; coba split ter-escape semicolon/comma (last resort)
-          try {
-            // coba eval safe-ish (NOT recommended normally) - skip
-          } catch(e2){}
+          // bukan JSON, lanjutkan
         }
       }
     }
@@ -271,36 +271,35 @@ async function loadHistory(){
 
   return (json.items||[]).map(h => {
     const rawRows = extractRowsFromRecord(h);
+    // jika tidak ada rawRows tapi ada kolom rows di spreadsheet sebagai string, coba parse h.rows juga:
+    if ((!rawRows || rawRows.length === 0) && typeof h.rows === 'string' && h.rows.trim()){
+      try { rawRows.push(...JSON.parse(h.rows)); } catch(e){}
+    }
 
     // map rows -> standar yang kita pakai (k and res)
     const mappedRows = (rawRows||[]).map(r => {
-      // r bisa berbentuk objek dengan fields langsung, atau stringified JSON per-row
       let rowObj = r;
       if (typeof r === 'string') {
         try { rowObj = JSON.parse(r); } catch(e){ rowObj = { nama: r }; }
       }
-
-      // toleransi nama field
-      const nama = rowObj.nama ?? rowObj.name ?? rowObj.Nama ?? "";
+      const nama = rowObj.nama ?? rowObj.name ?? rowObj.NAMA ?? "";
       const shift = rowObj.shift ?? rowObj.Shift ?? rowObj.shiftLabel ?? "";
-
-      // coba ambil angka dari beragam nama
       const avg = rowObj.avg ?? rowObj.Avg ?? rowObj.IndexCO ?? null;
       const count = rowObj.count ?? rowObj.TotalCO ?? rowObj.total ?? 0;
       const lastTime = rowObj.lastTime ?? rowObj.LastCO ?? rowObj.last ?? "-";
       const slaCount = rowObj.slaCount ?? rowObj.SLA ?? 0;
       const inProgressCount = rowObj.inProgressCount ?? rowObj.InProgress ?? 0;
-      const rel = rowObj.relasiResolved ?? rowObj.RelasiRslvd ?? rowObj.relasiResolved ?? 0;
+      const rel = rowObj.RelasiRslvd ?? rowObj.relasiResolved ?? rowObj.relasi_resolved ?? 0;
 
       return {
         k: { nama: nama, shift: shift },
         res: {
-          avg: avg,
-          count: count,
+          avg: (avg==="" ? null : (avg==null?null:Number(avg))),
+          count: Number.isFinite(Number(count)) ? Number(count) : 0,
           lastTime: lastTime,
-          slaCount: slaCount,
-          inProgressCount: inProgressCount,
-          relasiResolved: rel
+          slaCount: Number.isFinite(Number(slaCount)) ? Number(slaCount) : 0,
+          inProgressCount: Number.isFinite(Number(inProgressCount)) ? Number(inProgressCount) : 0,
+          RelasiRslvd: Number.isFinite(Number(rel)) ? Number(rel) : 0
         }
       };
     });
@@ -332,7 +331,7 @@ async function renderHistoryList(){
       return;
     }
     list.innerHTML = "";
-    arr.forEach(h=>{
+    arr.forEach((h, idx)=>{
       const btn = document.createElement("button");
       btn.type="button";
       btn.className="list-group-item list-group-item-action";
@@ -346,64 +345,59 @@ async function renderHistoryList(){
         <div class="mb-1">Tanggal: ${prettyTanggalLabel(h.tanggal)} • Personil: ${h.results?.length||0}</div>
       `;
       btn.addEventListener("click", ()=>{
-  console.log("History item raw:", h);
+        console.log("History item raw:", h);
+        // lastResults sudah dalam bentuk {k,res}
+        lastResults = (h.results || []).map(it=>{
+          // jika struktur sudah k/res
+          if(it && it.k && it.res){
+            return {
+              k: { nama: it.k.nama ?? it.k.name ?? "", shift: it.k.shift ?? "" },
+              res: {
+                avg: (it.res.avg===""?null:(it.res.avg==null?null:Number(it.res.avg))),
+                count: Number.isFinite(Number(it.res.count)) ? Number(it.res.count) : 0,
+                lastTime: it.res.lastTime ?? it.res.last ?? "-",
+                slaCount: Number.isFinite(Number(it.res.slaCount ?? it.res.sla)) ? Number(it.res.slaCount ?? it.res.sla) : 0,
+                inProgressCount: Number.isFinite(Number(it.res.inProgressCount ?? it.res.inProgress)) ? Number(it.res.inProgressCount ?? it.res.inProgress) : 0,
+                RelasiRslvd: Number.isFinite(Number(it.res.RelasiRslvd ?? it.res.relasiResolved ?? it.res.relasi_resolved)) ? Number(it.res.RelasiRslvd ?? it.res.relasiResolved ?? it.res.relasi_resolved) : 0
+              }
+            };
+          }
+          // fallback flat object
+          const nama = it.nama ?? it.name ?? it.NAMA ?? "";
+          const shift = it.shift ?? it.Shift ?? "";
+          const avg = it.avg ?? it.AVG ?? null;
+          const count = it.count ?? it.TotalCO ?? it.total ?? 0;
+          const lastTime = it.lastTime ?? it.last ?? "-";
+          const sla = it.slaCount ?? it.sla ?? 0;
+          const inProg = it.inProgressCount ?? it.inProgress ?? 0;
+          const rel = it.RelasiRslvd ?? it.relasiResolved ?? it.relasi_resolved ?? 0;
 
-  // Normalisasi dan mapping ke bentuk yang renderTable harapkan
-  lastResults = (h.results || []).map(it => {
-    // if already normalized (k,res)
-    if(it && it.k && it.res) {
-      const k = it.k;
-      const res = it.res;
-      return {
-        k: { nama: k.nama ?? k.name ?? "", shift: k.shift ?? "" },
-        res: {
-          avg: (res.avg == null || res.avg === "") ? null : Number(res.avg),
-          count: Number.isFinite(Number(res.count)) ? Number(res.count) : (res.count ? Number(res.count) : 0),
-          lastTime: res.lastTime ?? res.last_time ?? res.last ?? "-",
-          slaCount: Number.isFinite(Number(res.slaCount ?? res.sla)) ? Number(res.slaCount ?? res.sla) : 0,
-          inProgressCount: Number.isFinite(Number(res.inProgressCount ?? res.in_progress)) ? Number(res.inProgressCount ?? res.in_progress) : 0,
-          RelasiRslvd: Number.isFinite(Number(res.relasiResolved ?? res.RelasiRslvd ?? res.relasi_resolved)) ? Number(res.relasiResolved ?? res.RelasiRslvd ?? res.relasi_resolved) : 0
-        }
-      };
-    }
+          return {
+            k: { nama: nama, shift: shift },
+            res: {
+              avg: (avg===""?null:(avg==null?null:Number(avg))),
+              count: Number.isFinite(Number(count)) ? Number(count) : 0,
+              lastTime: lastTime,
+              slaCount: Number.isFinite(Number(sla)) ? Number(sla) : 0,
+              inProgressCount: Number.isFinite(Number(inProg)) ? Number(inProg) : 0,
+              RelasiRslvd: Number.isFinite(Number(rel)) ? Number(rel) : 0
+            }
+          };
+        });
 
-    // flat row fallback (common cases)
-    const nama = it.nama ?? it.name ?? it.NAMA ?? "";
-    const shift = it.shift ?? it.Shift ?? "";
-    const avg = it.avg ?? it.AVG ?? null;
-    const count = it.count ?? it.TotalCO ?? it.total ?? 0;
-    const lastTime = it.lastTime ?? it.last_time ?? it.last ?? "-";
-    const sla = it.slaCount ?? it.sla ?? 0;
-    const inProg = it.inProgressCount ?? it.in_progress ?? 0;
-    const rel = it.relasiResolved ?? it.RelasiRslvd ?? it.relasi_resolved ?? 0;
+        console.log("Mapped lastResults:", lastResults);
+        renderTable(lastResults);
 
-    return {
-      k: { nama: nama, shift: shift },
-      res: {
-        avg: (avg == null || avg === "") ? null : Number(avg),
-        count: Number.isFinite(Number(count)) ? Number(count) : 0,
-        lastTime: lastTime,
-        slaCount: Number.isFinite(Number(sla)) ? Number(sla) : 0,
-        inProgressCount: Number.isFinite(Number(inProg)) ? Number(inProg) : 0,
-        RelasiRslvd: Number.isFinite(Number(rel)) ? Number(rel) : 0
-      }
-    };
-  });
-
-  console.log("Mapped lastResults:", lastResults);
-  renderTable(lastResults);
-
-  const judul = document.getElementById("judulLaporan");
-  judul.classList.add("is-history");
-  document.getElementById("resultArea").classList.add("is-history");
-  judul.textContent =
-    (h.mode==="IDX")
-      ? `[HISTORY] Laporan Index CO — Index Hari Ini — Tanggal ${prettyTanggalLabel(h.tanggal)}`
-      : `[HISTORY] Laporan Index CO ${h.shiftLabel || h.mode} — Tanggal ${prettyTanggalLabel(h.tanggal)}`;
-  document.getElementById("statusText").textContent = `Ditampilkan dari history (${prettyDateTime(h.ts)}).`;
-  bootstrap.Modal.getInstance(document.getElementById("historyModal"))?.hide();
-});
-
+        const judul = document.getElementById("judulLaporan");
+        judul.classList.add("is-history");
+        document.getElementById("resultArea").classList.add("is-history");
+        judul.textContent =
+          (h.mode==="IDX")
+            ? `[HISTORY] Laporan Index CO — Index Hari Ini — Tanggal ${prettyTanggalLabel(h.tanggal)}`
+            : `[HISTORY] Laporan Index CO ${h.shiftLabel || h.mode} — Tanggal ${prettyTanggalLabel(h.tanggal)}`;
+        document.getElementById("statusText").textContent = `Ditampilkan dari history (${prettyDateTime(h.ts)}).`;
+        bootstrap.Modal.getInstance(document.getElementById("historyModal"))?.hide();
+      });
       list.appendChild(btn);
     });
   }catch(err){
@@ -449,7 +443,7 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
         document.getElementById("generateBtn").disabled = sheetData.length===0;
       }
       document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
-    }}); 
+    }});
 });
 
 /* ====== BUILD NAMA (MODE IDX) ====== */
@@ -622,7 +616,7 @@ function renderTable(results){
   <td>${res.count||0}</td>
   <td>${res.slaCount||0}</td>
   <td>${res.inProgressCount||0}</td>
-  <td>${res.RelasiRslvd||0}</td>
+  <td>${(res.RelasiRslvd||res.relasiResolved||res.Relasi_Rslvd||0)}</td>
 `;
     tbody.appendChild(tr);
   });
@@ -643,7 +637,7 @@ function sortColumn(key){
     case"TotalCO":asc=sortAscTotalCO;valFunc=r=>r.res.count||0;sortAscTotalCO=!sortAscTotalCO;break;
     case"SLA":asc=sortAscSLA;valFunc=r=>r.res.slaCount||0;sortAscSLA=!sortAscSLA;break;
     case"InProgress":asc=sortAscInProgress;valFunc=r=>r.res.inProgressCount||0;sortAscInProgress=!sortAscInProgress;break;
-    case"RelasiRslvd":asc=sortAscRelasiRslvd;valFunc=r=>r.res.relasiResolved||r.res.RelasiRslvd||0;sortAscRelasiRslvd=!sortAscRelasiRslvd;break;
+    case"RelasiRslvd":asc=sortAscRelasiRslvd;valFunc=r=>r.res.RelasiRslvd||r.res.relasiResolved||0;sortAscRelasiRslvd=!sortAscRelasiRslvd;break;
     default:return;
   }
   if(key==="Nama")lastResults.sort((a,b)=>asc?valFunc(a).localeCompare(valFunc(b)):valFunc(b).localeCompare(valFunc(a)));
@@ -724,5 +718,3 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
-
-
