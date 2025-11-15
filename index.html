@@ -13,9 +13,10 @@
     .container { max-width: 1100px; background: white; border-radius: 10px; padding: 25px;
                  box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
     #judulLaporan { font-weight: 700; font-size: 18px; text-align: center; margin-bottom: 15px; color:#000; }
-    #judulLaporan.is-history { color: #8e24aa; }
+    #judulLaporan.is-history { color: #8e24aa; } /* ubah di sini kalau mau merah/oranye */
     #copyright { text-align: center; font-size: 14px; color: #000; margin-top: 40px; margin-bottom: 10px; font-weight: 600; }
 
+    /* Header default biru */
     #resultTable.table thead tr th {
       background-color: #1976d2 !important; color: white !important; text-align: center;
       font-weight: 700; cursor: pointer; padding: 10px; user-select: none;
@@ -23,6 +24,7 @@
     }
     #resultTable.table thead tr th:hover { background-color: #1565c0 !important; }
 
+    /* Header abu-abu saat lihat HISTORY */
     #resultArea.is-history thead tr th {
       background-color: #9e9e9e !important;
       border-color: #757575 !important;
@@ -74,6 +76,7 @@
   <button id="generateBtn" class="btn btn-success mb-1" disabled>Hitung Index</button>
   <span id="statusText" class="ms-2 text-muted"></span>
 
+  <!-- Toggle hanya aktif saat S -->
   <div class="form-check mt-2">
     <input class="form-check-input" type="checkbox" id="toggleSiang14" disabled>
     <label class="form-check-label text-muted" for="toggleSiang14" id="labelToggleSiang14">
@@ -95,7 +98,7 @@
           <th id="sortTotalCO">TotalCO</th>
           <th id="sortSLA">SLA</th>
           <th id="sortInProgress">InProgress</th>
-          <th id="sortRelasiRslvd">RelasiRslvd</th>
+          <th id="sortRelasiResolved">RelasiResolved</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -126,23 +129,25 @@
   </div>
 </div>
 
+<!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
 <script>
-/* CONFIG */
+/* ====== KONFIG ====== */
 const GAS_URL="https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFMrU-NNqxMW2ZtSCRIpESCpC4Nz7VzdKRmt-Zx1rJXjnRd-g/exec";
 const HISTORY_GAS_URL="https://script.google.com/macros/s/AKfycbwrXZlIB4nyiQtb-MM79c8rm1rDuoVyEZRxdk4-yTHaM_teOWR-XxC_BK50RsVlmo-P/exec";
 
 let sheetData=[], csvData=[], lastResults=[];
 let shiftLabel="";
 
+/* ====== SORT STATE ====== */
 let sortAscNama=true,sortAscLastCO=false,sortAscIndexCO=false,sortAscTotalCO=true,
-    sortAscSLA=false,sortAscInProgress=false,sortAscRelasiRslvd=false;
+    sortAscSLA=false,sortAscInProgress=false,sortAscRelasiResolved=false;
 
-document.getElementById("tanggalCek").textContent =
+/* ====== INIT TANGGAL ====== */
+document.getElementById("tanggalCek").textContent=
   new Date().toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});
 
-/* UTIL */
+/* ====== UTIL ====== */
 function normKey(s){return(s||"").toString().toLowerCase().replace(/[^a-z0-9]/g,'');}
 function normalizeName(s){return(s||"").toString().toLowerCase().replace(/\s+/g,' ').replace(/[^\w\s]/g,'').trim();}
 function durasiKeDetik(v){if(!v)return 0;const s=v.toString().trim();
@@ -186,7 +191,7 @@ function prettyDateTime(ts){
   return d.toLocaleString("id-ID",{ day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
 }
 
-/* FILTER SIANG >=14:00 */
+/* ====== FILTER SIANG >=14:00 (hanya saat S + toggle ON) ====== */
 function lolosFilterShiftSiangByTanggalDiambil(record){
   const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
   if(shift !== "S") return true;
@@ -200,17 +205,18 @@ function lolosFilterShiftSiangByTanggalDiambil(record){
   return false;
 }
 
-/* HISTORY: robust loader + mapping */
+/* ====== HISTORY API ====== */
 async function saveHistoryEntry(entry){
   const compactResults = (entry.results || []).map(x => ({
-    nama: x.k?.nama || x.nama || "",
-    shift: x.k?.shift || x.shift || "",
-    avg: x.res?.avg ?? x.avg ?? null,
-    count: x.res?.count ?? x.count ?? 0,
-    lastTime: x.res?.lastTime ?? x.lastTime ?? "-",
-    slaCount: x.res?.slaCount ?? x.slaCount ?? 0,
-    inProgressCount: x.res?.inProgressCount ?? x.inProgressCount ?? 0,
-    relasiResolved: x.res?.RelasiRslvd ?? x.res?.relasiResolved ?? x.relasiResolved ?? x.RelasiRslvd ?? 0
+    k: { nama: x.k?.nama || "", shift: x.k?.shift || "" },
+    res:{
+      avg: x.res?.avg ?? null,
+      count: x.res?.count ?? 0,
+      lastTime: x.res?.lastTime ?? "-",
+      slaCount: x.res?.slaCount ?? 0,
+      inProgressCount: x.res?.inProgressCount ?? 0,
+      relasiResolved: x.res?.relasiResolved ?? 0
+    }
   }));
   const payload = {
     action: "saveHistory",
@@ -230,58 +236,30 @@ async function saveHistoryEntry(entry){
   });
   await res.text();
 }
-
 async function loadHistory(){
   const url = `${HISTORY_GAS_URL}?action=getHistory`;
   const res = await fetch(url);
   const json = await res.json();
-  console.log("History raw response:", json);
-
-  return (json.items||[]).map(h => {
-    // try many common places for the rows array
-    let rows = [];
-    if (Array.isArray(h.rows) && h.rows.length) rows = h.rows;
-    else if (Array.isArray(h.Results) && h.Results.length) rows = h.Results;
-    else if (Array.isArray(h.results) && h.results.length) rows = h.results;
-    else if (Array.isArray(h.Rows) && h.Rows.length) rows = h.Rows;
-    else if (h.data && Array.isArray(h.data.rows) && h.data.rows.length) rows = h.data.rows;
-
-    // try string fields that might contain JSON array
-    if (!rows.length) {
-      const candidates = ['RowsJson','rowsJson','rowsjson','Rows_JSON','Rows_Json','resultsJson','ResultsJson','results_json','rows_string','RowsString','resultsString'];
-      for (const key of candidates) {
-        if (typeof h[key] === 'string' && h[key].trim()) {
-          try {
-            const parsed = JSON.parse(h[key]);
-            if (Array.isArray(parsed)) { rows = parsed; break; }
-            if (parsed && Array.isArray(parsed.rows)) { rows = parsed.rows; break; }
-          } catch(e){
-            // ignore parse error
-          }
-        }
+  return (json.items||[]).map(h => ({
+    ts: h.ts,
+    mode: h.mode,
+    shiftLabel: h.shiftLabel,
+    tanggal: h.tanggal,
+    toggleSiang14: h.toggleSiang14,
+    results: (h.rows||[]).map(r => ({
+      k: { nama: r.nama, shift: r.shift },
+      res: {
+        avg: r.avg, count: r.count, lastTime: r.lastTime,
+        slaCount: r.slaCount, inProgressCount: r.inProgressCount, relasiResolved: r.relasiResolved
       }
-    }
-
-    // final fallback: try to synthesize rows from columns named like nama1..namaN (rare)
-    // (not implemented automatically; return empty array in that case)
-
-    return {
-      ts: h.ts,
-      mode: h.mode,
-      shiftLabel: h.shiftLabel,
-      tanggal: h.tanggal,
-      toggleSiang14: h.toggleSiang14,
-      results: rows
-    };
-  });
+    }))
+  }));
 }
-
 function showHistoryModal(){
   renderHistoryList();
   const modal = new bootstrap.Modal(document.getElementById("historyModal"));
   modal.show();
 }
-
 async function renderHistoryList(){
   const list = document.getElementById("historyList");
   list.innerHTML = '<div class="text-muted">Memuat...</div>';
@@ -296,71 +274,24 @@ async function renderHistoryList(){
       const btn = document.createElement("button");
       btn.type="button";
       btn.className="list-group-item list-group-item-action";
-      const shiftText = h.shiftLabel || (h.mode === "IDX" ? "Index" : (h.mode || ""));
-      const personil = (h.results && h.results.length) ? h.results.length : 0;
+      const modeLabel = (h.mode==="IDX") ? "Index hari ini" : h.shiftLabel;
       btn.innerHTML = `
         <div class="d-flex w-100 justify-content-between">
-          <h6 class="mb-1">Shift ${shiftText}</h6>
+          <h6 class="mb-1">${modeLabel}</h6>
           <small>${prettyDateTime(h.ts)}</small>
         </div>
-        <div class="mb-1">Tanggal: ${prettyTanggalLabel(h.tanggal)} • Personil: ${personil}</div>
+        <div class="mb-1">Tanggal: ${prettyTanggalLabel(h.tanggal)} • Baris: ${h.results?.length||0} • Siang≥14: ${h.toggleSiang14 ? "ON":"OFF"}</div>
       `;
       btn.addEventListener("click", ()=>{
-        console.log("History item raw:", h);
-
-        // map to the canonical structure used by renderTable
-        lastResults = (h.results || []).map(it => {
-          // if already {k,res}
-          if (it && it.k && it.res) {
-            const k = it.k;
-            const r = it.res;
-            return {
-              k: { nama: k.nama ?? k.name ?? "-", shift: k.shift ?? "-" },
-              res: {
-                avg: (r.avg===""? null : (r.avg==null? null : Number(r.avg))),
-                count: Number.isFinite(Number(r.count)) ? Number(r.count) : 0,
-                lastTime: r.lastTime ?? r.last ?? "-",
-                slaCount: Number.isFinite(Number(r.slaCount ?? r.sla)) ? Number(r.slaCount ?? r.sla) : 0,
-                inProgressCount: Number.isFinite(Number(r.inProgressCount ?? r.inProgress)) ? Number(r.inProgressCount ?? r.inProgress) : 0,
-                RelasiRslvd: Number.isFinite(Number(r.relasiResolved ?? r.RelasiRslvd ?? r.relasi_resolved ?? 0)) ? Number(r.relasiResolved ?? r.RelasiRslvd ?? r.relasi_resolved ?? 0) : 0
-              }
-            };
-          }
-
-          // else flat row case (what we stored with saveHistoryEntry)
-          const namaRaw = (it.nama ?? it.name ?? it.NAMA ?? "").toString().trim();
-          const nama = namaRaw || "-";
-          const shift = (it.shift ?? it.Shift ?? "").toString().trim() || "-";
-          const avg = it.avg ?? null;
-          const count = it.count ?? 0;
-          const lastTime = it.lastTime ?? "-";
-          const sla = it.slaCount ?? it.SLA ?? 0;
-          const inProg = it.inProgressCount ?? it.InProgress ?? 0;
-          const rel = it.relasiResolved ?? it.RelasiRslvd ?? it.relasi_resolved ?? 0;
-
-          return {
-            k: { nama, shift },
-            res: {
-              avg: (avg===""? null : (avg==null? null : Number(avg))),
-              count: Number.isFinite(Number(count)) ? Number(count) : 0,
-              lastTime: lastTime || "-",
-              slaCount: Number.isFinite(Number(sla)) ? Number(sla) : 0,
-              inProgressCount: Number.isFinite(Number(inProg)) ? Number(inProg) : 0,
-              RelasiRslvd: Number.isFinite(Number(rel)) ? Number(rel) : 0
-            }
-          };
-        });
-
-        console.log("Mapped lastResults:", lastResults);
+        lastResults = h.results || [];
         renderTable(lastResults);
-
         const judul = document.getElementById("judulLaporan");
         judul.classList.add("is-history");
         document.getElementById("resultArea").classList.add("is-history");
         judul.textContent =
           (h.mode==="IDX")
             ? `[HISTORY] Laporan Index CO — Index Hari Ini — Tanggal ${prettyTanggalLabel(h.tanggal)}`
-            : `[HISTORY] Laporan Index CO ${h.shiftLabel || h.mode} — Tanggal ${prettyTanggalLabel(h.tanggal)}`;
+            : `[HISTORY] Laporan Index CO ${h.shiftLabel} — Tanggal ${prettyTanggalLabel(h.tanggal)}`;
         document.getElementById("statusText").textContent = `Ditampilkan dari history (${prettyDateTime(h.ts)}).`;
         bootstrap.Modal.getInstance(document.getElementById("historyModal"))?.hide();
       });
@@ -368,11 +299,10 @@ async function renderHistoryList(){
     });
   }catch(err){
     list.innerHTML = `<div class="text-danger">Gagal memuat history: ${err.message}</div>`;
-    console.error(err);
   }
 }
 
-/* CSV LOAD (sama seperti sebelumnya) */
+/* ====== CSV LOAD ====== */
 document.getElementById("csvFile").addEventListener("change",(e)=>{
   const file=e.target.files[0];if(!file)return;
   Papa.parse(file,{header:true,delimiter:";",skipEmptyLines:true,
@@ -408,12 +338,15 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
       if(mode==="IDX"){
         sheetData = buildUniqueNamesFromCSV(csvData);
         document.getElementById("generateBtn").disabled = sheetData.length===0;
+        document.getElementById("modeNote").textContent = sheetData.length
+          ? " "
+          : "(Mode Index) Tidak ada nama pada kolom 'Diambil oleh'.";
       }
       document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
     }});
 });
 
-/* BUILD NAMA (MODE IDX) */
+/* ====== BUILD NAMA (MODE IDX) ====== */
 function buildUniqueNamesFromCSV(rows){
   const map=new Map();
   for(const r of rows){
@@ -425,12 +358,13 @@ function buildUniqueNamesFromCSV(rows){
   return Array.from(map.values()).map(nm=>({nama:nm, nik:'', shift:'Index'}));
 }
 
-/* AMBIL NAMA DARI GSHEET */
+/* ====== AMBIL NAMA DARI GSHEET (Generate Jadwal untuk P/S/M/MH1) ====== */
 document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
   const shiftInput=document.getElementById("shiftInput").value.trim().toUpperCase();
   if(!shiftInput){ alert("Pilih mode dulu!"); return; }
 
   if(shiftInput==="IDX"){
+    // Sesuai permintaan: di mode IDX tombol ini memang DINONAKTIFKAN, tapi kalau kepencet:
     document.getElementById("statusText").textContent="Mode Index: upload CSV lalu langsung 'Hitung Index'.";
     return;
   }
@@ -445,7 +379,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
     document.getElementById("tanggalCek").textContent=tanggalLabel;
 
     let shifts=[shiftInput];
-    if(shiftInput==="P")shifts=["P","P1"];
+    if(shiftInput==="P")shifts=["P","P1"]; // aturan lama
 
     const shiftMap={P:"Shift 1",S:"Shift 2",M:"Shift 3",MH1:"Shift 3"};
     shiftLabel=shiftMap[shiftInput]||shiftInput;
@@ -459,8 +393,10 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
       const list=(data.karyawan||[]).map(k=>({nama:(k.nama||"").trim(),nik:(k.nik||"").trim(),shift:(k.shift||"").trim()}));
       sheetData=sheetData.concat(list);
     }
+    // unikkan nama
     sheetData=sheetData.filter((obj,idx,arr)=>idx===arr.findIndex(t=>t.nama===obj.nama));
 
+    // sukses → enable Hitung Index
     document.getElementById("generateBtn").disabled=false;
     document.getElementById("statusText").textContent=`✅ ${sheetData.length} nama berhasil diambil (${shiftLabel}).`;
   }catch(err){
@@ -470,7 +406,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
   }
 });
 
-/* PERHITUNGAN */
+/* ====== PERHITUNGAN ====== */
 function computeC(r){return r.waktuSlaDetik>0?r.durasiDetik/r.waktuSlaDetik:0;}
 function rataRata_byName(nama,thr=0.85){
   const matches=[];
@@ -483,29 +419,28 @@ function rataRata_byName(nama,thr=0.85){
 
     const currentShift=document.getElementById("shiftInput").value.trim().toUpperCase();
     if(currentShift==="IDX"){
-      if(normalizeName(r.diambilOleh)!==keyNama) continue;
+      if(normalizeName(r.diambilOleh)!==keyNama) continue; // exact match pada IDX
     }else{
-      if(similarity(nama,r.diambilOleh)<thr) continue;
+      if(similarity(nama,r.diambilOleh)<thr) continue;     // toleran typo pada shift
     }
     matches.push(r);
   }
 
-  if(!matches.length)return{avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0,RelasiRslvd:0};
+  if(!matches.length)return{avg:null,count:0,lastTime:"-",slaCount:0,inProgressCount:0,relasiResolved:0};
 
   const sum=matches.reduce((a,b)=>a+computeC(b),0);
   const latest=matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
-
   return{
     avg:sum/matches.length,
     count:matches.length,
     lastTime:ambilJamDariTanggal(latest),
     slaCount:matches.filter(r=>r.statusSLA&&r.statusSLA.toLowerCase().includes("lewat")).length,
     inProgressCount:matches.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length,
-    RelasiRslvd:matches.filter(r=>r.statusNorm.includes("pending")).length
+    relasiResolved:matches.filter(r=>r.statusNorm.includes("pending")).length
   };
 }
 
-/* GENERATE TABEL */
+/* ====== GENERATE TABEL ====== */
 document.getElementById("generateBtn").addEventListener("click", async ()=>{
   const mode=document.getElementById("shiftInput").value.trim().toUpperCase();
   if(!csvData.length) return alert("Upload CSV dulu!");
@@ -544,80 +479,59 @@ document.getElementById("generateBtn").addEventListener("click", async ()=>{
 
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 
-  // SIMPAN HISTORY HANYA JIKA DATANYA DARI UPLOAD CSV
   try{
-    if (csvData && csvData.length) {
-      await saveHistoryEntry({
-        ts: Date.now(),
-        mode,
-        shiftLabel,
-        tanggal: tgl,
-        toggleSiang14: document.getElementById("toggleSiang14").checked,
-        results: results
-      });
-    }
+    await saveHistoryEntry({
+      ts: Date.now(),
+      mode,
+      shiftLabel,
+      tanggal: tgl,
+      toggleSiang14: document.getElementById("toggleSiang14").checked,
+      results: results
+    });
   }catch(e){
     console.warn("Gagal simpan history:", e);
     document.getElementById("statusText").textContent = "⚠️ Gagal simpan history: " + e.message;
   }
 });
 
-/* RENDER TABEL */
+/* ====== RENDER TABEL ====== */
 function renderTable(results){
   const tbody=document.querySelector("#resultTable tbody");tbody.innerHTML="";
   results.forEach((item,index)=>{
-    const {k,res}=item;
-    const nama = (k && k.nama) ? k.nama : "-";
-    const shift = (k && k.shift) ? k.shift : "-";
-    const lastTime = res && res.lastTime ? res.lastTime : "-";
-    const avg = (res && res.avg != null && !Number.isNaN(Number(res.avg))) ? (Math.round(Number(res.avg)*100)/100).toFixed(2) : "-";
-    const total = res && Number.isFinite(Number(res.count)) ? Number(res.count) : 0;
-    const sla = res && Number.isFinite(Number(res.slaCount)) ? Number(res.slaCount) : 0;
-    const inProg = res && Number.isFinite(Number(res.inProgressCount)) ? Number(res.inProgressCount) : 0;
-    const rel = res && Number.isFinite(Number(res.RelasiRslvd ?? res.relasiResolved)) ? Number(res.RelasiRslvd ?? res.relasiResolved) : 0;
-
-    const tr=document.createElement("tr");if(sla>0)tr.className="table-danger";
-    tr.innerHTML = `
-      <td>${index+1}</td>
-      <td>${nama}</td>
-      <td>${shift}</td>
-      <td>${lastTime}</td>
-      <td>${avg}</td>
-      <td>${total}</td>
-      <td>${sla}</td>
-      <td>${inProg}</td>
-      <td>${rel}</td>
-    `;
+    const {k,res}=item;const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
+    const tr=document.createElement("tr");if(res.slaCount>0)tr.className="table-danger";
+    tr.innerHTML=`<td>${index+1}</td><td>${k.nama}</td><td>${k.shift||'-'}</td>
+      <td>${res.lastTime}</td><td>${avg}</td><td>${res.count||0}</td>
+      <td>${res.slaCount||0}</td><td>${res.inProgressCount||0}</td><td>${res.relasiResolved||0}</td>`;
     tbody.appendChild(tr);
   });
-  ["Nama","LastCO","IndexCO","TotalCO","SLA","InProgress","RelasiRslvd"].forEach(k=>{
+  ["Nama","LastCO","IndexCO","TotalCO","SLA","InProgress","RelasiResolved"].forEach(k=>{
     const el=document.getElementById(`sort${k}`);
     if(el)el.onclick=()=>sortColumn(k);
   });
 }
 
-/* SORTING */
+/* ====== SORTING KLIK HEADER ====== */
 function sortColumn(key){
   if(!lastResults.length)return alert("Belum ada data tabel.");
   let asc,valFunc;
   switch(key){
     case"Nama":asc=sortAscNama;valFunc=r=>(r.k.nama||"").toLowerCase();sortAscNama=!sortAscNama;break;
-    case"LastCO":asc=sortAscLastCO;valFunc=r=>r.res.lastTime==="-"?0:parseInt((r.res.lastTime||"").toString().replace(":",""))||0;sortAscLastCO=!sortAscLastCO;break;
+    case"LastCO":asc=sortAscLastCO;valFunc=r=>r.res.lastTime==="-"?0:parseInt(r.res.lastTime.replace(":",""));sortAscLastCO=!sortAscLastCO;break;
     case"IndexCO":asc=sortAscIndexCO;valFunc=r=>r.res.avg||0;sortAscIndexCO=!sortAscIndexCO;break;
     case"TotalCO":asc=sortAscTotalCO;valFunc=r=>r.res.count||0;sortAscTotalCO=!sortAscTotalCO;break;
     case"SLA":asc=sortAscSLA;valFunc=r=>r.res.slaCount||0;sortAscSLA=!sortAscSLA;break;
     case"InProgress":asc=sortAscInProgress;valFunc=r=>r.res.inProgressCount||0;sortAscInProgress=!sortAscInProgress;break;
-    case"RelasiRslvd":asc=sortAscRelasiRslvd;valFunc=r=>r.res.RelasiRslvd||r.res.relasiResolved||0;sortAscRelasiRslvd=!sortAscRelasiRslvd;break;
+    case"RelasiResolved":asc=sortAscRelasiResolved;valFunc=r=>r.res.relasiResolved||0;sortAscRelasiResolved=!sortAscRelasiResolved;break;
     default:return;
   }
   if(key==="Nama")lastResults.sort((a,b)=>asc?valFunc(a).localeCompare(valFunc(b)):valFunc(b).localeCompare(valFunc(a)));
   else lastResults.sort((a,b)=>asc?(valFunc(a)-valFunc(b)):(valFunc(b)-valFunc(a)));
   renderTable(lastResults);
-  const hdr = document.getElementById(`sort${key}`);
-  if(hdr) hdr.textContent = `${key} ${asc?"↑":"↓"}`;
+  document.getElementById(`sort${key}`).textContent=`${key} ${asc?"↑":"↓"}`;
 }
 
-/* DOWNLOAD JPG */
+/* ====== DOWNLOAD JPG ====== */
 document.getElementById("downloadBtn").addEventListener("click", async () => {
   const area = document.querySelector("#resultArea");
   const canvas = await html2canvas(area, { scale: 2 });
@@ -627,7 +541,7 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
   link.click();
 });
 
-/* UI helpers */
+/* ====== UI: Toggle Siang aktif hanya saat S; tombol Generate disabled saat IDX ====== */
 function updateToggleSiangAvailability(){
   const mode = document.getElementById("shiftInput").value.trim().toUpperCase();
   const cb    = document.getElementById("toggleSiang14");
@@ -636,6 +550,7 @@ function updateToggleSiangAvailability(){
   const note  = document.getElementById("modeNote");
   const isSiang = (mode === "S");
 
+  // Toggle hanya aktif saat S
   cb.disabled = !isSiang;
   cb.checked  = isSiang;
   label.classList.toggle("text-muted", !isSiang);
@@ -643,23 +558,27 @@ function updateToggleSiangAvailability(){
                      : (mode==="IDX" ? "Tidak berlaku pada mode Index hari ini"
                                      : "Tidak berlaku untuk shift selain Siang (S)");
 
+  // Tombol Generate: disable saat IDX, aktif saat P/S/M/MH1
   if(mode==="IDX"){
     btnGsheet.disabled = true;
     btnGsheet.title = "Mode Index: tidak perlu Generate Jadwal";
-    document.getElementById("generateBtn").disabled = sheetData.length===0;
+    document.getElementById("generateBtn").disabled = sheetData.length===0; // aktif setelah CSV → build nama
   }else if(mode){
     btnGsheet.disabled = false;
     btnGsheet.title = "Ambil nama dari GSheet";
-    document.getElementById("generateBtn").disabled = true;
+    note.textContent = "";
+    document.getElementById("generateBtn").disabled = true; // tunggu ambil nama
   }else{
     btnGsheet.disabled = false;
     btnGsheet.title = "Pilih mode terlebih dahulu";
+    note.textContent = "";
     document.getElementById("generateBtn").disabled = true;
   }
 }
 
-/* EVENTS */
+/* ====== EVENTS ====== */
 document.getElementById("historyBtn").addEventListener("click", showHistoryModal);
+
 document.getElementById("shiftInput").addEventListener("change", ()=>{
   updateToggleSiangAvailability();
   const mode=document.getElementById("shiftInput").value.trim().toUpperCase();
@@ -674,6 +593,7 @@ document.getElementById("shiftInput").addEventListener("change", ()=>{
     document.getElementById("generateBtn").disabled = true;
   }
 });
+
 document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </script>
 
@@ -682,3 +602,4 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
+
