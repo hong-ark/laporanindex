@@ -280,7 +280,7 @@ async function renderHistoryList(){
           <h6 class="mb-1">${modeLabel}</h6>
           <small>${prettyDateTime(h.ts)}</small>
         </div>
-        <div class="mb-1">Tanggal: ${prettyTanggalLabel(h.tanggal)} • Baris: ${h.results?.length||0} • Siang≥14: ${h.toggleSiang14 ? "ON":"OFF"}</div>
+        <div class="mb-1">Tanggal: ${prettyTanggalLabel(h.tanggal)} • Personil: ${h.results?.length||0}</div>
       `;
       btn.addEventListener("click", ()=>{
         lastResults = h.results || [];
@@ -601,3 +601,4 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
+
