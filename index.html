@@ -165,6 +165,11 @@ function similarity(a,b){a=normalizeName(a);b=normalizeName(b);if(!a||!b)return 
   const d=levenshtein(a,b);return 1-d/Math.max(a.length,b.length);}
 function ambilJamDariTanggal(s){if(!s)return"-";const m=s.match(/(\d{1,2}):(\d{2})/);
   return m?`${m[1].padStart(2,'0')}:${m[2]}`:"-";}
+function jamMenitDariTanggal(s){
+  const m = (s||"").match(/(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?/);
+  if(!m) return null;
+  return { h: parseInt(m[1],10), m: parseInt(m[2],10) };
+}
 function prettyTanggalLabel(value){
   if(typeof value === "string" && value.includes("T")){
     const d = new Date(value);
@@ -182,11 +187,6 @@ function prettyDateTime(ts){
 }
 
 /* FILTER SIANG >=14:00 */
-function jamMenitDariTanggal(s){
-  const m = (s||"").match(/(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?/);
-  if(!m) return null;
-  return { h: parseInt(m[1],10), m: parseInt(m[2],10) };
-}
 function lolosFilterShiftSiangByTanggalDiambil(record){
   const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
   if(shift !== "S") return true;
@@ -200,17 +200,17 @@ function lolosFilterShiftSiangByTanggalDiambil(record){
   return false;
 }
 
-/* HISTORY: save in simple rows array (compatible with old loader) */
+/* HISTORY: robust loader + mapping */
 async function saveHistoryEntry(entry){
   const compactResults = (entry.results || []).map(x => ({
-    nama: x.k?.nama || "",
-    shift: x.k?.shift || "",
-    avg: x.res?.avg ?? null,
-    count: x.res?.count ?? 0,
-    lastTime: x.res?.lastTime ?? "-",
-    slaCount: x.res?.slaCount ?? 0,
-    inProgressCount: x.res?.inProgressCount ?? 0,
-    relasiResolved: x.res?.RelasiRslvd ?? x.res?.relasiResolved ?? 0
+    nama: x.k?.nama || x.nama || "",
+    shift: x.k?.shift || x.shift || "",
+    avg: x.res?.avg ?? x.avg ?? null,
+    count: x.res?.count ?? x.count ?? 0,
+    lastTime: x.res?.lastTime ?? x.lastTime ?? "-",
+    slaCount: x.res?.slaCount ?? x.slaCount ?? 0,
+    inProgressCount: x.res?.inProgressCount ?? x.inProgressCount ?? 0,
+    relasiResolved: x.res?.RelasiRslvd ?? x.res?.relasiResolved ?? x.relasiResolved ?? x.RelasiRslvd ?? 0
   }));
   const payload = {
     action: "saveHistory",
@@ -231,38 +231,49 @@ async function saveHistoryEntry(entry){
   await res.text();
 }
 
-/* HISTORY: load — expect GAS returns { ok:true, items:[ { ts,mode,shiftLabel,tanggal,toggleSiang14, rows: [...] } ] }
-   This mirrors the old working loader. If GAS stores results in a different property name, adapt accordingly. */
 async function loadHistory(){
   const url = `${HISTORY_GAS_URL}?action=getHistory`;
   const res = await fetch(url);
   const json = await res.json();
   console.log("History raw response:", json);
-  return (json.items||[]).map(h => ({
-    ts: h.ts,
-    mode: h.mode,
-    shiftLabel: h.shiftLabel,
-    tanggal: h.tanggal,
-    toggleSiang14: h.toggleSiang14,
-    // accept either h.rows (array) OR h.rowsJson (stringified array) OR h.Results etc.
-    results: (function(){
-      if (Array.isArray(h.rows) && h.rows.length) return h.rows;
-      if (Array.isArray(h.Results) && h.Results.length) return h.Results;
-      // try parsing common string fields:
-      const candidates = ['RowsJson','rowsJson','rows','Rows','ResultsJson','resultsJson'];
-      for (const key of candidates){
-        if (typeof h[key] === 'string' && h[key].trim()){
+
+  return (json.items||[]).map(h => {
+    // try many common places for the rows array
+    let rows = [];
+    if (Array.isArray(h.rows) && h.rows.length) rows = h.rows;
+    else if (Array.isArray(h.Results) && h.Results.length) rows = h.Results;
+    else if (Array.isArray(h.results) && h.results.length) rows = h.results;
+    else if (Array.isArray(h.Rows) && h.Rows.length) rows = h.Rows;
+    else if (h.data && Array.isArray(h.data.rows) && h.data.rows.length) rows = h.data.rows;
+
+    // try string fields that might contain JSON array
+    if (!rows.length) {
+      const candidates = ['RowsJson','rowsJson','rowsjson','Rows_JSON','Rows_Json','resultsJson','ResultsJson','results_json','rows_string','RowsString','resultsString'];
+      for (const key of candidates) {
+        if (typeof h[key] === 'string' && h[key].trim()) {
           try {
             const parsed = JSON.parse(h[key]);
-            if(Array.isArray(parsed)) return parsed;
-            if(parsed && Array.isArray(parsed.rows)) return parsed.rows;
-          } catch(e){}
+            if (Array.isArray(parsed)) { rows = parsed; break; }
+            if (parsed && Array.isArray(parsed.rows)) { rows = parsed.rows; break; }
+          } catch(e){
+            // ignore parse error
+          }
         }
       }
-      // fallback: if the server wrote individual columns (nama,..) then compose minimal rows
-      return [];
-    })()
-  }));
+    }
+
+    // final fallback: try to synthesize rows from columns named like nama1..namaN (rare)
+    // (not implemented automatically; return empty array in that case)
+
+    return {
+      ts: h.ts,
+      mode: h.mode,
+      shiftLabel: h.shiftLabel,
+      tanggal: h.tanggal,
+      toggleSiang14: h.toggleSiang14,
+      results: rows
+    };
+  });
 }
 
 function showHistoryModal(){
@@ -286,47 +297,46 @@ async function renderHistoryList(){
       btn.type="button";
       btn.className="list-group-item list-group-item-action";
       const shiftText = h.shiftLabel || (h.mode === "IDX" ? "Index" : (h.mode || ""));
+      const personil = (h.results && h.results.length) ? h.results.length : 0;
       btn.innerHTML = `
         <div class="d-flex w-100 justify-content-between">
           <h6 class="mb-1">Shift ${shiftText}</h6>
           <small>${prettyDateTime(h.ts)}</small>
         </div>
-        <div class="mb-1">Tanggal: ${prettyTanggalLabel(h.tanggal)} • Personil: ${h.results?.length||0}</div>
+        <div class="mb-1">Tanggal: ${prettyTanggalLabel(h.tanggal)} • Personil: ${personil}</div>
       `;
       btn.addEventListener("click", ()=>{
         console.log("History item raw:", h);
 
-        // Map to shape { k: {nama,shift}, res: {avg,count,lastTime,slaCount,inProgressCount,RelasiRslvd} }
+        // map to the canonical structure used by renderTable
         lastResults = (h.results || []).map(it => {
-          // if it already in nested form (k/res)
-          if(it && it.k && it.res){
-            const namaRaw = (it.k.nama ?? it.k.name ?? "").toString().trim();
-            const nama = namaRaw || "-";
-            const shift = (it.k.shift ?? it.k.Shift ?? "").toString().trim() || "-";
-            const res = it.res;
+          // if already {k,res}
+          if (it && it.k && it.res) {
+            const k = it.k;
+            const r = it.res;
             return {
-              k: { nama, shift },
+              k: { nama: k.nama ?? k.name ?? "-", shift: k.shift ?? "-" },
               res: {
-                avg: res.avg===""? null : (res.avg==null? null : Number(res.avg)),
-                count: Number.isFinite(Number(res.count)) ? Number(res.count) : 0,
-                lastTime: res.lastTime ?? res.last ?? "-",
-                slaCount: Number.isFinite(Number(res.slaCount ?? res.sla)) ? Number(res.slaCount ?? res.sla) : 0,
-                inProgressCount: Number.isFinite(Number(res.inProgressCount ?? res.inProgress)) ? Number(res.inProgressCount ?? res.inProgress) : 0,
-                RelasiRslvd: Number.isFinite(Number(res.relasiResolved ?? res.RelasiRslvd ?? 0)) ? Number(res.relasiResolved ?? res.RelasiRslvd ?? 0) : 0
+                avg: (r.avg===""? null : (r.avg==null? null : Number(r.avg))),
+                count: Number.isFinite(Number(r.count)) ? Number(r.count) : 0,
+                lastTime: r.lastTime ?? r.last ?? "-",
+                slaCount: Number.isFinite(Number(r.slaCount ?? r.sla)) ? Number(r.slaCount ?? r.sla) : 0,
+                inProgressCount: Number.isFinite(Number(r.inProgressCount ?? r.inProgress)) ? Number(r.inProgressCount ?? r.inProgress) : 0,
+                RelasiRslvd: Number.isFinite(Number(r.relasiResolved ?? r.RelasiRslvd ?? r.relasi_resolved ?? 0)) ? Number(r.relasiResolved ?? r.RelasiRslvd ?? r.relasi_resolved ?? 0) : 0
               }
             };
           }
 
-          // if flat object (expected when saved by saveHistoryEntry above)
-          const namaRaw = (it.nama ?? it.name ?? "").toString().trim();
+          // else flat row case (what we stored with saveHistoryEntry)
+          const namaRaw = (it.nama ?? it.name ?? it.NAMA ?? "").toString().trim();
           const nama = namaRaw || "-";
           const shift = (it.shift ?? it.Shift ?? "").toString().trim() || "-";
           const avg = it.avg ?? null;
           const count = it.count ?? 0;
           const lastTime = it.lastTime ?? "-";
-          const sla = it.slaCount ?? 0;
-          const inProg = it.inProgressCount ?? 0;
-          const rel = it.relasiResolved ?? it.RelasiRslvd ?? 0;
+          const sla = it.slaCount ?? it.SLA ?? 0;
+          const inProg = it.inProgressCount ?? it.InProgress ?? 0;
+          const rel = it.relasiResolved ?? it.RelasiRslvd ?? it.relasi_resolved ?? 0;
 
           return {
             k: { nama, shift },
@@ -362,7 +372,7 @@ async function renderHistoryList(){
   }
 }
 
-/* CSV LOAD */
+/* CSV LOAD (sama seperti sebelumnya) */
 document.getElementById("csvFile").addEventListener("change",(e)=>{
   const file=e.target.files[0];if(!file)return;
   Papa.parse(file,{header:true,delimiter:";",skipEmptyLines:true,
@@ -552,7 +562,7 @@ document.getElementById("generateBtn").addEventListener("click", async ()=>{
   }
 });
 
-/* RENDER TABEL (aman — fallback bila nilai kosong) */
+/* RENDER TABEL */
 function renderTable(results){
   const tbody=document.querySelector("#resultTable tbody");tbody.innerHTML="";
   results.forEach((item,index)=>{
@@ -592,7 +602,7 @@ function sortColumn(key){
   let asc,valFunc;
   switch(key){
     case"Nama":asc=sortAscNama;valFunc=r=>(r.k.nama||"").toLowerCase();sortAscNama=!sortAscNama;break;
-    case"LastCO":asc=sortAscLastCO;valFunc=r=>r.res.lastTime==="-"?0:parseInt(r.res.lastTime.replace(":",""));sortAscLastCO=!sortAscLastCO;break;
+    case"LastCO":asc=sortAscLastCO;valFunc=r=>r.res.lastTime==="-"?0:parseInt((r.res.lastTime||"").toString().replace(":",""))||0;sortAscLastCO=!sortAscLastCO;break;
     case"IndexCO":asc=sortAscIndexCO;valFunc=r=>r.res.avg||0;sortAscIndexCO=!sortAscIndexCO;break;
     case"TotalCO":asc=sortAscTotalCO;valFunc=r=>r.res.count||0;sortAscTotalCO=!sortAscTotalCO;break;
     case"SLA":asc=sortAscSLA;valFunc=r=>r.res.slaCount||0;sortAscSLA=!sortAscSLA;break;
@@ -650,7 +660,6 @@ function updateToggleSiangAvailability(){
 
 /* EVENTS */
 document.getElementById("historyBtn").addEventListener("click", showHistoryModal);
-
 document.getElementById("shiftInput").addEventListener("change", ()=>{
   updateToggleSiangAvailability();
   const mode=document.getElementById("shiftInput").value.trim().toUpperCase();
@@ -665,7 +674,6 @@ document.getElementById("shiftInput").addEventListener("change", ()=>{
     document.getElementById("generateBtn").disabled = true;
   }
 });
-
 document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </script>
 
