@@ -206,18 +206,44 @@ function lolosFilterShiftSiangByTanggalDiambil(record){
 }
 
 /* ====== HISTORY API ====== */
+/* Revised saveHistoryEntry: only save when entry.source === "upload" and filter empty-name rows */
 async function saveHistoryEntry(entry){
-  const compactResults = (entry.results || []).map(x => ({
-    k: { nama: x.k?.nama || "", shift: x.k?.shift || "" },
-    res:{
-      avg: x.res?.avg ?? null,
-      count: x.res?.count ?? 0,
-      lastTime: x.res?.lastTime ?? "-",
-      slaCount: x.res?.slaCount ?? 0,
-      inProgressCount: x.res?.inProgressCount ?? 0,
-      relasiResolved: x.res?.relasiResolved ?? 0
-    }
-  }));
+  // hanya simpan apabila explicitly diberi source: "upload"
+  if(!entry || entry.source !== "upload"){
+    console.log("saveHistoryEntry: skipped (not upload source)", entry && entry.source);
+    return;
+  }
+
+  // compact fields & toleransi bentuk input
+  const compactResults = (entry.results || []).map(x => {
+    const nama = x.k?.nama ?? x.nama ?? "";
+    const shift = x.k?.shift ?? x.shift ?? "";
+    const avg = x.res?.avg ?? x.avg ?? null;
+    const count = x.res?.count ?? x.count ?? 0;
+    const lastTime = x.res?.lastTime ?? x.lastTime ?? "-";
+    const slaCount = x.res?.slaCount ?? x.slaCount ?? 0;
+    const inProgressCount = x.res?.inProgressCount ?? x.inProgressCount ?? 0;
+    const rel = x.res?.relasiResolved ?? x.res?.RelasiRslvd ?? x.relasiResolved ?? x.relasiResolved ?? 0;
+
+    return {
+      nama: String(nama || "").trim(),
+      shift: String(shift || "").trim(),
+      avg,
+      count,
+      lastTime,
+      slaCount,
+      inProgressCount,
+      relasiResolved: rel
+    };
+  })
+  // filter row tanpa nama (agar tidak menyimpan baris kosong)
+  .filter(r => r && r.nama && r.nama.length > 0);
+
+  if(!compactResults.length){
+    console.log("saveHistoryEntry: nothing to save after filtering empty-nama rows. skip.");
+    return;
+  }
+
   const payload = {
     action: "saveHistory",
     data: {
@@ -229,13 +255,23 @@ async function saveHistoryEntry(entry){
       results: compactResults
     }
   };
-  const res = await fetch(HISTORY_GAS_URL, {
-    method: "POST",
-    headers: { "Content-Type":"text/plain;charset=utf-8" },
-    body: JSON.stringify(payload)
-  });
-  await res.text();
+
+  try{
+    console.log("saveHistoryEntry: sending", payload);
+    const res = await fetch(HISTORY_GAS_URL, {
+      method: "POST",
+      headers: { "Content-Type":"text/plain;charset=utf-8" },
+      body: JSON.stringify(payload)
+    });
+    await res.text();
+    console.log("saveHistoryEntry: saved");
+  }catch(err){
+    console.warn("saveHistoryEntry failed:", err);
+    throw err;
+  }
 }
+
+/* loadHistory tetap: mengharapkan GAS mengembalikan items dengan rows */
 async function loadHistory(){
   const url = `${HISTORY_GAS_URL}?action=getHistory`;
   const res = await fetch(url);
@@ -255,11 +291,13 @@ async function loadHistory(){
     }))
   }));
 }
+
 function showHistoryModal(){
   renderHistoryList();
   const modal = new bootstrap.Modal(document.getElementById("historyModal"));
   modal.show();
 }
+
 async function renderHistoryList(){
   const list = document.getElementById("historyList");
   list.innerHTML = '<div class="text-muted">Memuat...</div>';
@@ -274,15 +312,17 @@ async function renderHistoryList(){
       const btn = document.createElement("button");
       btn.type="button";
       btn.className="list-group-item list-group-item-action";
-      const modeLabel = (h.mode==="IDX") ? "Index hari ini" : h.shiftLabel;
+      // ringkas tampilan: "Shift X Tanggal: Y Personil: Z"
+      const shiftText = h.shiftLabel || (h.mode === "IDX" ? "Index" : (h.mode || ""));
       btn.innerHTML = `
         <div class="d-flex w-100 justify-content-between">
-          <h6 class="mb-1">${modeLabel}</h6>
+          <h6 class="mb-1">Shift ${shiftText}</h6>
           <small>${prettyDateTime(h.ts)}</small>
         </div>
-        <div class="mb-1">Tanggal: ${prettyTanggalLabel(h.tanggal)} • Baris: ${h.results?.length||0} • Siang≥14: ${h.toggleSiang14 ? "ON":"OFF"}</div>
+        <div class="mb-1">Tanggal: ${prettyTanggalLabel(h.tanggal)} • Personil: ${h.results?.length||0}</div>
       `;
       btn.addEventListener("click", ()=>{
+        // TAMPILKAN history (tidak memanggil saveHistoryEntry)
         lastResults = h.results || [];
         renderTable(lastResults);
         const judul = document.getElementById("judulLaporan");
@@ -339,7 +379,7 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
         sheetData = buildUniqueNamesFromCSV(csvData);
         document.getElementById("generateBtn").disabled = sheetData.length===0;
         document.getElementById("modeNote").textContent = sheetData.length
-          ? " "
+          ? "(Mode Index) Klik 'Hitung Index' untuk menghitung dari daftar CSV."
           : "(Mode Index) Tidak ada nama pada kolom 'Diambil oleh'.";
       }
       document.getElementById("statusText").textContent=`File CSV terbaca: ${csvData.length} baris.`;
@@ -364,7 +404,6 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
   if(!shiftInput){ alert("Pilih mode dulu!"); return; }
 
   if(shiftInput==="IDX"){
-    // Sesuai permintaan: di mode IDX tombol ini memang DINONAKTIFKAN, tapi kalau kepencet:
     document.getElementById("statusText").textContent="Mode Index: upload CSV lalu langsung 'Hitung Index'.";
     return;
   }
@@ -379,7 +418,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
     document.getElementById("tanggalCek").textContent=tanggalLabel;
 
     let shifts=[shiftInput];
-    if(shiftInput==="P")shifts=["P","P1"]; // aturan lama
+    if(shiftInput==="P")shifts=["P","P1"];
 
     const shiftMap={P:"Shift 1",S:"Shift 2",M:"Shift 3",MH1:"Shift 3"};
     shiftLabel=shiftMap[shiftInput]||shiftInput;
@@ -393,10 +432,8 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
       const list=(data.karyawan||[]).map(k=>({nama:(k.nama||"").trim(),nik:(k.nik||"").trim(),shift:(k.shift||"").trim()}));
       sheetData=sheetData.concat(list);
     }
-    // unikkan nama
     sheetData=sheetData.filter((obj,idx,arr)=>idx===arr.findIndex(t=>t.nama===obj.nama));
 
-    // sukses → enable Hitung Index
     document.getElementById("generateBtn").disabled=false;
     document.getElementById("statusText").textContent=`✅ ${sheetData.length} nama berhasil diambil (${shiftLabel}).`;
   }catch(err){
@@ -441,6 +478,7 @@ function rataRata_byName(nama,thr=0.85){
 }
 
 /* ====== GENERATE TABEL ====== */
+/* History only saved when CSV was uploaded (csvData.length > 0) */
 document.getElementById("generateBtn").addEventListener("click", async ()=>{
   const mode=document.getElementById("shiftInput").value.trim().toUpperCase();
   if(!csvData.length) return alert("Upload CSV dulu!");
@@ -479,15 +517,22 @@ document.getElementById("generateBtn").addEventListener("click", async ()=>{
 
   document.getElementById("statusText").textContent="✅ Perhitungan selesai.";
 
+  // SIMPAN HISTORY HANYA JIKA DATANYA DARI UPLOAD CSV
   try{
-    await saveHistoryEntry({
-      ts: Date.now(),
-      mode,
-      shiftLabel,
-      tanggal: tgl,
-      toggleSiang14: document.getElementById("toggleSiang14").checked,
-      results: results
-    });
+    if (csvData && csvData.length) {
+      // penting: beri flag source: "upload"
+      await saveHistoryEntry({
+        ts: Date.now(),
+        mode,
+        shiftLabel,
+        tanggal: tgl,
+        toggleSiang14: document.getElementById("toggleSiang14").checked,
+        results: results,
+        source: "upload"
+      });
+    } else {
+      console.log("Perhitungan bukan berasal dari upload CSV — tidak menyimpan history.");
+    }
   }catch(e){
     console.warn("Gagal simpan history:", e);
     document.getElementById("statusText").textContent = "⚠️ Gagal simpan history: " + e.message;
@@ -558,7 +603,7 @@ function updateToggleSiangAvailability(){
                      : (mode==="IDX" ? "Tidak berlaku pada mode Index hari ini"
                                      : "Tidak berlaku untuk shift selain Siang (S)");
 
-  // Tombol Generate: disable saat IDX, aktif saat P/S/M/MH1
+  // Tombol Generate GSheet: disable saat IDX, aktif saat P/S/M/MH1
   if(mode==="IDX"){
     btnGsheet.disabled = true;
     btnGsheet.title = "Mode Index: tidak perlu Generate Jadwal";
@@ -566,12 +611,10 @@ function updateToggleSiangAvailability(){
   }else if(mode){
     btnGsheet.disabled = false;
     btnGsheet.title = "Ambil nama dari GSheet";
-    note.textContent = "";
-    document.getElementById("generateBtn").disabled = true; // tunggu ambil nama
+    document.getElementById("generateBtn").disabled = true;
   }else{
     btnGsheet.disabled = false;
     btnGsheet.title = "Pilih mode terlebih dahulu";
-    note.textContent = "";
     document.getElementById("generateBtn").disabled = true;
   }
 }
