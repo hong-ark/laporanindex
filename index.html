@@ -504,16 +504,23 @@ function renderTable(results){
     const avgNum = res.avg; 
     const avg = avgNum!==null ? (Math.round(avgNum*100)/100).toFixed(2) : "-";
 
-    const tr=document.createElement("tr");
+ const tr=document.createElement("tr");
 
-    // 🔴 Warna merah jika SLA > 0
-    if(res.slaCount > 0){
-      tr.classList.add("table-danger");
+// Merah jika ada SLA lewat
+if(res.slaCount > 0){
+    tr.classList.add("table-danger");
+}
+
+// Kuning jika index > 0.35
+const avgNum = res.avg !== null ? res.avg : null;
+if(avgNum !== null && avgNum > 0.35){
+    tr.classList.add("table-warning");
+}assList.add("table-danger");
     }
 
     // 🟡 Warna kuning pada index > 0.35
     const indexStyle = (avgNum !== null && avgNum > 0.35)
-      ? 'style="background-color:#fff3cd !important;"'
+      ? 'style="background-color:#ffcc80 !important;"'
       : '';
 
     tr.innerHTML=`
@@ -626,6 +633,7 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
+
 
 
 
