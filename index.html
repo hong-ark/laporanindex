@@ -33,6 +33,11 @@
 
     #resultTable td { text-align: center; vertical-align: middle; font-size: 0.95rem; }
     .table-danger { background-color: #ffeaea !important; }
+
+    /* Baris untuk index warning (oranye / kuning) */
+    .table-index-warning {
+      background-color: #ffcc80 !important; /* oranye/kuning; ganti hex kalau mau warna lain */
+    }
   </style>
 </head>
 
@@ -494,41 +499,32 @@ document.getElementById("generateBtn").addEventListener("click", async ()=>{
   }
 });
 
-/* ====== RENDER TABEL ====== */
+/* ====== RENDER TABEL (DIBENAHI) ====== */
 function renderTable(results){
   const tbody=document.querySelector("#resultTable tbody");
   tbody.innerHTML="";
 
   results.forEach((item,index)=>{
     const {k,res}=item;
-    const avgNum = res.avg; 
-    const avg = avgNum!==null ? (Math.round(avgNum*100)/100).toFixed(2) : "-";
+    const avgNum = (res && res.avg !== null) ? res.avg : null;
+    const avg = avgNum !== null ? (Math.round(avgNum*100)/100).toFixed(2) : "-";
 
- const tr=document.createElement("tr");
+    const tr = document.createElement("tr");
 
-// Merah jika ada SLA lewat
-if(res.slaCount > 0){
-    tr.classList.add("table-danger");
-}
-
-// Kuning jika index > 0.35
-const avgNum = res.avg !== null ? res.avg : null;
-if(avgNum !== null && avgNum > 0.35){
-    tr.classList.add("table-warning");
-}assList.add("table-danger");
+    // Prioritas: merah jika ada SLA lewat (table-danger)
+    // Jika tidak, berikan warna oranye/kuning pada baris jika index > 0.35
+    if(res && res.slaCount > 0){
+      tr.classList.add("table-danger");
+    } else if(avgNum !== null && avgNum > 0.35){
+      tr.classList.add("table-index-warning");
     }
 
-    // 🟡 Warna kuning pada index > 0.35
-    const indexStyle = (avgNum !== null && avgNum > 0.35)
-      ? 'style="background-color:#ffcc80 !important;"'
-      : '';
-
-    tr.innerHTML=`
+    tr.innerHTML = `
       <td>${index+1}</td>
       <td>${k.nama}</td>
       <td>${k.shift||'-'}</td>
       <td>${res.lastTime}</td>
-      <td ${indexStyle}>${avg}</td>
+      <td>${avg}</td>
       <td>${res.count||0}</td>
       <td>${res.slaCount||0}</td>
       <td>${res.inProgressCount||0}</td>
@@ -543,6 +539,7 @@ if(avgNum !== null && avgNum > 0.35){
     if(el) el.onclick=()=>sortColumn(k);
   });
 }
+
 /* ====== SORTING KLIK HEADER ====== */
 function sortColumn(key){
   if(!lastResults.length)return alert("Belum ada data tabel.");
@@ -633,8 +630,3 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
-
-
-
-
-
