@@ -496,21 +496,46 @@ document.getElementById("generateBtn").addEventListener("click", async ()=>{
 
 /* ====== RENDER TABEL ====== */
 function renderTable(results){
-  const tbody=document.querySelector("#resultTable tbody");tbody.innerHTML="";
+  const tbody=document.querySelector("#resultTable tbody");
+  tbody.innerHTML="";
+
   results.forEach((item,index)=>{
-    const {k,res}=item;const avg=res.avg!==null?(Math.round(res.avg*100)/100).toFixed(2):"-";
-    const tr=document.createElement("tr");if(res.slaCount>0)tr.className="table-danger";
-    tr.innerHTML=`<td>${index+1}</td><td>${k.nama}</td><td>${k.shift||'-'}</td>
-      <td>${res.lastTime}</td><td>${avg}</td><td>${res.count||0}</td>
-      <td>${res.slaCount||0}</td><td>${res.inProgressCount||0}</td><td>${res.relasiResolved||0}</td>`;
+    const {k,res}=item;
+    const avgNum = res.avg; 
+    const avg = avgNum!==null ? (Math.round(avgNum*100)/100).toFixed(2) : "-";
+
+    const tr=document.createElement("tr");
+
+    // 🔴 Warna merah jika SLA > 0
+    if(res.slaCount > 0){
+      tr.classList.add("table-danger");
+    }
+
+    // 🟡 Warna kuning pada index > 0.35
+    const indexStyle = (avgNum !== null && avgNum > 0.35)
+      ? 'style="background-color:#fff3cd !important;"'
+      : '';
+
+    tr.innerHTML=`
+      <td>${index+1}</td>
+      <td>${k.nama}</td>
+      <td>${k.shift||'-'}</td>
+      <td>${res.lastTime}</td>
+      <td ${indexStyle}>${avg}</td>
+      <td>${res.count||0}</td>
+      <td>${res.slaCount||0}</td>
+      <td>${res.inProgressCount||0}</td>
+      <td>${res.relasiResolved||0}</td>
+    `;
+
     tbody.appendChild(tr);
   });
+
   ["Nama","LastCO","IndexCO","TotalCO","SLA","InProgress","RelasiResolved"].forEach(k=>{
     const el=document.getElementById(`sort${k}`);
-    if(el)el.onclick=()=>sortColumn(k);
+    if(el) el.onclick=()=>sortColumn(k);
   });
 }
-
 /* ====== SORTING KLIK HEADER ====== */
 function sortColumn(key){
   if(!lastResults.length)return alert("Belum ada data tabel.");
@@ -601,6 +626,7 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
+
 
 
 
