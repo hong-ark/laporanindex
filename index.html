@@ -36,7 +36,14 @@
 
     /* Baris untuk index warning (oranye / kuning) */
     .table-index-warning {
-      background-color: #ff9800 !important; /* oranye/kuning; ganti hex kalau mau warna lain */
+      background-color: #ffcc80 !important; /* oranye muda (lebih serasi untuk baris) */
+      color: #000 !important;               /* teks hitam agar kontras */
+    }
+
+    /* Jika ingin mewarnai hanya cell IndexCO, gunakan kelas ini */
+    .td-index-warning {
+      background-color: #ffcc80 !important;
+      color: #000 !important;
     }
   </style>
 </head>
@@ -172,7 +179,7 @@ function levenshtein(a,b){a=a||"";b=b||"";const al=a.length,bl=b.length;if(!al)r
     dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
   return dp[al][bl];}
 function similarity(a,b){a=normalizeName(a);b=normalizeName(b);if(!a||!b)return 0;
-  const d=levenshtein(a,b);return 1-d/Math.max(a.length,b.length);}
+  const d=levenshtein(a,b);return 1-d/Math.max(a.length,b.length);} 
 function ambilJamDariTanggal(s){if(!s)return"-";const m=s.match(/(\d{1,2}):(\d{2})/);
   return m?`${m[1].padStart(2,'0')}:${m[2]}`:"-";}
 function jamMenitDariTanggal(s){
@@ -379,7 +386,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
     const now=new Date();
     let tanggalLabel;
     if(shiftInput==="MH1"){const y=new Date(now);y.setDate(now.getDate()-1);
-      tanggalLabel=y.toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});}
+      tanggalLabel=y.toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric");}
     else{tanggalLabel=now.toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});}
     document.getElementById("tanggalCek").textContent=tanggalLabel;
 
@@ -508,20 +515,21 @@ function renderTable(results){
     const { k, res } = item;
 
     // Pastikan avgNum adalah Number atau null
-    const avgNum = (res && res.avg !== null && res.avg !== undefined)
-      ? Number(res.avg)
-      : null;
+    let avgNum = null;
+    if (res && res.avg !== null && res.avg !== undefined) {
+      const raw = String(res.avg).replace(",", ".");
+      avgNum = Number(raw);
+      if (Number.isNaN(avgNum)) avgNum = null;
+    }
 
-    const avg = avgNum !== null && !Number.isNaN(avgNum)
-      ? (Math.round(avgNum * 100) / 100).toFixed(2)
-      : "-";
+    const avg = (avgNum !== null) ? (Math.round(avgNum * 100) / 100).toFixed(2) : "-";
 
     const tr = document.createElement("tr");
 
     // Prioritas: merah bila ada SLA lewat
     if (res && (res.slaCount || 0) > 0) {
       tr.classList.add("table-danger");
-    } else if (avgNum !== null && !Number.isNaN(avgNum) && avgNum > 0.35) {
+    } else if (avgNum !== null && avgNum > 0.35) {
       // Oranye / kuning baris kalau avg > 0.35
       tr.classList.add("table-index-warning");
     }
@@ -638,4 +646,3 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
-
