@@ -340,6 +340,7 @@ function rataRata_byName(nama,thr=0.85){
     if(currentShift==="IDX"){
       if(normalizeName(r.diambilOleh) !== keyNama) continue;
     }else{
+      // fuzzy match
       if(similarity(nama, r.diambilOleh) < thr) continue;
     }
     matches.push(r);
@@ -471,7 +472,7 @@ function sortColumn(key){
     case "TotalCO": asc=sortAscTotalCO; valFunc=r=> r.res.count || 0; sortAscTotalCO=!sortAscTotalCO; break;
     case "SLA": asc=sortAscSLA; valFunc=r=> r.res.slaCount || 0; sortAscSLA=!sortAscSLA; break;
     case "InProgress": asc=sortAscInProgress; valFunc=r=> r.res.inProgressCount || 0; sortAscInProgress=!sortAscInProgress; break;
-    case "RelasiResolved": asc=sortAscRelasiResolved; valFunc=r=> r.res.relasiResolved || 0; sortAscRelasiResolved=!sortAspRelasiResolved; break;
+    case "RelasiResolved": asc=sortAscRelasiResolved; valFunc=r=> r.res.relasiResolved || 0; sortAscRelasiResolved=!sortAscRelasiResolved; break;
     default: return;
   }
   if(key==="Nama") lastResults.sort((a,b)=> asc? valFunc(a).localeCompare(valFunc(b)) : valFunc(b).localeCompare(valFunc(a)));
@@ -500,6 +501,7 @@ function updateToggleSiangAvailability(){
   const isSiang = (mode === "S");
 
   cb.disabled = !isSiang;
+  // leave checkbox state as-is (do not forcibly check to avoid surprising user)
   label.classList.toggle("text-muted", !isSiang);
   cb.title = isSiang ? "Aktifkan untuk hitung mulai jam 13:00" : (mode==="IDX" ? "Tidak berlaku pada mode Index hari ini" : "Tidak berlaku untuk shift selain Siang (S)");
 
@@ -538,7 +540,9 @@ document.getElementById("shiftInput").addEventListener("change", ()=>{
 });
 
 /* === ensure initial UI state === */
-document.addEventListener("DOMContentLoaded", ()=> { updateToggleSiangAvailability(); });
+document.addEventListener("DOMContentLoaded", ()=> {
+  updateToggleSiangAvailability();
+});
 </script>
 
 <div id="copyright" class="text-center mt-3">
