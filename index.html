@@ -13,7 +13,7 @@
     .container { max-width: 1100px; background: white; border-radius: 10px; padding: 25px;
                  box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
     #judulLaporan { font-weight: 700; font-size: 18px; text-align: center; margin-bottom: 15px; color:#000; }
-    #judulLaporan.is-history { color: #8e24aa; } /* ubah di sini kalau mau merah/oranye */
+    #judulLaporan.is-history { color: #8e24aa; }
     #copyright { text-align: center; font-size: 14px; color: #000; margin-top: 40px; margin-bottom: 10px; font-weight: 600; }
 
     /* Header default biru */
@@ -32,19 +32,12 @@
     }
 
     #resultTable td { text-align: center; vertical-align: middle; font-size: 0.95rem; }
+
+    /* Baris merah bila ada SLA lewat */
     .table-danger { background-color: #ffeaea !important; }
 
-    /* Baris untuk index warning (oranye / kuning) */
-    .table-index-warning {
-      background-color: #ffcc80 !important; /* oranye muda (lebih serasi untuk baris) */
-      color: #000 !important;               /* teks hitam agar kontras */
-    }
-
-    /* Jika ingin mewarnai hanya cell IndexCO, gunakan kelas ini */
-    .td-index-warning {
-      background-color: #ffcc80 !important;
-      color: #000 !important;
-    }
+    /* Baris oranye/kuning bila index > 0.35 (prioritas lebih rendah dari merah) */
+    .table-index-warning { background-color: #ffcc80 !important; }
   </style>
 </head>
 
@@ -179,7 +172,7 @@ function levenshtein(a,b){a=a||"";b=b||"";const al=a.length,bl=b.length;if(!al)r
     dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
   return dp[al][bl];}
 function similarity(a,b){a=normalizeName(a);b=normalizeName(b);if(!a||!b)return 0;
-  const d=levenshtein(a,b);return 1-d/Math.max(a.length,b.length);} 
+  const d=levenshtein(a,b);return 1-d/Math.max(a.length,b.length);}
 function ambilJamDariTanggal(s){if(!s)return"-";const m=s.match(/(\d{1,2}):(\d{2})/);
   return m?`${m[1].padStart(2,'0')}:${m[2]}`:"-";}
 function jamMenitDariTanggal(s){
@@ -376,7 +369,6 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
   if(!shiftInput){ alert("Pilih mode dulu!"); return; }
 
   if(shiftInput==="IDX"){
-    // Sesuai permintaan: di mode IDX tombol ini memang DINONAKTIFKAN, tapi kalau kepencet:
     document.getElementById("statusText").textContent="";
     return;
   }
@@ -386,7 +378,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
     const now=new Date();
     let tanggalLabel;
     if(shiftInput==="MH1"){const y=new Date(now);y.setDate(now.getDate()-1);
-      tanggalLabel=y.toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric");}
+      tanggalLabel=y.toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});}
     else{tanggalLabel=now.toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});}
     document.getElementById("tanggalCek").textContent=tanggalLabel;
 
@@ -506,7 +498,7 @@ document.getElementById("generateBtn").addEventListener("click", async ()=>{
   }
 });
 
-/* ====== RENDER TABEL (DIBENAHI) ====== */
+/* ====== RENDER TABEL (SINGLE, CLEAN) ====== */
 function renderTable(results){
   const tbody = document.querySelector("#resultTable tbody");
   tbody.innerHTML = "";
@@ -514,23 +506,22 @@ function renderTable(results){
   results.forEach((item, index) => {
     const { k, res } = item;
 
-    // Pastikan avgNum adalah Number atau null
-    let avgNum = null;
-    if (res && res.avg !== null && res.avg !== undefined) {
-      const raw = String(res.avg).replace(",", ".");
-      avgNum = Number(raw);
-      if (Number.isNaN(avgNum)) avgNum = null;
-    }
+    // safety: parse avg as number (some sources might give string)
+    const avgNum = (res && res.avg !== null && res.avg !== undefined)
+      ? Number(String(res.avg).replace(',', '.'))
+      : null;
 
-    const avg = (avgNum !== null) ? (Math.round(avgNum * 100) / 100).toFixed(2) : "-";
+    const avg = (avgNum !== null && !Number.isNaN(avgNum))
+      ? (Math.round(avgNum * 100) / 100).toFixed(2)
+      : "-";
 
     const tr = document.createElement("tr");
 
     // Prioritas: merah bila ada SLA lewat
     if (res && (res.slaCount || 0) > 0) {
       tr.classList.add("table-danger");
-    } else if (avgNum !== null && avgNum > 0.35) {
-      // Oranye / kuning baris kalau avg > 0.35
+    } else if (avgNum !== null && !Number.isNaN(avgNum) && avgNum > 0.35) {
+      // Oranye jika avg > 0.35 (bukan >=)
       tr.classList.add("table-index-warning");
     }
 
@@ -549,7 +540,7 @@ function renderTable(results){
     tbody.appendChild(tr);
   });
 
-  // Reset event handler sorting (tetap sama)
+  // reattach column header click handlers
   ["Nama","LastCO","IndexCO","TotalCO","SLA","InProgress","RelasiResolved"].forEach(k=>{
     const el = document.getElementById(`sort${k}`);
     if (el) el.onclick = () => sortColumn(k);
