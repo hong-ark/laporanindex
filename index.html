@@ -36,7 +36,7 @@
 
     /* Baris untuk index warning (oranye / kuning) */
     .table-index-warning {
-      background-color: #ffcc80 !important; /* oranye/kuning; ganti hex kalau mau warna lain */
+      background-color: #ff9800 !important; /* oranye/kuning; ganti hex kalau mau warna lain */
     }
   </style>
 </head>
@@ -501,42 +501,50 @@ document.getElementById("generateBtn").addEventListener("click", async ()=>{
 
 /* ====== RENDER TABEL (DIBENAHI) ====== */
 function renderTable(results){
-  const tbody=document.querySelector("#resultTable tbody");
-  tbody.innerHTML="";
+  const tbody = document.querySelector("#resultTable tbody");
+  tbody.innerHTML = "";
 
-  results.forEach((item,index)=>{
-    const {k,res}=item;
-    const avgNum = (res && res.avg !== null) ? res.avg : null;
-    const avg = avgNum !== null ? (Math.round(avgNum*100)/100).toFixed(2) : "-";
+  results.forEach((item, index) => {
+    const { k, res } = item;
+
+    // Pastikan avgNum adalah Number atau null
+    const avgNum = (res && res.avg !== null && res.avg !== undefined)
+      ? Number(res.avg)
+      : null;
+
+    const avg = avgNum !== null && !Number.isNaN(avgNum)
+      ? (Math.round(avgNum * 100) / 100).toFixed(2)
+      : "-";
 
     const tr = document.createElement("tr");
 
-    // Prioritas: merah jika ada SLA lewat (table-danger)
-    // Jika tidak, berikan warna oranye/kuning pada baris jika index > 0.35
-    if(res && res.slaCount > 0){
+    // Prioritas: merah bila ada SLA lewat
+    if (res && (res.slaCount || 0) > 0) {
       tr.classList.add("table-danger");
-    } else if(avgNum !== null && avgNum > 0.35){
+    } else if (avgNum !== null && !Number.isNaN(avgNum) && avgNum > 0.35) {
+      // Oranye / kuning baris kalau avg > 0.35
       tr.classList.add("table-index-warning");
     }
 
     tr.innerHTML = `
-      <td>${index+1}</td>
+      <td>${index + 1}</td>
       <td>${k.nama}</td>
-      <td>${k.shift||'-'}</td>
+      <td>${k.shift || '-'}</td>
       <td>${res.lastTime}</td>
       <td>${avg}</td>
-      <td>${res.count||0}</td>
-      <td>${res.slaCount||0}</td>
-      <td>${res.inProgressCount||0}</td>
-      <td>${res.relasiResolved||0}</td>
+      <td>${res.count || 0}</td>
+      <td>${res.slaCount || 0}</td>
+      <td>${res.inProgressCount || 0}</td>
+      <td>${res.relasiResolved || 0}</td>
     `;
 
     tbody.appendChild(tr);
   });
 
+  // Reset event handler sorting (tetap sama)
   ["Nama","LastCO","IndexCO","TotalCO","SLA","InProgress","RelasiResolved"].forEach(k=>{
-    const el=document.getElementById(`sort${k}`);
-    if(el) el.onclick=()=>sortColumn(k);
+    const el = document.getElementById(`sort${k}`);
+    if (el) el.onclick = () => sortColumn(k);
   });
 }
 
@@ -630,3 +638,4 @@ document.addEventListener("DOMContentLoaded", updateToggleSiangAvailability);
 </div>
 </body>
 </html>
+
