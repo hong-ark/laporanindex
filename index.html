@@ -538,7 +538,7 @@ function renderTable(results){
     // Prioritaskan merah bila ada SLA lewat
     if (res && (res.slaCount || 0) > 0) {
       tr.classList.add("table-danger");
-    } else if (avgNum !== null && avgNum > 0.35) {
+    } else if (avgNum !== null && avgNum > 0.36) {
       // oranye bila avg > 0.35 (bukan >=)
       tr.classList.add("table-index-warning");
     }
@@ -672,3 +672,4 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </script>
 </body>
 </html>
+
