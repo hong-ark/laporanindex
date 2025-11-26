@@ -4,40 +4,65 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Laporan Index Shift (Index terakhir CO)</title>
-
-  <!-- Favicon tetap sebagai data-URL SVG -->
-  <link rel="icon" type="image/svg+xml"
-        href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='32' fill='%23b71c1c'/><text x='50%25' y='50%25' fill='white' font-family='Arial, Helvetica, sans-serif' font-weight='700' font-size='28' text-anchor='middle' dominant-baseline='central'>R3</text></svg>">
-  <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='32' fill='%23b71c1c'/><text x='50%25' y='50%25' fill='white' font-family='Arial, Helvetica, sans-serif' font-weight='700' font-size='28' text-anchor='middle' dominant-baseline='central'>R3</text></svg>">
-  <meta name="theme-color" content="#1976d2">
-
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
   <style>
-    body { background: #f6f7fb; padding: 20px; }
-    .container { max-width: 1100px; background: white; border-radius: 10px; padding: 0; 
-                 box-shadow: 0 2px 6px rgba(0,0,0,0.1); overflow: hidden; }
+    /* PAGE */
+    body { background: #f6f7fb; padding: 20px; font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+    .container { max-width: 1100px; background: white; border-radius: 10px; padding: 25px;
+                 box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin-top: 16px; }
 
-    /* Top header area (blue) - no logo image next to text */
+    /* TOP BLUE HEADER with marquee */
     .site-top {
-      background: linear-gradient(#2286d2, #1976d2);
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+      background: linear-gradient(180deg,#2196f3,#1976d2);
       color: #fff;
-      padding: 18px 22px;
-      display:flex;
-      align-items:center;
-      gap:14px;
+      border-radius: 8px;
+      padding: 10px 16px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
-    .site-top h1 { margin:0; font-size:20px; font-weight:700; letter-spacing:0.5px; }
+    .site-top .title {
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: .5px;
+      white-space: nowrap;
+    }
+    .marquee-wrap{
+      overflow: hidden;
+      flex: 1;
+      display: block;
+      position: relative;
+    }
+    .marquee{
+      display: inline-block;
+      white-space: nowrap;
+      animation: marquee-right-left 12s linear infinite;
+      will-change: transform;
+      font-weight:700;
+      font-size:14px;
+      color: #fff;
+      padding: 4px 0;
+    }
+    .marquee span{ display:inline-block; padding-right: 60px; }
+    .marquee-wrap:hover .marquee{ animation-play-state: paused; }
 
-    .content-area { padding:20px 25px; }
+    @keyframes marquee-right-left {
+      0%   { transform: translateX(100%); }
+      100% { transform: translateX(-100%); }
+    }
 
-    #judulLaporan { font-weight: 700; font-size: 18px; text-align: center; margin-bottom: 8px; color:#000; }
+    /* CONTAINER TITLES */
+    #judulLaporan { font-weight: 700; font-size: 18px; text-align: center; margin-bottom: 15px; color:#000; }
     #judulLaporan.is-history { color: #8e24aa; }
-    #resultTable td { text-align: center; vertical-align: middle; font-size: 0.95rem; }
 
-    /* Header tabel biru + teks putih, dan align center */
+    /* TABLE header biru + teks putih, align center */
     #resultTable.table thead tr th {
       background-color: #1976d2 !important;
       color: #fff !important;
@@ -51,47 +76,58 @@
     }
     #resultTable.table thead tr th:hover { background-color: #1565c0 !important; }
 
-    /* Header abu-abu saat lihat HISTORY */
+    /* Header abu-abu saat lihat history */
     #resultArea.is-history thead tr th {
       background-color: #9e9e9e !important;
       border-color: #757575 !important;
       color: #fff !important;
     }
 
-    /* Merah bila ada SLA lewat (prioritas) */
+    /* body cells */
+    #resultTable td { text-align: center; vertical-align: middle; font-size: 0.95rem; }
+
+    /* merah bila ada SLA lewat (prioritas) */
     .table-danger td {
       background-color: #ffeaea !important;
       color: #000 !important;
     }
 
-    /* Oranye/kuning untuk index > 0.35 pada seluruh baris */
+    /* oranye/kuning untuk index > 0.35 pada seluruh baris */
     .table-index-warning td {
-      background-color: #ffcc80 !important; /* oranye-kuning */
+      background-color: #ffcc80 !important;
       color: #000 !important;
     }
 
     /* kecilkan spasi panah supaya rapi */
-    .hdr-arrow { font-weight: 700; margin-left: 6px; font-size: 0.9em; }
+    .hdr-arrow { font-weight: 700; margin-left: 6px; font-size: 0.95em; }
 
-    #copyright { text-align: center; font-size: 13px; color: #666; margin: 18px 0; padding-bottom: 14px; }
-
+    /* responsive tweaks */
     @media (max-width: 600px){
-      .site-top h1 { font-size:16px; }
-      .site-top { padding:12px; gap:10px; }
-      .content-area { padding:12px; }
+      .site-top { padding: 8px 10px; gap: 8px; }
+      .site-top .title { font-size: 14px; }
+      .marquee { font-size: 13px; animation-duration: 10s; }
+      #resultTable td { font-size: 0.85rem; }
     }
   </style>
 </head>
 
 <body>
-<div class="container">
-  <!-- top blue header WITHOUT logo image -->
-  <div class="site-top">
-    <h1></h1>
+
+  <!-- TOP BAR with Marquee -->
+  <div class="site-top" role="banner" aria-label="Header Pengumuman">
+    <div class="title">LAPORAN</div>
+    <div class="marquee-wrap" aria-hidden="false" role="region" aria-label="Pengumuman penting">
+      <div class="marquee" id="mainMarquee">
+        <span>JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
+        <span>JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
+      </div>
+    </div>
   </div>
 
-  <div class="content-area">
-    <p style="margin:0 0 12px 0;color:#333">Pilih shift → Generate Jadwal → Upload CSV → Hitung Index</p>
+  <!-- MAIN CONTAINER -->
+  <div class="container">
+    <h4><b>Laporan Index Shift</b></h4>
+    <p>Pilih shift → Generate Jadwal → Upload CSV → Hitung Index</p>
 
     <div class="mb-3 row align-items-end">
       <div class="col-auto">
@@ -163,31 +199,25 @@
     </div>
   </div>
 
-  <div id="copyright">
-    © 2025 EDP Fai
-  </div>
-</div>
-
-<!-- Modal History -->
-<div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">History Laporan (10 terakhir)</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
-      </div>
-      <div class="modal-body">
-        <div id="historyList" class="list-group"></div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Tutup</button>
+  <!-- Modal History -->
+  <div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">History Laporan (10 terakhir)</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+        </div>
+        <div class="modal-body">
+          <div id="historyList" class="list-group"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Tutup</button>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
 <script>
 /* ====== KONFIG / STATE ====== */
 const GAS_URL = "https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFMrU-NNqxMW2ZtSCRIpESCpC4Nz7VzdKRmt-Zx1rJXjnRd-g/exec";
@@ -306,43 +336,42 @@ async function renderHistoryList(){
 /* ====== CSV LOAD ====== */
 document.getElementById("csvFile").addEventListener("change",(e)=>{
   const file = e.target.files[0]; if(!file) return;
-  Papa.parse(file,{header:true,delimiter:";",skipEmptyLines:true,
-    complete:(res)=>{
-      const headerMap={}; (res.meta.fields||[]).forEach(f=>headerMap[normKey(f)]=f);
-      const getCol = (row,arr)=>{
-        for(const c of arr){ for(const key in headerMap){ if(key.includes(c)){ const realKey=headerMap[key]; if(row[realKey]) return row[realKey].toString(); } } }
-        return "";
+  Papa.parse(file,{header:true,delimiter:";",skipEmptyLines:true, complete:(res)=>{
+    const headerMap={}; (res.meta.fields||[]).forEach(f=>headerMap[normKey(f)]=f);
+    const getCol = (row,arr)=>{
+      for(const c of arr){ for(const key in headerMap){ if(key.includes(c)){ const realKey=headerMap[key]; if(row[realKey]) return row[realKey].toString(); } } }
+      return "";
+    };
+    csvData = res.data.map(r=>{
+      const diambilOleh = getCol(r,['diambiloleh','diambil oleh']);
+      const durasiRaw = getCol(r,['durasikomplain','durasi']);
+      const waktuSlaRaw = getCol(r,['waktusla','waktu sla']);
+      const statusRaw = getCol(r,['statuskomplain','status']);
+      const statusSlaRaw = getCol(r,['statussla','status sla']);
+      const tglDiambilRaw = getCol(r,['tanggaldiambil','tgl diambil','tanggal diambil']);
+      const tipeLokasiRaw = getCol(r,['tipelokasiasal','tipe lokasi asal']);
+      const slaNum = parseFloat((waktuSlaRaw||"").replace(",","."))||0;
+      return {
+        diambilOleh,
+        durasiRaw,
+        durasiDetik: durasiKeDetik(durasiRaw),
+        waktuSlaDetik: slaNum*3600,
+        status: statusRaw,
+        statusNorm: normalizeStatus(statusRaw),
+        statusSLA: statusSlaRaw,
+        tanggalDiambil: tglDiambilRaw,
+        tipeLokasi: (tipeLokasiRaw||"").trim()
       };
-      csvData = res.data.map(r=>{
-        const diambilOleh = getCol(r,['diambiloleh','diambil oleh']);
-        const durasiRaw = getCol(r,['durasikomplain','durasi']);
-        const waktuSlaRaw = getCol(r,['waktusla','waktu sla']);
-        const statusRaw = getCol(r,['statuskomplain','status']);
-        const statusSlaRaw = getCol(r,['statussla','status sla']);
-        const tglDiambilRaw = getCol(r,['tanggaldiambil','tgl diambil','tanggal diambil']);
-        const tipeLokasiRaw = getCol(r,['tipelokasiasal','tipe lokasi asal']);
-        const slaNum = parseFloat((waktuSlaRaw||"").replace(",","."))||0;
-        return {
-          diambilOleh,
-          durasiRaw,
-          durasiDetik: durasiKeDetik(durasiRaw),
-          waktuSlaDetik: slaNum*3600,
-          status: statusRaw,
-          statusNorm: normalizeStatus(statusRaw),
-          statusSLA: statusSlaRaw,
-          tanggalDiambil: tglDiambilRaw,
-          tipeLokasi: (tipeLokasiRaw||"").trim()
-        };
-      });
+    });
 
-      const mode = document.getElementById("shiftInput").value.trim().toUpperCase();
-      if(mode==="IDX"){
-        sheetData = buildUniqueNamesFromCSV(csvData);
-        document.getElementById("generateBtn").disabled = sheetData.length===0;
-        document.getElementById("modeNote").textContent = sheetData.length ? " " : "(Mode Index) Tidak ada nama pada kolom 'Diambil oleh'.";
-      }
-      document.getElementById("statusText").textContent = `File CSV terbaca: ${csvData.length} baris.`;
-    }});
+    const mode = document.getElementById("shiftInput").value.trim().toUpperCase();
+    if(mode==="IDX"){
+      sheetData = buildUniqueNamesFromCSV(csvData);
+      document.getElementById("generateBtn").disabled = sheetData.length===0;
+      document.getElementById("modeNote").textContent = sheetData.length ? " " : "(Mode Index) Tidak ada nama pada kolom 'Diambil oleh'.";
+    }
+    document.getElementById("statusText").textContent = `File CSV terbaca: ${csvData.length} baris.`;
+  }});
 });
 
 /* ====== BUILD NAMA (MODE IDX) ====== */
@@ -425,7 +454,7 @@ function rataRata_byName(nama,thr=0.85){
   };
 }
 
-/* simple levenshtein/similarity */
+/* levenshtein + similarity */
 function levenshtein(a,b){ a=a||""; b=b||""; const al=a.length, bl=b.length; if(!al) return bl; if(!bl) return al;
   const dp=Array.from({length:al+1},()=>Array(bl+1).fill(0));
   for(let i=0;i<=al;i++) dp[i][0]=i; for(let j=0;j<=bl;j++) dp[0][j]=j;
@@ -501,13 +530,13 @@ function renderTable(results){
     if (res && (res.slaCount || 0) > 0) {
       tr.classList.add("table-danger");
     } else if (avgNum !== null && avgNum > 0.35) {
-      // oranye bila avg > 0.35 (bukan >=)
+      // oranye bila avg > 0.35
       tr.classList.add("table-index-warning");
     }
 
     tr.innerHTML = `
       <td>${index + 1}</td>
-      <td>${k.nama}</td>
+      <td style="text-align:left; padding-left:10px;">${k.nama}</td>
       <td>${k.shift || '-'}</td>
       <td>${res.lastTime}</td>
       <td>${avg}</td>
@@ -526,7 +555,7 @@ function renderTable(results){
   });
 }
 
-/* ====== SORTING ====== */
+/* ====== SORTING helpers ====== */
 function resetAllHeaderArrows(){
   Object.keys(originalHeaderText).forEach(id=>{
     const el = document.getElementById(id);
@@ -583,11 +612,12 @@ function updateToggleSiangAvailability(){
   const isSiang = (mode === "S");
 
   cb.disabled = !isSiang;
+  // auto-check when Siang and current hour >=13 (per request earlier)
   const nowHour = new Date().getHours();
   cb.checked  = isSiang && (nowHour >= 13);
 
   label.classList.toggle("text-muted", !isSiang);
-  cb.title = isSiang ? "Jika aktif → hitung siang mulai jam 13:00" : (mode==="IDX" ? "Tidak berlaku pada mode Index hari ini" : "Tidak berlaku untuk shift selain Siang (S)");
+  cb.title = isSiang ? "Aktifkan untuk hitung mulai jam 13:00" : (mode==="IDX" ? "Tidak berlaku pada mode Index hari ini" : "Tidak berlaku untuk shift selain Siang (S)");
 
   if(mode==="IDX"){
     btnGsheet.disabled = true;
@@ -632,6 +662,9 @@ document.addEventListener("DOMContentLoaded", ()=> {
   updateToggleSiangAvailability();
 });
 </script>
+
+<div id="copyright" class="text-center mt-3">
+  © 2025 EDP Fai
+</div>
 </body>
 </html>
-
