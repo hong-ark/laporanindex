@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Laporan Index Shift (Index terakhir CO)</title>
 
-  <!-- Favicon tetap sebagai data-URL SVG -->
+  <!-- === Favicon (data-URL SVG, kembalikan seperti script lama) === -->
   <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='32' fill='%23b71c1c'/><text x='50%25' y='50%25' fill='white' font-family='Arial, Helvetica, sans-serif' font-weight='700' font-size='28' text-anchor='middle' dominant-baseline='central'>R3</text></svg>">
   <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='32' fill='%23b71c1c'/><text x='50%25' y='50%25' fill='white' font-family='Arial, Helvetica, sans-serif' font-weight='700' font-size='28' text-anchor='middle' dominant-baseline='central'>R3</text></svg>">
@@ -16,20 +16,47 @@
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
   <style>
-    body { background: #f6f7fb; padding: 20px; }
-    .container { max-width: 1100px; background: white; border-radius: 10px; padding: 0; 
-                 box-shadow: 0 2px 6px rgba(0,0,0,0.1); overflow: hidden; }
+    /* PAGE */
+    body { background: #f6f7fb; padding: 20px; font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+    .container { max-width: 1100px; background: white; border-radius: 10px; padding: 0;
+                 box-shadow: 0 2px 6px rgba(0,0,0,0.1); overflow: hidden; margin: 0 auto; }
 
-    /* Top header area (blue) - no logo image next to text */
+    /* Top header area (blue) with marquee */
     .site-top {
       background: linear-gradient(#2286d2, #1976d2);
       color: #fff;
-      padding: 18px 22px;
+      padding: 12px 18px;
       display:flex;
       align-items:center;
       gap:14px;
     }
-    .site-top h1 { margin:0; font-size:20px; font-weight:700; letter-spacing:0.5px; }
+    .site-top .title { margin:0; font-size:18px; font-weight:700; letter-spacing:0.5px; white-space:nowrap; color:#fff; }
+
+    /* Marquee container */
+    .marquee-wrap {
+      overflow: hidden;
+      flex: 1;
+      position: relative;
+      min-width: 120px;
+    }
+    .marquee {
+      display: inline-block;
+      white-space: nowrap;
+      /* ubah durasi di sini (lebih kecil = lebih cepat) */
+      --marquee-duration: 20s;
+      animation: marquee-rl var(--marquee-duration) linear infinite;
+      will-change: transform;
+      font-weight:700;
+      font-size:14px;
+      color: #fff;
+    }
+    .marquee span { display:inline-block; padding-right: 60px; }
+    .marquee-wrap:hover .marquee { animation-play-state: paused; }
+
+    @keyframes marquee-rl {
+      0%   { transform: translateX(100%); }
+      100% { transform: translateX(-100%); }
+    }
 
     .content-area { padding:20px 25px; }
 
@@ -76,18 +103,28 @@
     #copyright { text-align: center; font-size: 13px; color: #666; margin: 18px 0; padding-bottom: 14px; }
 
     @media (max-width: 600px){
-      .site-top h1 { font-size:16px; }
-      .site-top { padding:12px; gap:10px; }
+      .site-top .title { font-size:16px; }
+      .site-top { padding:10px; gap:10px; }
       .content-area { padding:12px; }
+      .marquee { font-size:13px; --marquee-duration: 12s; }
+      #resultTable td { font-size: 0.85rem; }
     }
   </style>
 </head>
 
 <body>
 <div class="container">
-  <!-- top blue header WITHOUT logo image -->
-  <div class="site-top">
-    <h1>LAPORAN</h1>
+  <!-- top blue header WITH marquee (no logo image) -->
+  <div class="site-top" role="banner" aria-label="Header Pengumuman">
+    <h1 class="title"></h1>
+    <div class="marquee-wrap" aria-hidden="false" role="region" aria-label="Pengumuman penting">
+      <div class="marquee" id="mainMarquee" aria-live="polite">
+        <!-- ulang beberapa kali supaya continuous -->
+        <span>JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
+        <span>JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
+        <span>JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
+      </div>
+    </div>
   </div>
 
   <div class="content-area">
@@ -190,6 +227,7 @@
 
 <script>
 /* ====== KONFIG / STATE ====== */
+/* (sisa script Anda dipertahankan; hanya disisipkan di sini) */
 const GAS_URL = "https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFMrU-NNqxMW2ZtSCRIpESCpC4Nz7VzdKRmt-Zx1rJXjnRd-g/exec";
 const HISTORY_GAS_URL = "https://script.google.com/macros/s/AKfycbwrXZlIB4nyiQtb-MM79c8rm1rDuoVyEZRxdk4-yTHaM_teOWR-XxC_BK50RsVlmo-P/exec";
 
@@ -425,7 +463,7 @@ function rataRata_byName(nama,thr=0.85){
   };
 }
 
-/* simple levenshtein/similarity */
+/* levenshtein + similarity */
 function levenshtein(a,b){ a=a||""; b=b||""; const al=a.length, bl=b.length; if(!al) return bl; if(!bl) return al;
   const dp=Array.from({length:al+1},()=>Array(bl+1).fill(0));
   for(let i=0;i<=al;i++) dp[i][0]=i; for(let j=0;j<=bl;j++) dp[0][j]=j;
