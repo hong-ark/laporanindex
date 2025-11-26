@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Laporan Index Shift (Index terakhir CO)</title>
+
+  <!-- Favicon: embedded SVG (image clipped to circle) -->
+  <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiB2aWV3Qm94PSIwIDAgMjU2IDI1NiI+CiAgPGRlZnM+CiAgICA8Y2xpcFBhdGggaWQ9ImMiPgogICAgICA8Y2lyY2xlIGN4PSIxMjgiIGN5PSIxMjgiIHI9IjEyOCIvPgogICAgPC9jbGlwUGF0aD4KICA8L2RlZnM+CiAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idHJhbnNwYXJlbnQiLz4KICA8aW1hZ2UgY2xpcC1wYXRoPSJ1cmwoI2MpIiB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgcHJlc2VydmVBc3BlY3RSYXRpbz0ieE1pZHdZTWlkIHNsaWNlIiBocmVmPSJkYXRhOmltYWdlL3BuZztiYXNlNjQs{{BASE64_PNG}}Ii8+Cjwvc3ZnPg==">
+
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -18,7 +22,7 @@
     .site-top {
       width: 100%;
       max-width: 1100px;
-      margin: 0 auto;
+      margin: 0 auto 12px;
       background: linear-gradient(180deg,#2196f3,#1976d2);
       color: #fff;
       border-radius: 8px;
@@ -33,6 +37,7 @@
       font-size: 18px;
       letter-spacing: .5px;
       white-space: nowrap;
+      color: rgba(255,255,255,0.95);
     }
     .marquee-wrap{
       overflow: hidden;
@@ -86,6 +91,9 @@
     /* body cells */
     #resultTable td { text-align: center; vertical-align: middle; font-size: 0.95rem; }
 
+    /* Name cell left aligned for readability */
+    #resultTable td.name-col { text-align: left; padding-left: 10px; }
+
     /* merah bila ada SLA lewat (prioritas) */
     .table-danger td {
       background-color: #ffeaea !important;
@@ -115,9 +123,9 @@
 
   <!-- TOP BAR with Marquee -->
   <div class="site-top" role="banner" aria-label="Header Pengumuman">
-    <div class="title"></div>
+    <div class="title">LAPORAN</div>
     <div class="marquee-wrap" aria-hidden="false" role="region" aria-label="Pengumuman penting">
-      <div class="marquee" id="mainMarquee">
+      <div class="marquee" id="mainMarquee" aria-live="polite">
         <span>JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
         <span>JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
         <span>JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
@@ -126,7 +134,7 @@
   </div>
 
   <!-- MAIN CONTAINER -->
-  <div class="container">
+  <div class="container" role="main">
     <h4><b>Laporan Index Shift</b></h4>
     <p>Pilih shift → Generate Jadwal → Upload CSV → Hitung Index</p>
 
@@ -173,21 +181,21 @@
       </label>
     </div>
 
-    <div id="judulLaporan" class="mt-2"></div>
+    <div id="judulLaporan" class="mt-2" aria-live="polite"></div>
 
     <div id="resultArea" class="mt-2">
-      <table id="resultTable" class="table table-bordered table-striped">
+      <table id="resultTable" class="table table-bordered table-striped" role="table" aria-describedby="judulLaporan">
         <thead>
           <tr>
-            <th>No</th>
-            <th id="sortNama">Nama Karyawan</th>
-            <th>Shift</th>
-            <th id="sortLastCO">LastCO</th>
-            <th id="sortIndexCO">IndexCO</th>
-            <th id="sortTotalCO">TotalCO</th>
-            <th id="sortSLA">SLA</th>
-            <th id="sortInProgress">InProgress</th>
-            <th id="sortRelasiResolved">Relasi</th>
+            <th scope="col">No</th>
+            <th id="sortNama" scope="col">Nama Karyawan</th>
+            <th scope="col">Shift</th>
+            <th id="sortLastCO" scope="col">LastCO</th>
+            <th id="sortIndexCO" scope="col">IndexCO</th>
+            <th id="sortTotalCO" scope="col">TotalCO</th>
+            <th id="sortSLA" scope="col">SLA</th>
+            <th id="sortInProgress" scope="col">InProgress</th>
+            <th id="sortRelasiResolved" scope="col">Relasi</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -537,7 +545,7 @@ function renderTable(results){
 
     tr.innerHTML = `
       <td>${index + 1}</td>
-      <td style="text-align:left; padding-left:10px;">${k.nama}</td>
+      <td class="name-col">${k.nama}</td>
       <td>${k.shift || '-'}</td>
       <td>${res.lastTime}</td>
       <td>${avg}</td>
@@ -613,7 +621,7 @@ function updateToggleSiangAvailability(){
   const isSiang = (mode === "S");
 
   cb.disabled = !isSiang;
-  // auto-check when Siang and current hour >=13 (per request earlier)
+  // auto-check when Siang and current hour >=13
   const nowHour = new Date().getHours();
   cb.checked  = isSiang && (nowHour >= 13);
 
@@ -669,5 +677,3 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </div>
 </body>
 </html>
-
-
