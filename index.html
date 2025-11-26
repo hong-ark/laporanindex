@@ -5,8 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Laporan Index Shift (Index terakhir CO)</title>
 
-  <!-- Favicon & Apple touch (data-URL SVG, bundar merah dengan teks putih "R3") -->
-  <!-- Data-URL menggunakan SVG inline; jika browser cache lama favicon, refresh / buka incognito -->
+  <!-- Favicon tetap sebagai data-URL SVG -->
   <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='32' fill='%23b71c1c'/><text x='50%25' y='50%25' fill='white' font-family='Arial, Helvetica, sans-serif' font-weight='700' font-size='28' text-anchor='middle' dominant-baseline='central'>R3</text></svg>">
   <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='32' fill='%23b71c1c'/><text x='50%25' y='50%25' fill='white' font-family='Arial, Helvetica, sans-serif' font-weight='700' font-size='28' text-anchor='middle' dominant-baseline='central'>R3</text></svg>">
@@ -21,7 +20,7 @@
     .container { max-width: 1100px; background: white; border-radius: 10px; padding: 0; 
                  box-shadow: 0 2px 6px rgba(0,0,0,0.1); overflow: hidden; }
 
-    /* Top header area (mirip contoh biru) */
+    /* Top header area (blue) - no logo image next to text */
     .site-top {
       background: linear-gradient(#2286d2, #1976d2);
       color: #fff;
@@ -31,11 +30,6 @@
       gap:14px;
     }
     .site-top h1 { margin:0; font-size:20px; font-weight:700; letter-spacing:0.5px; }
-    .site-top .logo-circle {
-      width:44px; height:44px; border-radius:50%;
-      display:inline-block; overflow:hidden; flex:0 0 44px; align-items:center; justify-content:center;
-    }
-    .site-top .logo-circle img { width:100%; height:100%; object-fit:cover; display:block; }
 
     .content-area { padding:20px 25px; }
 
@@ -79,13 +73,8 @@
     /* kecilkan spasi panah supaya rapi */
     .hdr-arrow { font-weight: 700; margin-left: 6px; font-size: 0.9em; }
 
-    /* buat ikon/logo di tabel header tetap clickable area */
-    #resultTable thead th { white-space: nowrap; }
-
-    /* footer */
     #copyright { text-align: center; font-size: 13px; color: #666; margin: 18px 0; padding-bottom: 14px; }
 
-    /* responsive tweaks */
     @media (max-width: 600px){
       .site-top h1 { font-size:16px; }
       .site-top { padding:12px; gap:10px; }
@@ -96,11 +85,8 @@
 
 <body>
 <div class="container">
-  <!-- top blue header with circular logo (embedded SVG data URL) -->
+  <!-- top blue header WITHOUT logo image -->
   <div class="site-top">
-    <div class="logo-circle">
-      <img alt="logo" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='32' fill='%23b71c1c'/><text x='50%25' y='50%25' fill='white' font-family='Arial, Helvetica, sans-serif' font-weight='700' font-size='28' text-anchor='middle' dominant-baseline='central'>R3</text></svg>">
-    </div>
     <h1>LAPORAN</h1>
   </div>
 
@@ -541,7 +527,6 @@ function renderTable(results){
 }
 
 /* ====== SORTING ====== */
-/* Helper: reset all headers to original, then set arrow on one */
 function resetAllHeaderArrows(){
   Object.keys(originalHeaderText).forEach(id=>{
     const el = document.getElementById(id);
@@ -598,7 +583,6 @@ function updateToggleSiangAvailability(){
   const isSiang = (mode === "S");
 
   cb.disabled = !isSiang;
-  // auto-check when Siang and current hour >=13
   const nowHour = new Date().getHours();
   cb.checked  = isSiang && (nowHour >= 13);
 
