@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Laporan Index Shift (Index terakhir CO)</title>
 
-  <!-- === Favicon (data-URL SVG, kembalikan seperti script lama) === -->
+  <!-- Favicon (data-URL SVG seperti permintaan Anda sebelumnya) -->
   <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='32' fill='%23b71c1c'/><text x='50%25' y='50%25' fill='white' font-family='Arial, Helvetica, sans-serif' font-weight='700' font-size='28' text-anchor='middle' dominant-baseline='central'>R3</text></svg>">
   <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='32' fill='%23b71c1c'/><text x='50%25' y='50%25' fill='white' font-family='Arial, Helvetica, sans-serif' font-weight='700' font-size='28' text-anchor='middle' dominant-baseline='central'>R3</text></svg>">
@@ -16,12 +16,10 @@
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
   <style>
-    /* PAGE */
     body { background: #f6f7fb; padding: 20px; font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial; }
     .container { max-width: 1100px; background: white; border-radius: 10px; padding: 0;
                  box-shadow: 0 2px 6px rgba(0,0,0,0.1); overflow: hidden; margin: 0 auto; }
 
-    /* Top header area (blue) with marquee */
     .site-top {
       background: linear-gradient(#2286d2, #1976d2);
       color: #fff;
@@ -32,98 +30,53 @@
     }
     .site-top .title { margin:0; font-size:18px; font-weight:700; letter-spacing:0.5px; white-space:nowrap; color:#fff; }
 
-    /* Marquee container */
-    .marquee-wrap {
-      overflow: hidden;
-      flex: 1;
-      position: relative;
-      min-width: 120px;
-    }
+    .marquee-wrap { overflow: hidden; flex: 1; position: relative; min-width: 120px; }
     .marquee {
-      display: inline-block;
-      white-space: nowrap;
-      /* ubah durasi di sini (lebih kecil = lebih cepat) */
+      display: inline-block; white-space: nowrap;
       --marquee-duration: 20s;
       animation: marquee-rl var(--marquee-duration) linear infinite;
-      will-change: transform;
-      font-weight:700;
-      font-size:14px;
-      color: #fff;
+      will-change: transform; font-weight:700; font-size:14px; color: #fff;
     }
     .marquee span { display:inline-block; padding-right: 60px; }
     .marquee-wrap:hover .marquee { animation-play-state: paused; }
-
-    @keyframes marquee-rl {
-      0%   { transform: translateX(100%); }
-      100% { transform: translateX(-100%); }
-    }
+    @keyframes marquee-rl { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
 
     .content-area { padding:20px 25px; }
-
     #judulLaporan { font-weight: 700; font-size: 18px; text-align: center; margin-bottom: 8px; color:#000; }
-    #judulLaporan.is-history { color: #8e24aa; }
     #resultTable td { text-align: center; vertical-align: middle; font-size: 0.95rem; }
 
-    /* Header tabel biru + teks putih, dan align center */
     #resultTable.table thead tr th {
-      background-color: #1976d2 !important;
-      color: #fff !important;
-      text-align: center !important;
-      font-weight: 700;
-      cursor: pointer;
-      padding: 10px;
-      user-select: none;
-      vertical-align: middle;
+      background-color: #1976d2 !important; color: #fff !important; text-align: center !important;
+      font-weight: 700; cursor: pointer; padding: 10px; user-select: none; vertical-align: middle;
       border-color: #1565c0 !important;
     }
     #resultTable.table thead tr th:hover { background-color: #1565c0 !important; }
+    #resultArea.is-history thead tr th { background-color: #9e9e9e !important; border-color: #757575 !important; color: #fff !important; }
 
-    /* Header abu-abu saat lihat HISTORY */
-    #resultArea.is-history thead tr th {
-      background-color: #9e9e9e !important;
-      border-color: #757575 !important;
-      color: #fff !important;
-    }
+    .table-danger td { background-color: #ffeaea !important; color: #000 !important; }
+    .table-index-warning td { background-color: #ffcc80 !important; color: #000 !important; }
 
-    /* Merah bila ada SLA lewat (prioritas) */
-    .table-danger td {
-      background-color: #ffeaea !important;
-      color: #000 !important;
-    }
-
-    /* Oranye/kuning untuk index > 0.35 pada seluruh baris */
-    .table-index-warning td {
-      background-color: #ffcc80 !important; /* oranye-kuning */
-      color: #000 !important;
-    }
-
-    /* kecilkan spasi panah supaya rapi */
     .hdr-arrow { font-weight: 700; margin-left: 6px; font-size: 0.9em; }
 
     #copyright { text-align: center; font-size: 13px; color: #666; margin: 18px 0; padding-bottom: 14px; }
 
     @media (max-width: 600px){
-      .site-top .title { font-size:16px; }
-      .site-top { padding:10px; gap:10px; }
-      .content-area { padding:12px; }
-      .marquee { font-size:13px; --marquee-duration: 12s; }
-      #resultTable td { font-size: 0.85rem; }
+      .site-top .title { font-size:16px; } .site-top { padding:10px; gap:10px; } .content-area { padding:12px; }
+      .marquee { font-size:13px; --marquee-duration: 12s; } #resultTable td { font-size: 0.85rem; }
     }
   </style>
 </head>
 
 <body>
 <div class="container">
-  <!-- top blue header WITH marquee (no logo image) -->
   <div class="site-top" role="banner" aria-label="Header Pengumuman">
     <h1 class="title"></h1>
     <div class="marquee-wrap" aria-hidden="false" role="region" aria-label="Pengumuman penting">
       <div class="marquee" id="mainMarquee" aria-live="polite">
-        <!-- ulang beberapa kali supaya continuous -->
         <span>JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
         <span>JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
         <span>JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
-       </div>
+      </div>
     </div>
   </div>
 
@@ -165,12 +118,9 @@
     <button id="generateBtn" class="btn btn-success mb-1" disabled>Hitung Index</button>
     <span id="statusText" class="ms-2 text-muted"></span>
 
-    <!-- Toggle hanya aktif saat S -->
     <div class="form-check mt-2">
       <input class="form-check-input" type="checkbox" id="toggleSiang14" disabled>
-      <label class="form-check-label text-muted" for="toggleSiang14" id="labelToggleSiang14">
-        Hitung Siang mulai ≥ 13:00
-      </label>
+      <label class="form-check-label text-muted" for="toggleSiang14" id="labelToggleSiang14">Hitung Siang mulai ≥ 13:00</label>
     </div>
 
     <div id="judulLaporan" class="mt-2"></div>
@@ -186,6 +136,8 @@
             <th id="sortIndexCO">IndexCO</th>
             <th id="sortTotalCO">TotalCO</th>
             <th id="sortSLA">SLA</th>
+            <!-- new column -->
+            <th id="sortDurasiSLA">DurasiSLA</th>
             <th id="sortInProgress">InProgress</th>
             <th id="sortRelasiResolved">Relasi</th>
           </tr>
@@ -200,9 +152,7 @@
     </div>
   </div>
 
-  <div id="copyright">
-    © 2025 EDP Fai
-  </div>
+  <div id="copyright">© 2025 EDP Fai</div>
 </div>
 
 <!-- Modal History -->
@@ -213,12 +163,8 @@
         <h5 class="modal-title">History Laporan (10 terakhir)</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
       </div>
-      <div class="modal-body">
-        <div id="historyList" class="list-group"></div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Tutup</button>
-      </div>
+      <div class="modal-body"><div id="historyList" class="list-group"></div></div>
+      <div class="modal-footer"><button type="button" class="btn btn-primary" data-bs-dismiss="modal">Tutup</button></div>
     </div>
   </div>
 </div>
@@ -227,7 +173,6 @@
 
 <script>
 /* ====== KONFIG / STATE ====== */
-/* (sisa script Anda dipertahankan; hanya disisipkan di sini) */
 const GAS_URL = "https://script.google.com/macros/s/AKfycbzR5FqFZM_G3XcPFeurBRFMrU-NNqxMW2ZtSCRIpESCpC4Nz7VzdKRmt-Zx1rJXjnRd-g/exec";
 const HISTORY_GAS_URL = "https://script.google.com/macros/s/AKfycbwrXZlIB4nyiQtb-MM79c8rm1rDuoVyEZRxdk4-yTHaM_teOWR-XxC_BK50RsVlmo-P/exec";
 
@@ -235,9 +180,8 @@ let sheetData = [], csvData = [], lastResults = [];
 let shiftLabel = "";
 
 let sortAscNama=true, sortAscLastCO=false, sortAscIndexCO=false, sortAscTotalCO=true,
-    sortAscSLA=false, sortAscInProgress=false, sortAscRelasiResolved=false;
+    sortAscSLA=false, sortAscDurasiSLA=false, sortAscInProgress=false, sortAscRelasiResolved=false;
 
-/* store original header innerHTML so sorting won't clobber labels */
 const originalHeaderText = {};
 
 /* ====== INIT ====== */
@@ -285,6 +229,7 @@ async function saveHistoryEntry(entry){
       count: x.res?.count ?? 0,
       lastTime: x.res?.lastTime ?? "-",
       slaCount: x.res?.slaCount ?? 0,
+      durasiSLA: (x.res?.durasiSLA !== undefined && x.res?.durasiSLA !== null) ? x.res.durasiSLA : "-",
       inProgressCount: x.res?.inProgressCount ?? 0,
       relasiResolved: x.res?.relasiResolved ?? 0
     }
@@ -305,9 +250,10 @@ async function loadHistory(){
   const url = `${HISTORY_GAS_URL}?action=getHistory`;
   const res = await fetch(url);
   const json = await res.json();
+  // fallback untuk beberapa nama properti yang mungkin dikirim dari GAS (rows, RowsJson, rowsJson)
   return (json.items||[]).map(h => ({
     ts: h.ts, mode: h.mode, shiftLabel: h.shiftLabel, tanggal: h.tanggal, toggleSiang14: h.toggleSiang14,
-    results: (h.rows||[]).map(r => ({ k: { nama: r.nama, shift: r.shift }, res: { avg: r.avg, count: r.count, lastTime: r.lastTime, slaCount: r.slaCount, inProgressCount: r.inProgressCount, relasiResolved: r.relasiResolved } }))
+    rows: h.rows || h.RowsJson || h.rowsJson || []
   }));
 }
 function showHistoryModal(){ renderHistoryList(); const modal = new bootstrap.Modal(document.getElementById("historyModal")); modal.show(); }
@@ -323,9 +269,23 @@ async function renderHistoryList(){
       btn.type="button";
       btn.className="list-group-item list-group-item-action";
       const modeLabel = (h.mode==="IDX") ? "Index hari ini" : h.shiftLabel;
-      btn.innerHTML = `<div class="d-flex w-100 justify-content-between"><h6 class="mb-1">${modeLabel}</h6><small>${prettyDateTime(h.ts)}</small></div><div class="mb-1">Tanggal: ${prettyTanggalLabel(h.tanggal)} • Personil: ${h.results?.length||0}</div>`;
+      btn.innerHTML = `<div class="d-flex w-100 justify-content-between"><h6 class="mb-1">${modeLabel}</h6><small>${prettyDateTime(h.ts)}</small></div><div class="mb-1">Tanggal: ${prettyTanggalLabel(h.tanggal)} • Personil: ${h.rows?.length||0}</div>`;
       btn.addEventListener("click", ()=>{
-        lastResults = h.results || [];
+        // gunakan fallback rows / RowsJson / rowsJson
+        const rawRows = h.rows || h.RowsJson || h.rowsJson || [];
+        lastResults = rawRows.map(r => ({
+          k: { nama: r.nama, shift: r.shift },
+          res: {
+            avg: r.avg,
+            count: r.count,
+            lastTime: r.lastTime,
+            slaCount: r.slaCount,
+            // pastikan durasiSLA tampil '-' bila kosong/null
+            durasiSLA: (r.durasiSLA !== undefined && r.durasiSLA !== null && r.durasiSLA !== "") ? r.durasiSLA : "-",
+            inProgressCount: r.inProgressCount,
+            relasiResolved: r.relasiResolved
+          }
+        }));
         renderTable(lastResults);
         const judul = document.getElementById("judulLaporan");
         judul.classList.add("is-history");
@@ -348,7 +308,14 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
     complete:(res)=>{
       const headerMap={}; (res.meta.fields||[]).forEach(f=>headerMap[normKey(f)]=f);
       const getCol = (row,arr)=>{
-        for(const c of arr){ for(const key in headerMap){ if(key.includes(c)){ const realKey=headerMap[key]; if(row[realKey]) return row[realKey].toString(); } } }
+        for(const c of arr){
+          for(const key in headerMap){
+            if(key.includes(c)){
+              const realKey=headerMap[key];
+              if(row[realKey]) return row[realKey].toString();
+            }
+          }
+        }
         return "";
       };
       csvData = res.data.map(r=>{
@@ -359,6 +326,8 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
         const statusSlaRaw = getCol(r,['statussla','status sla']);
         const tglDiambilRaw = getCol(r,['tanggaldiambil','tgl diambil','tanggal diambil']);
         const tipeLokasiRaw = getCol(r,['tipelokasiasal','tipe lokasi asal']);
+        // new: umur komplain raw
+        const umurRaw = getCol(r,['umurkomplain','umur komplain','umur']);
         const slaNum = parseFloat((waktuSlaRaw||"").replace(",","."))||0;
         return {
           diambilOleh,
@@ -369,7 +338,8 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
           statusNorm: normalizeStatus(statusRaw),
           statusSLA: statusSlaRaw,
           tanggalDiambil: tglDiambilRaw,
-          tipeLokasi: (tipeLokasiRaw||"").trim()
+          tipeLokasi: (tipeLokasiRaw||"").trim(),
+          umurRaw: (umurRaw||"").toString()
         };
       });
 
@@ -435,6 +405,9 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
 
 /* ====== PERHITUNGAN ====== */
 function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik / r.waktuSlaDetik : 0; }
+
+/* rataRata_byName - DurasiSLA diambil dari right(8) umurRaw **hanya** untuk baris yang statusSLA mengandung "lewat".
+   Jika tidak ada nilai, durasiSLA akan menjadi "-" */
 function rataRata_byName(nama,thr=0.85){
   const matches=[];
   const keyNama = normalizeName(nama);
@@ -450,14 +423,35 @@ function rataRata_byName(nama,thr=0.85){
     }
     matches.push(r);
   }
-  if(!matches.length) return { avg:null, count:0, lastTime:"-", slaCount:0, inProgressCount:0, relasiResolved:0 };
+  if(!matches.length) return { avg:null, count:0, lastTime:"-", slaCount:0, durasiSLA:"-", inProgressCount:0, relasiResolved:0 };
+
   const sum = matches.reduce((a,b)=>a+computeC(b),0);
   const latest = matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
+
+  // Ambil hanya dari baris yang statusSLA mengandung "lewat"
+  const lewatRows = matches.filter(r => (r.statusSLA||"").toString().toLowerCase().includes("lewat"));
+  let chosenDurasiSLA = "-";
+  if(lewatRows.length){
+    // Pilih baris lewat yang paling baru (tanggalDiambil), jika ada
+    lewatRows.sort((a,b)=>{
+      const ta = a.tanggalDiambil || "";
+      const tb = b.tanggalDiambil || "";
+      if(ta > tb) return -1;
+      if(ta < tb) return 1;
+      return 0;
+    });
+    // ambil right 8 chars dari umurRaw; jika kosong atau whitespace -> '-'
+    const candidate = (lewatRows[0].umurRaw || "").toString();
+    const extracted = candidate.slice(-8).trim();
+    chosenDurasiSLA = extracted ? extracted : "-";
+  }
+
   return {
     avg: sum / matches.length,
     count: matches.length,
     lastTime: ambilJamDariTanggal(latest),
     slaCount: matches.filter(r=>r.statusSLA && r.statusSLA.toLowerCase().includes("lewat")).length,
+    durasiSLA: chosenDurasiSLA,
     inProgressCount: matches.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length,
     relasiResolved: matches.filter(r=>r.statusNorm.includes("pending")).length
   };
@@ -510,9 +504,7 @@ document.getElementById("generateBtn").addEventListener("click", async ()=>{
 
   try{
     saveHistoryEntry({ ts: Date.now(), mode, shiftLabel, tanggal: tgl, toggleSiang14: document.getElementById("toggleSiang14").checked, results });
-  }catch(e){
-    console.warn("Gagal simpan history:", e);
-  }
+  }catch(e){ console.warn("Gagal simpan history:", e); }
 });
 
 /* ====== RENDER TABEL ====== */
@@ -523,7 +515,6 @@ function renderTable(results){
   results.forEach((item, index) => {
     const { k, res } = item;
 
-    // normalize avg to Number or null (handle strings like "0,36")
     let avgNum = null;
     if (res && res.avg !== null && res.avg !== undefined && res.avg !== "") {
       const raw = String(res.avg).trim().replace(/\s+/g,"");
@@ -535,11 +526,9 @@ function renderTable(results){
 
     const tr = document.createElement("tr");
 
-    // Prioritaskan merah bila ada SLA lewat
     if (res && (res.slaCount || 0) > 0) {
       tr.classList.add("table-danger");
-    } else if (avgNum !== null && avgNum > 0.36) {
-      // oranye bila avg > 0.35 (bukan >=)
+    } else if (avgNum !== null && avgNum > 0.35) {
       tr.classList.add("table-index-warning");
     }
 
@@ -551,20 +540,21 @@ function renderTable(results){
       <td>${avg}</td>
       <td>${res.count || 0}</td>
       <td>${res.slaCount || 0}</td>
+      <td>${(res.durasiSLA !== undefined && res.durasiSLA !== null && res.durasiSLA !== "") ? res.durasiSLA : '-'}</td>
       <td>${res.inProgressCount || 0}</td>
       <td>${res.relasiResolved || 0}</td>
     `;
     tbody.appendChild(tr);
   });
 
-  // reattach sorting handlers
-  ["Nama","LastCO","IndexCO","TotalCO","SLA","InProgress","RelasiResolved"].forEach(k=>{
+  // reattach sorting handlers (added DurasiSLA id)
+  ["Nama","LastCO","IndexCO","TotalCO","SLA","DurasiSLA","InProgress","RelasiResolved"].forEach(k=>{
     const el = document.getElementById(`sort${k}`);
     if(el) el.onclick = () => sortColumn(k);
   });
 }
 
-/* ====== SORTING ====== */
+/* ====== SORTING helpers ====== */
 function resetAllHeaderArrows(){
   Object.keys(originalHeaderText).forEach(id=>{
     const el = document.getElementById(id);
@@ -581,24 +571,24 @@ function setHeaderArrow(headerId, arrow){
 
 function sortColumn(key){
   if(!lastResults.length) return alert("Belum ada data tabel.");
-  let asc, valFunc, headerId = `sort${key}`;
+  let asc, valFunc;
   switch(key){
     case "Nama": asc=sortAscNama; valFunc=r=> (r.k.nama||"").toLowerCase(); sortAscNama=!sortAscNama; break;
     case "LastCO": asc=sortAscLastCO; valFunc=r=> r.res.lastTime==="-"?0:parseInt(r.res.lastTime.replace(":","")); sortAscLastCO=!sortAscLastCO; break;
     case "IndexCO": asc=sortAscIndexCO; valFunc=r=> r.res.avg || 0; sortAscIndexCO=!sortAscIndexCO; break;
     case "TotalCO": asc=sortAscTotalCO; valFunc=r=> r.res.count || 0; sortAscTotalCO=!sortAscTotalCO; break;
     case "SLA": asc=sortAscSLA; valFunc=r=> r.res.slaCount || 0; sortAscSLA=!sortAscSLA; break;
+    case "DurasiSLA": asc=sortAscDurasiSLA; valFunc=r=> (r.res.durasiSLA||""); sortAscDurasiSLA=!sortAscDurasiSLA; break;
     case "InProgress": asc=sortAscInProgress; valFunc=r=> r.res.inProgressCount || 0; sortAscInProgress=!sortAscInProgress; break;
     case "RelasiResolved": asc=sortAscRelasiResolved; valFunc=r=> r.res.relasiResolved || 0; sortAscRelasiResolved=!sortAscRelasiResolved; break;
     default: return;
   }
 
-  if(key==="Nama") lastResults.sort((a,b)=> asc? valFunc(a).localeCompare(valFunc(b)) : valFunc(b).localeCompare(valFunc(a)));
+  if(key==="Nama" || key==="DurasiSLA") lastResults.sort((a,b)=> asc? valFunc(a).localeCompare(valFunc(b)) : valFunc(b).localeCompare(valFunc(a)));
   else lastResults.sort((a,b)=> asc? (valFunc(a)-valFunc(b)) : (valFunc(b)-valFunc(a)));
   renderTable(lastResults);
 
-  // update header arrows without changing original labels
-  setHeaderArrow(headerId, asc ? "↑" : "↓");
+  setHeaderArrow(`sort${key}`, asc ? "↑" : "↓");
 }
 
 /* ====== DOWNLOAD JPG ====== */
@@ -663,7 +653,6 @@ document.getElementById("shiftInput").addEventListener("change", ()=>{
 
 /* === ensure initial UI state === */
 document.addEventListener("DOMContentLoaded", ()=> {
-  // save original header innerHTMLs so we can restore labels later
   document.querySelectorAll('#resultTable thead th[id]').forEach(th=>{
     originalHeaderText[th.id] = th.innerHTML;
   });
@@ -672,6 +661,3 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </script>
 </body>
 </html>
-
-
-
