@@ -229,7 +229,7 @@ async function saveHistoryEntry(entry){
       count: x.res?.count ?? 0,
       lastTime: x.res?.lastTime ?? "-",
       slaCount: x.res?.slaCount ?? 0,
-      durasiSLA: (x.res?.durasiSLA !== undefined && x.res?.durasiSLA !== null) ? x.res.durasiSLA : "-",
+      durasiSLA: (x.res?.durasiSLA !== undefined && x.res?.durasiSLA !== null) ? x.res.durasiSLA : "0",
       inProgressCount: x.res?.inProgressCount ?? 0,
       relasiResolved: x.res?.relasiResolved ?? 0
     }
@@ -281,7 +281,7 @@ async function renderHistoryList(){
             lastTime: r.lastTime,
             slaCount: r.slaCount,
             // pastikan durasiSLA tampil '-' bila kosong/null
-            durasiSLA: (r.durasiSLA !== undefined && r.durasiSLA !== null && r.durasiSLA !== "") ? r.durasiSLA : "-",
+            durasiSLA: (r.durasiSLA !== undefined && r.durasiSLA !== null && r.durasiSLA !== "") ? r.durasiSLA : "0",
             inProgressCount: r.inProgressCount,
             relasiResolved: r.relasiResolved
           }
@@ -423,14 +423,14 @@ function rataRata_byName(nama,thr=0.85){
     }
     matches.push(r);
   }
-  if(!matches.length) return { avg:null, count:0, lastTime:"-", slaCount:0, durasiSLA:"-", inProgressCount:0, relasiResolved:0 };
+  if(!matches.length) return { avg:null, count:0, lastTime:"-", slaCount:0, durasiSLA:"0", inProgressCount:0, relasiResolved:0 };
 
   const sum = matches.reduce((a,b)=>a+computeC(b),0);
   const latest = matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
 
   // Ambil hanya dari baris yang statusSLA mengandung "lewat"
   const lewatRows = matches.filter(r => (r.statusSLA||"").toString().toLowerCase().includes("lewat"));
-  let chosenDurasiSLA = "-";
+  let chosenDurasiSLA = "0";
   if(lewatRows.length){
     // Pilih baris lewat yang paling baru (tanggalDiambil), jika ada
     lewatRows.sort((a,b)=>{
@@ -443,7 +443,7 @@ function rataRata_byName(nama,thr=0.85){
     // ambil right 8 chars dari umurRaw; jika kosong atau whitespace -> '-'
     const candidate = (lewatRows[0].umurRaw || "").toString();
     const extracted = candidate.slice(-8).trim();
-    chosenDurasiSLA = extracted ? extracted : "-";
+    chosenDurasiSLA = extracted ? extracted : "0";
   }
 
   return {
@@ -540,7 +540,7 @@ function renderTable(results){
       <td>${avg}</td>
       <td>${res.count || 0}</td>
       <td>${res.slaCount || 0}</td>
-      <td>${(res.durasiSLA !== undefined && res.durasiSLA !== null && res.durasiSLA !== "") ? res.durasiSLA : '-'}</td>
+      <td>${(res.durasiSLA !== undefined && res.durasiSLA !== null && res.durasiSLA !== "") ? res.durasiSLA : '0'}</td>
       <td>${res.inProgressCount || 0}</td>
       <td>${res.relasiResolved || 0}</td>
     `;
@@ -661,3 +661,4 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </script>
 </body>
 </html>
+
