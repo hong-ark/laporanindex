@@ -518,7 +518,13 @@ function renderTable(results){
       avgNum = Number.isFinite(parsed) ? parsed : null;
     }
 
-    const avg = (avgNum !== null) ? (Math.round(avgNum * 100) / 100).toFixed(2) : "-";
+    // buat versi yang DIBULATKAN ke 2 desimal untuk ditampilkan dan dibandingkan
+    let avgRounded = null;
+    let avg = "-";
+    if (avgNum !== null) {
+      avgRounded = Math.round(avgNum * 100) / 100; // contoh: 0.35000000000000003 -> 0.35
+      avg = avgRounded.toFixed(2);
+    }
 
     const tr = document.createElement("tr");
 
@@ -526,8 +532,8 @@ function renderTable(results){
     if (res && (res.slaCount || 0) > 0) {
       tr.classList.add("table-danger");
     } else {
-      // warna kuning/oranye HANYA jika avgNum > 0.35 (strict greater)
-      if (avgNum !== null && avgNum > 0.35) {
+      // warna kuning/oranye HANYA jika avgRounded > 0.35 (strict greater)
+      if (avgRounded !== null && avgRounded > 0.35) {
         tr.classList.add("table-index-warning");
       }
     }
@@ -553,6 +559,7 @@ function renderTable(results){
     if(el) el.onclick = () => sortColumn(k);
   });
 }
+
 
 /* ====== SORTING helpers ====== */
 function resetAllHeaderArrows(){
@@ -661,3 +668,4 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </script>
 </body>
 </html>
+
