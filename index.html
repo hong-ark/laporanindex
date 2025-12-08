@@ -30,16 +30,28 @@
     }
     .site-top .title { margin:0; font-size:18px; font-weight:700; letter-spacing:0.5px; white-space:nowrap; color:#fff; }
 
+    /* ===== SMOOTH MARQUEE ===== */
     .marquee-wrap { overflow: hidden; flex: 1; position: relative; min-width: 120px; }
     .marquee {
-      display: inline-block; white-space: nowrap;
-      --marquee-duration: 30s;
-      animation: marquee-rl var(--marquee-duration) linear infinite;
-      will-change: transform; font-weight:700; font-size:14px; color: #fff;
+      display: flex;
+      width: max-content;
+      white-space: nowrap;
+      --marquee-duration: 30s; /* durasi default, bisa diubah inline */
+      animation: marqueeScroll var(--marquee-duration) linear infinite;
+      will-change: transform;
+      font-weight:700; font-size:14px; color: #fff;
+      align-items: center;
     }
-    .marquee span { display:inline-block; padding-right: 60px; }
+    /* setiap item diberi jarak, tetap gunakan span agar kompatibel */
+    .marquee .item { display:inline-block; padding-right: 60px; }
+    /* duplikasi konten membuat loop seamless; saat hover -> pause */
     .marquee-wrap:hover .marquee { animation-play-state: paused; }
-    @keyframes marquee-rl { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+
+    @keyframes marqueeScroll {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); } /* bergeser sebanyak setengah lebar (karena isi diduplikasi) */
+    }
+    /* ===== END MARQUEE ===== */
 
     .content-area { padding:20px 25px; }
     #judulLaporan { font-weight: 700; font-size: 18px; text-align: center; margin-bottom: 8px; color:#000; }
@@ -72,10 +84,22 @@
   <div class="site-top" role="banner" aria-label="Header Pengumuman">
     <h1 class="title"></h1>
     <div class="marquee-wrap" aria-hidden="false" role="region" aria-label="Pengumuman penting">
-      <div class="marquee" id="mainMarquee" aria-live="polite">
-        <span>JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
-        <span>HIGHLIGHT MERAH UNTUK SLA, KUNING UNTUK INDEX DIATAS 0.35 &nbsp; • &nbsp;</span>
-        <span>CHECKLIST HITUNG SLA MULAI ≥ 13:00, HANYA UNTUK MENAMPILKAN PENGHITUNGAN PASCA SHIFT MALAM MASUK SIANG, JIKA INDEX KUNING MAKA HILANGKAN SAJA CHECKLISTNYA &nbsp; • &nbsp;</span>
+      <!--
+         Duplikasi konten (set A + set A lagi) → membuat animasi translateX(-50%) menjadi seamless.
+         Untuk ubah kecepatan: set inline style --marquee-duration di elemen .marquee,
+         misal: <div class="marquee" style="--marquee-duration:20s">
+      -->
+      <div class="marquee" id="mainMarquee" aria-live="polite" style="--marquee-duration:30s;">
+        <!-- SET A -->
+        <span class="item">JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
+        <span class="item">HIGHLIGHT MERAH UNTUK SLA &nbsp; • &nbsp;</span>
+        <span class="item">HIGHLIGHT KUNING UNTUK INDEX DIATAS 0.35 &nbsp; • &nbsp;</span>
+        <span class="item">CHECKLIST HITUNG SLA MULAI ≥ 13:00 HANYA UNTUK MENAMPILKAN PENGHITUNGAN PASCA SHIFT MALAM MASUK SIANG, HILANGKAN CHECKLIST UNTUK MENGHITUNG INDEX TOTALNYA &nbsp; • &nbsp;</span>
+        <!-- SET A DUPLIKAT (harus sama persis untuk seamless) -->
+        <span class="item">JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
+        <span class="item">HIGHLIGHT MERAH UNTUK SLA &nbsp; • &nbsp;</span>
+        <span class="item">HIGHLIGHT KUNING UNTUK INDEX DIATAS 0.35 &nbsp; • &nbsp;</span>
+        <span class="item">CHECKLIST HITUNG SLA MULAI ≥ 13:00 HANYA UNTUK MENAMPILKAN PENGHITUNGAN PASCA SHIFT MALAM MASUK SIANG, HILANGKAN CHECKLIST UNTUK MENGHITUNG INDEX TOTALNYA &nbsp; • &nbsp;</span>
       </div>
     </div>
   </div>
@@ -482,7 +506,6 @@ document.getElementById("generateBtn").addEventListener("click", async ()=>{
   results.sort((a,b)=> {
     const av = (a.res && a.res.avg !== null && a.res.avg !== undefined) ? Number(a.res.avg) : -Infinity;
     const bv = (b.res && b.res.avg !== null && b.res.avg !== undefined) ? Number(b.res.avg) : -Infinity;
-    // jika ada NaN, tangani sebagai -Infinity
     const na = Number.isFinite(av) ? av : -Infinity;
     const nb = Number.isFinite(bv) ? bv : -Infinity;
     return nb - na;
@@ -673,7 +696,3 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </script>
 </body>
 </html>
-
-
-
-
