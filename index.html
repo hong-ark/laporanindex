@@ -76,6 +76,8 @@
         <span>JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
         <span>JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
         <span>JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
+        <span>HIGHLIGHT MERAH UNTUK SLA, KUNING UNTUK INDEX DIATAS 0.35 &nbsp; • &nbsp;</span>
+        <span>CHECKLIST HITUNG SLA MULAI ≥ 13:00, HANYA UNTUK MENAMPILKAN PENGHITUNGAN PASCA SHIFT MALAM MASUK SIANG, JIKA INDEX KUNING MAKA HILANGKAN SAJA CHECKLISTNYA &nbsp; • &nbsp;</span>
       </div>
     </div>
   </div>
@@ -475,17 +477,22 @@ document.getElementById("generateBtn").addEventListener("click", async ()=>{
     shiftLabel = shiftMap[mode] || mode;
   }
 
+  // hitung semua hasil
   let results = sheetData.map(k => ({ k, res: rataRata_byName(k.nama) }));
 
-  if(mode==="IDX"){
-    results.sort((a,b)=> {
-      const av = a.res.avg === null ? -Infinity : a.res.avg;
-      const bv = b.res.avg === null ? -Infinity : b.res.avg;
-      return bv - av;
-    });
-    setHeaderArrow('sortIndexCO', '↓');
-    sortAscIndexCO = false;
-  }
+  // AUTO-SORT: selalu sortir berdasarkan IndexCO (res.avg) dari terbesar -> terkecil
+  results.sort((a,b)=> {
+    const av = (a.res && a.res.avg !== null && a.res.avg !== undefined) ? Number(a.res.avg) : -Infinity;
+    const bv = (b.res && b.res.avg !== null && b.res.avg !== undefined) ? Number(b.res.avg) : -Infinity;
+    // jika ada NaN, tangani sebagai -Infinity
+    const na = Number.isFinite(av) ? av : -Infinity;
+    const nb = Number.isFinite(bv) ? bv : -Infinity;
+    return nb - na;
+  });
+
+  // update header arrow untuk IndexCO (menunjukkan sort descending)
+  setHeaderArrow('sortIndexCO', '↓');
+  sortAscIndexCO = false;
 
   lastResults = results;
   renderTable(results);
@@ -668,4 +675,5 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </script>
 </body>
 </html>
+
 
