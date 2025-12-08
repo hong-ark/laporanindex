@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Laporan Index Shift (Index terakhir CO)</title>
 
-  <!-- Favicon (data-URL SVG seperti permintaan Anda sebelumnya) -->
+  <!-- Favicon (data-URL SVG) -->
   <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='32' fill='%23b71c1c'/><text x='50%25' y='50%25' fill='white' font-family='Arial, Helvetica, sans-serif' font-weight='700' font-size='28' text-anchor='middle' dominant-baseline='central'>R3</text></svg>">
   <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='32' fill='%23b71c1c'/><text x='50%25' y='50%25' fill='white' font-family='Arial, Helvetica, sans-serif' font-weight='700' font-size='28' text-anchor='middle' dominant-baseline='central'>R3</text></svg>">
@@ -136,7 +136,6 @@
             <th id="sortIndexCO">IndexCO</th>
             <th id="sortTotalCO">TotalCO</th>
             <th id="sortSLA">SLA</th>
-            <!-- new column -->
             <th id="sortDurasiSLA">DurasiSLA</th>
             <th id="sortInProgress">InProgress</th>
             <th id="sortRelasiResolved">Relasi</th>
@@ -250,7 +249,6 @@ async function loadHistory(){
   const url = `${HISTORY_GAS_URL}?action=getHistory`;
   const res = await fetch(url);
   const json = await res.json();
-  // fallback untuk beberapa nama properti yang mungkin dikirim dari GAS (rows, RowsJson, rowsJson)
   return (json.items||[]).map(h => ({
     ts: h.ts, mode: h.mode, shiftLabel: h.shiftLabel, tanggal: h.tanggal, toggleSiang14: h.toggleSiang14,
     rows: h.rows || h.RowsJson || h.rowsJson || []
@@ -271,7 +269,6 @@ async function renderHistoryList(){
       const modeLabel = (h.mode==="IDX") ? "Index hari ini" : h.shiftLabel;
       btn.innerHTML = `<div class="d-flex w-100 justify-content-between"><h6 class="mb-1">${modeLabel}</h6><small>${prettyDateTime(h.ts)}</small></div><div class="mb-1">Tanggal: ${prettyTanggalLabel(h.tanggal)} • Personil: ${h.rows?.length||0}</div>`;
       btn.addEventListener("click", ()=>{
-        // gunakan fallback rows / RowsJson / rowsJson
         const rawRows = h.rows || h.RowsJson || h.rowsJson || [];
         lastResults = rawRows.map(r => ({
           k: { nama: r.nama, shift: r.shift },
@@ -280,7 +277,6 @@ async function renderHistoryList(){
             count: r.count,
             lastTime: r.lastTime,
             slaCount: r.slaCount,
-            // pastikan durasiSLA tampil '-' bila kosong/null
             durasiSLA: (r.durasiSLA !== undefined && r.durasiSLA !== null && r.durasiSLA !== "") ? r.durasiSLA : "0",
             inProgressCount: r.inProgressCount,
             relasiResolved: r.relasiResolved
@@ -326,7 +322,6 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
         const statusSlaRaw = getCol(r,['statussla','status sla']);
         const tglDiambilRaw = getCol(r,['tanggaldiambil','tgl diambil','tanggal diambil']);
         const tipeLokasiRaw = getCol(r,['tipelokasiasal','tipe lokasi asal']);
-        // new: umur komplain raw
         const umurRaw = getCol(r,['umurkomplain','umur komplain','umur']);
         const slaNum = parseFloat((waktuSlaRaw||"").replace(",","."))||0;
         return {
@@ -407,7 +402,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
 function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik / r.waktuSlaDetik : 0; }
 
 /* rataRata_byName - DurasiSLA diambil dari right(8) umurRaw **hanya** untuk baris yang statusSLA mengandung "lewat".
-   Jika tidak ada nilai, durasiSLA akan menjadi "-" */
+   Jika tidak ada nilai, durasiSLA akan menjadi "0" */
 function rataRata_byName(nama,thr=0.85){
   const matches=[];
   const keyNama = normalizeName(nama);
@@ -440,7 +435,7 @@ function rataRata_byName(nama,thr=0.85){
       if(ta < tb) return 1;
       return 0;
     });
-    // ambil right 8 chars dari umurRaw; jika kosong atau whitespace -> '-'
+    // ambil right 8 chars dari umurRaw; jika kosong atau whitespace -> '0'
     const candidate = (lewatRows[0].umurRaw || "").toString();
     const extracted = candidate.slice(-8).trim();
     chosenDurasiSLA = extracted ? extracted : "0";
@@ -515,21 +510,26 @@ function renderTable(results){
   results.forEach((item, index) => {
     const { k, res } = item;
 
+    // parse avg sebagai angka (lebih aman untuk perbandingan)
     let avgNum = null;
     if (res && res.avg !== null && res.avg !== undefined && res.avg !== "") {
-      const raw = String(res.avg).trim().replace(/\s+/g,"");
-      avgNum = Number(raw.replace(",", "."));
-      if(Number.isNaN(avgNum)) avgNum = null;
+      const raw = String(res.avg).trim().replace(/\s+/g,"").replace(",",".");
+      const parsed = parseFloat(raw);
+      avgNum = Number.isFinite(parsed) ? parsed : null;
     }
 
     const avg = (avgNum !== null) ? (Math.round(avgNum * 100) / 100).toFixed(2) : "-";
 
     const tr = document.createElement("tr");
 
+    // warna untuk SLA (merah) bila ada slaCount > 0
     if (res && (res.slaCount || 0) > 0) {
       tr.classList.add("table-danger");
-    } else if (avgNum !== null && avgNum > 0.35) {
-      tr.classList.add("table-index-warning");
+    } else {
+      // warna kuning/oranye HANYA jika avgNum > 0.35 (strict greater)
+      if (avgNum !== null && avgNum > 0.35) {
+        tr.classList.add("table-index-warning");
+      }
     }
 
     tr.innerHTML = `
@@ -661,5 +661,3 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </script>
 </body>
 </html>
-
-
