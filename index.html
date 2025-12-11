@@ -42,14 +42,12 @@
       font-weight:700; font-size:14px; color: #fff;
       align-items: center;
     }
-    /* setiap item diberi jarak, tetap gunakan span agar kompatibel */
     .marquee .item { display:inline-block; padding-right: 60px; }
-    /* duplikasi konten membuat loop seamless; saat hover -> pause */
     .marquee-wrap:hover .marquee { animation-play-state: paused; }
 
     @keyframes marqueeScroll {
       0% { transform: translateX(0); }
-      100% { transform: translateX(-50%); } /* bergeser sebanyak setengah lebar (karena isi diduplikasi) */
+      100% { transform: translateX(-50%); }
     }
     /* ===== END MARQUEE ===== */
 
@@ -84,18 +82,11 @@
   <div class="site-top" role="banner" aria-label="Header Pengumuman">
     <h1 class="title"></h1>
     <div class="marquee-wrap" aria-hidden="false" role="region" aria-label="Pengumuman penting">
-      <!--
-         Duplikasi konten (set A + set A lagi) → membuat animasi translateX(-50%) menjadi seamless.
-         Untuk ubah kecepatan: set inline style --marquee-duration di elemen .marquee,
-         misal: <div class="marquee" style="--marquee-duration:20s">
-      -->
       <div class="marquee" id="mainMarquee" aria-live="polite" style="--marquee-duration:30s;">
-        <!-- SET A -->
         <span class="item">JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
         <span class="item">HIGHLIGHT MERAH UNTUK SLA &nbsp; • &nbsp;</span>
         <span class="item">HIGHLIGHT KUNING UNTUK INDEX DIATAS 0.35 &nbsp; • &nbsp;</span>
         <span class="item">CHECKLIST HITUNG SLA MULAI ≥ 13:00 HANYA UNTUK MENAMPILKAN PENGHITUNGAN PASCA SHIFT MALAM MASUK SIANG, HILANGKAN CHECKLIST UNTUK MENGHITUNG INDEX TOTALNYA &nbsp; • &nbsp;</span>
-        <!-- SET A DUPLIKAT (harus sama persis untuk seamless) -->
         <span class="item">JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
         <span class="item">HIGHLIGHT MERAH UNTUK SLA &nbsp; • &nbsp;</span>
         <span class="item">HIGHLIGHT KUNING UNTUK INDEX DIATAS 0.35 &nbsp; • &nbsp;</span>
@@ -229,6 +220,41 @@ function jamMenitDariTanggal(s){ const m = (s||"").match(/(\d{1,2}):(\d{2})(?::\
 function prettyTanggalLabel(value){ if(typeof value === "string" && value.includes("T")){ const d = new Date(value); if(!isNaN(d)) return d.toLocaleDateString("id-ID",{day:"2-digit",month:"short",year:"numeric"});} if(typeof value === "number"){ const d = new Date(value); if(!isNaN(d)) return d.toLocaleDateString("id-ID",{day:"2-digit",month:"short",year:"numeric"});} return String(value||""); }
 function prettyDateTime(ts){ const d=new Date(ts); return d.toLocaleString("id-ID",{ day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" }); }
 
+/* safe date parser (try new Date, else parse dd-MMM-yyyy HH:MM) */
+function parseDateSafe(s){
+  if(!s) return null;
+  // try native parse
+  const d1 = new Date(s);
+  if(!isNaN(d1)) return d1;
+  // try dd-MMM-yyyy HH:MM(:ss)?
+  const m = s.match(/(\d{1,2})[-\/](\w+)[-\/](\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if(m){
+    const day = parseInt(m[1],10);
+    const monText = m[2].toLowerCase();
+    const year = parseInt(m[3],10);
+    const hour = parseInt(m[4],10);
+    const min = parseInt(m[5],10);
+    const sec = m[6] ? parseInt(m[6],10) : 0;
+    // map month names (singkat/pendek)
+    const months = { jan:0,feb:1,mar:2,apr:3,mei:4,jun:5,juli:6,jul:6,jun:5,jul:6,aug:7,agt:7,august:7,sep:8,sept:8,oct:9,okt:9,nov:10,des:11,dec:11 };
+    let mm = months[monText.slice(0,3)] !== undefined ? months[monText.slice(0,3)] : (months[monText] !== undefined ? months[monText] : NaN);
+    if(isNaN(mm)){
+      // try full english month name
+      const en = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+      mm = en.indexOf(monText.slice(0,3));
+    }
+    if(mm>=0){
+      return new Date(year, mm, day, hour, min, sec);
+    }
+  }
+  return null;
+}
+
+function isSameDate(d1,d2){
+  if(!d1 || !d2) return false;
+  return d1.getFullYear()===d2.getFullYear() && d1.getMonth()===d2.getMonth() && d1.getDate()===d2.getDate();
+}
+
 /* ====== FILTER SIANG >=13:00 (toggle) ====== */
 function lolosFilterShiftSiangByTanggalDiambil(record){
   const shift = document.getElementById("shiftInput").value.trim().toUpperCase();
@@ -254,7 +280,8 @@ async function saveHistoryEntry(entry){
       slaCount: x.res?.slaCount ?? 0,
       durasiSLA: (x.res?.durasiSLA !== undefined && x.res?.durasiSLA !== null) ? x.res.durasiSLA : "0",
       inProgressCount: x.res?.inProgressCount ?? 0,
-      relasiResolved: x.res?.relasiResolved ?? 0
+      relasiResolved: x.res?.relasiResolved ?? 0,
+      earlyMorning: x.res?.earlyMorning ? true : false
     }
   }));
   const payload = { action: "saveHistory", data: { ts: entry.ts, mode: entry.mode, shiftLabel: entry.shiftLabel, tanggal: entry.tanggal, toggleSiang14: entry.toggleSiang14, results: compactResults } };
@@ -303,7 +330,8 @@ async function renderHistoryList(){
             slaCount: r.slaCount,
             durasiSLA: (r.durasiSLA !== undefined && r.durasiSLA !== null && r.durasiSLA !== "") ? r.durasiSLA : "0",
             inProgressCount: r.inProgressCount,
-            relasiResolved: r.relasiResolved
+            relasiResolved: r.relasiResolved,
+            earlyMorning: r.earlyMorning ? true : false
           }
         }));
         renderTable(lastResults);
@@ -426,7 +454,8 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
 function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik / r.waktuSlaDetik : 0; }
 
 /* rataRata_byName - DurasiSLA diambil dari right(8) umurRaw **hanya** untuk baris yang statusSLA mengandung "lewat".
-   Jika tidak ada nilai, durasiSLA akan menjadi "0" */
+   Jika tidak ada nilai, durasiSLA akan menjadi "0"
+   Juga mengembalikan flag earlyMorning (00:00-05:59 hari ini) */
 function rataRata_byName(nama,thr=0.85){
   const matches=[];
   const keyNama = normalizeName(nama);
@@ -442,7 +471,7 @@ function rataRata_byName(nama,thr=0.85){
     }
     matches.push(r);
   }
-  if(!matches.length) return { avg:null, count:0, lastTime:"-", slaCount:0, durasiSLA:"0", inProgressCount:0, relasiResolved:0 };
+  if(!matches.length) return { avg:null, count:0, lastTime:"-", slaCount:0, durasiSLA:"0", inProgressCount:0, relasiResolved:0, earlyMorning:false };
 
   const sum = matches.reduce((a,b)=>a+computeC(b),0);
   const latest = matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
@@ -451,7 +480,6 @@ function rataRata_byName(nama,thr=0.85){
   const lewatRows = matches.filter(r => (r.statusSLA||"").toString().toLowerCase().includes("lewat"));
   let chosenDurasiSLA = "0";
   if(lewatRows.length){
-    // Pilih baris lewat yang paling baru (tanggalDiambil), jika ada
     lewatRows.sort((a,b)=>{
       const ta = a.tanggalDiambil || "";
       const tb = b.tanggalDiambil || "";
@@ -459,10 +487,25 @@ function rataRata_byName(nama,thr=0.85){
       if(ta < tb) return 1;
       return 0;
     });
-    // ambil right 8 chars dari umurRaw; jika kosong atau whitespace -> '0'
     const candidate = (lewatRows[0].umurRaw || "").toString();
     const extracted = candidate.slice(-8).trim();
     chosenDurasiSLA = extracted ? extracted : "0";
+  }
+
+  // DETEKSI earlyMorning (00:00 - 05:59) pada tanggal HARI INI
+  const today = new Date();
+  let earlyMorningFlag = false;
+  for(const r of matches){
+    if(!r.tanggalDiambil) continue;
+    const dt = parseDateSafe(r.tanggalDiambil);
+    if(!dt) continue;
+    if(isSameDate(dt, today)){
+      const h = dt.getHours();
+      if(h >= 0 && h < 6){
+        earlyMorningFlag = true;
+        break;
+      }
+    }
   }
 
   return {
@@ -472,7 +515,8 @@ function rataRata_byName(nama,thr=0.85){
     slaCount: matches.filter(r=>r.statusSLA && r.statusSLA.toLowerCase().includes("lewat")).length,
     durasiSLA: chosenDurasiSLA,
     inProgressCount: matches.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length,
-    relasiResolved: matches.filter(r=>r.statusNorm.includes("pending")).length
+    relasiResolved: matches.filter(r=>r.statusNorm.includes("pending")).length,
+    earlyMorning: earlyMorningFlag
   };
 }
 
@@ -555,6 +599,12 @@ function renderTable(results){
     }
 
     const tr = document.createElement("tr");
+
+    // bold jika mode Siang dan earlyMorning flag true
+    const modeNow = document.getElementById("shiftInput").value.trim().toUpperCase();
+    if(modeNow === "S" && res && res.earlyMorning){
+      tr.style.fontWeight = "700";
+    }
 
     // warna untuk SLA (merah) bila ada slaCount > 0
     if (res && (res.slaCount || 0) > 0) {
