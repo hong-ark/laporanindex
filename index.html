@@ -579,6 +579,8 @@ function renderTable(results){
   const tbody = document.querySelector("#resultTable tbody");
   tbody.innerHTML = "";
 
+  const modeNow = document.getElementById("shiftInput").value.trim().toUpperCase();
+
   results.forEach((item, index) => {
     const { k, res } = item;
 
@@ -600,12 +602,6 @@ function renderTable(results){
 
     const tr = document.createElement("tr");
 
-    // bold jika mode Siang dan earlyMorning flag true
-    const modeNow = document.getElementById("shiftInput").value.trim().toUpperCase();
-    if(modeNow === "S" && res && res.earlyMorning){
-      tr.style.fontWeight = "700";
-    }
-
     // warna untuk SLA (merah) bila ada slaCount > 0
     if (res && (res.slaCount || 0) > 0) {
       tr.classList.add("table-danger");
@@ -616,18 +612,24 @@ function renderTable(results){
       }
     }
 
-    tr.innerHTML = `
-      <td>${index + 1}</td>
-      <td>${k.nama}</td>
-      <td>${k.shift || '-'}</td>
-      <td>${res.lastTime}</td>
-      <td>${avg}</td>
-      <td>${res.count || 0}</td>
-      <td>${res.slaCount || 0}</td>
-      <td>${(res.durasiSLA !== undefined && res.durasiSLA !== null && res.durasiSLA !== "") ? res.durasiSLA : '0'}</td>
-      <td>${res.inProgressCount || 0}</td>
-      <td>${res.relasiResolved || 0}</td>
-    `;
+    // tentukan apakah nama harus bold: hanya saat mode Siang (S) dan earlyMorning flag true
+    const shouldBoldName = (modeNow === "S") && Boolean(res && res.earlyMorning);
+
+    // buat sel-sel (tekan nama dengan inline style jika perlu)
+    const tdNo = `<td>${index + 1}</td>`;
+    const tdNama = shouldBoldName
+      ? `<td style="font-weight:700">${escapeHtml(k.nama)}</td>`
+      : `<td>${escapeHtml(k.nama)}</td>`;
+    const tdShift = `<td>${escapeHtml(k.shift || '-')}</td>`;
+    const tdLast = `<td>${escapeHtml(res.lastTime || "-")}</td>`;
+    const tdIndex = `<td>${avg}</td>`;
+    const tdTotal = `<td>${res.count || 0}</td>`;
+    const tdSLA = `<td>${res.slaCount || 0}</td>`;
+    const tdDurasi = `<td>${(res.durasiSLA !== undefined && res.durasiSLA !== null && res.durasiSLA !== "") ? escapeHtml(res.durasiSLA) : '0'}</td>`;
+    const tdInProg = `<td>${res.inProgressCount || 0}</td>`;
+    const tdRelasi = `<td>${res.relasiResolved || 0}</td>`;
+
+    tr.innerHTML = `${tdNo}${tdNama}${tdShift}${tdLast}${tdIndex}${tdTotal}${tdSLA}${tdDurasi}${tdInProg}${tdRelasi}`;
     tbody.appendChild(tr);
   });
 
@@ -636,6 +638,17 @@ function renderTable(results){
     const el = document.getElementById(`sort${k}`);
     if(el) el.onclick = () => sortColumn(k);
   });
+}
+
+/* small helper to avoid XSS-ish issues when injecting text */
+function escapeHtml(str){
+  if(str === null || str === undefined) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 
@@ -746,3 +759,4 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </script>
 </body>
 </html>
+
