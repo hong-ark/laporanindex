@@ -44,11 +44,7 @@
     }
     .marquee .item { display:inline-block; padding-right: 60px; }
     .marquee-wrap:hover .marquee { animation-play-state: paused; }
-
-    @keyframes marqueeScroll {
-      0% { transform: translateX(0); }
-      100% { transform: translateX(-50%); }
-    }
+    @keyframes marqueeScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
     /* ===== END MARQUEE ===== */
 
     .content-area { padding:20px 25px; }
@@ -87,6 +83,8 @@
         <span class="item">HIGHLIGHT MERAH UNTUK SLA &nbsp; • &nbsp;</span>
         <span class="item">HIGHLIGHT KUNING UNTUK INDEX DIATAS 0.35 &nbsp; • &nbsp;</span>
         <span class="item">CHECKLIST HITUNG SLA MULAI ≥ 13:00 HANYA UNTUK MENAMPILKAN PENGHITUNGAN PASCA SHIFT MALAM MASUK SIANG, HILANGKAN CHECKLIST UNTUK MENGHITUNG INDEX TOTALNYA &nbsp; • &nbsp;</span>
+
+        <!-- duplikat untuk loop seamless -->
         <span class="item">JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
         <span class="item">HIGHLIGHT MERAH UNTUK SLA &nbsp; • &nbsp;</span>
         <span class="item">HIGHLIGHT KUNING UNTUK INDEX DIATAS 0.35 &nbsp; • &nbsp;</span>
@@ -220,39 +218,41 @@ function jamMenitDariTanggal(s){ const m = (s||"").match(/(\d{1,2}):(\d{2})(?::\
 function prettyTanggalLabel(value){ if(typeof value === "string" && value.includes("T")){ const d = new Date(value); if(!isNaN(d)) return d.toLocaleDateString("id-ID",{day:"2-digit",month:"short",year:"numeric"});} if(typeof value === "number"){ const d = new Date(value); if(!isNaN(d)) return d.toLocaleDateString("id-ID",{day:"2-digit",month:"short",year:"numeric"});} return String(value||""); }
 function prettyDateTime(ts){ const d=new Date(ts); return d.toLocaleString("id-ID",{ day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" }); }
 
-/* safe date parser (try new Date, else parse dd-MMM-yyyy HH:MM) */
-function parseDateSafe(s){
+/* ====== Parse tolerant tanggal+waktu dari CSV ====== */
+function parseDateTime(s){
   if(!s) return null;
-  // try native parse
+  // try straight Date constructor (handles ISO, some locales)
   const d1 = new Date(s);
   if(!isNaN(d1)) return d1;
-  // try dd-MMM-yyyy HH:MM(:ss)?
-  const m = s.match(/(\d{1,2})[-\/](\w+)[-\/](\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+
+  const str = s.toString().trim();
+  // try dd/mm/yyyy or dd-mm-yyyy [ hh:mm]
+  let m = str.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?/);
+  if(m){
+    let day = parseInt(m[1],10), mon = parseInt(m[2],10)-1, yr = parseInt(m[3],10);
+    if(yr < 100) yr += 2000;
+    let hh = parseInt(m[4] || "0",10), mm = parseInt(m[5] || "0",10);
+    return new Date(yr, mon, day, hh, mm);
+  }
+
+  // try "dd MonthName yyyy hh:mm" e.g. "9 Dec 2025 02:15" or "9 Des 2025 02:15"
+  m = str.match(/(\d{1,2})\s+([A-Za-z\u00C0-\u017F]+)\s+(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
   if(m){
     const day = parseInt(m[1],10);
-    const monText = m[2].toLowerCase();
-    const year = parseInt(m[3],10);
-    const hour = parseInt(m[4],10);
-    const min = parseInt(m[5],10);
-    const sec = m[6] ? parseInt(m[6],10) : 0;
-    // map month names (singkat/pendek)
-    const months = { jan:0,feb:1,mar:2,apr:3,mei:4,jun:5,juli:6,jul:6,jun:5,jul:6,aug:7,agt:7,august:7,sep:8,sept:8,oct:9,okt:9,nov:10,des:11,dec:11 };
-    let mm = months[monText.slice(0,3)] !== undefined ? months[monText.slice(0,3)] : (months[monText] !== undefined ? months[monText] : NaN);
-    if(isNaN(mm)){
-      // try full english month name
-      const en = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
-      mm = en.indexOf(monText.slice(0,3));
-    }
-    if(mm>=0){
-      return new Date(year, mm, day, hour, min, sec);
+    const monName = m[2];
+    const yr = parseInt(m[3],10);
+    const hh = parseInt(m[4] || "0",10);
+    const mm = parseInt(m[5] || "0",10);
+    // try letting Date parse month name (fallback)
+    const tryDate = new Date(`${monName} 1, ${yr}`);
+    if(!isNaN(tryDate)){
+      const monIdx = tryDate.getMonth();
+      return new Date(yr, monIdx, day, hh, mm);
     }
   }
-  return null;
-}
 
-function isSameDate(d1,d2){
-  if(!d1 || !d2) return false;
-  return d1.getFullYear()===d2.getFullYear() && d1.getMonth()===d2.getMonth() && d1.getDate()===d2.getDate();
+  // if all fails return null
+  return null;
 }
 
 /* ====== FILTER SIANG >=13:00 (toggle) ====== */
@@ -454,8 +454,7 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
 function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik / r.waktuSlaDetik : 0; }
 
 /* rataRata_byName - DurasiSLA diambil dari right(8) umurRaw **hanya** untuk baris yang statusSLA mengandung "lewat".
-   Jika tidak ada nilai, durasiSLA akan menjadi "0"
-   Juga mengembalikan flag earlyMorning (00:00-05:59 hari ini) */
+   Jika tidak ada nilai, durasiSLA akan menjadi "0" */
 function rataRata_byName(nama,thr=0.85){
   const matches=[];
   const keyNama = normalizeName(nama);
@@ -471,7 +470,7 @@ function rataRata_byName(nama,thr=0.85){
     }
     matches.push(r);
   }
-  if(!matches.length) return { avg:null, count:0, lastTime:"-", slaCount:0, durasiSLA:"0", inProgressCount:0, relasiResolved:0, earlyMorning:false };
+  if(!matches.length) return { avg:null, count:0, lastTime:"-", slaCount:0, durasiSLA:"0", inProgressCount:0, relasiResolved:0, earlyMorning: false };
 
   const sum = matches.reduce((a,b)=>a+computeC(b),0);
   const latest = matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
@@ -492,18 +491,21 @@ function rataRata_byName(nama,thr=0.85){
     chosenDurasiSLA = extracted ? extracted : "0";
   }
 
-  // DETEKSI earlyMorning (00:00 - 05:59) pada tanggal HARI INI
-  const today = new Date();
+  // ===== DETEKSI EARLY MORNING (00:00–06:00) PADA TANGGAL HARI INI - hanya untuk shift Siang =====
   let earlyMorningFlag = false;
-  for(const r of matches){
-    if(!r.tanggalDiambil) continue;
-    const dt = parseDateSafe(r.tanggalDiambil);
-    if(!dt) continue;
-    if(isSameDate(dt, today)){
-      const h = dt.getHours();
-      if(h >= 0 && h < 6){
-        earlyMorningFlag = true;
-        break;
+  const modeNow = document.getElementById("shiftInput").value.trim().toUpperCase();
+  if(modeNow === "S"){
+    const today = new Date();
+    for(const r of matches){
+      const parsed = parseDateTime(r.tanggalDiambil);
+      if(!parsed || isNaN(parsed)) continue;
+      // sama tanggal (local)
+      if(parsed.getFullYear() === today.getFullYear() && parsed.getMonth() === today.getMonth() && parsed.getDate() === today.getDate()){
+        const h = parsed.getHours();
+        if(h >= 0 && h <= 6){
+          earlyMorningFlag = true;
+          break;
+        }
       }
     }
   }
@@ -512,10 +514,10 @@ function rataRata_byName(nama,thr=0.85){
     avg: sum / matches.length,
     count: matches.length,
     lastTime: ambilJamDariTanggal(latest),
-    slaCount: matches.filter(r=>r.statusSLA && r.statusSLA.toLowerCase().includes("lewat")).length,
+    slaCount: matches.filter(rr=> rr.statusSLA && rr.statusSLA.toLowerCase().includes("lewat")).length,
     durasiSLA: chosenDurasiSLA,
-    inProgressCount: matches.filter(r=>r.statusNorm.includes("inprogress")||r.statusNorm.includes("in progress")).length,
-    relasiResolved: matches.filter(r=>r.statusNorm.includes("pending")).length,
+    inProgressCount: matches.filter(rr=> rr.statusNorm.includes("inprogress")||rr.statusNorm.includes("in progress")).length,
+    relasiResolved: matches.filter(rr=> rr.statusNorm.includes("pending")).length,
     earlyMorning: earlyMorningFlag
   };
 }
@@ -612,24 +614,22 @@ function renderTable(results){
       }
     }
 
-    // tentukan apakah nama harus bold: hanya saat mode Siang (S) dan earlyMorning flag true
+    // Bold nama jika earlyMorning flag TRUE dan mode = S
     const shouldBoldName = (modeNow === "S") && Boolean(res && res.earlyMorning);
+    const nameHtml = shouldBoldName ? `<strong>${escapeHtml(k.nama)}</strong>` : escapeHtml(k.nama);
 
-    // buat sel-sel (tekan nama dengan inline style jika perlu)
-    const tdNo = `<td>${index + 1}</td>`;
-    const tdNama = shouldBoldName
-      ? `<td style="font-weight:700">${escapeHtml(k.nama)}</td>`
-      : `<td>${escapeHtml(k.nama)}</td>`;
-    const tdShift = `<td>${escapeHtml(k.shift || '-')}</td>`;
-    const tdLast = `<td>${escapeHtml(res.lastTime || "-")}</td>`;
-    const tdIndex = `<td>${avg}</td>`;
-    const tdTotal = `<td>${res.count || 0}</td>`;
-    const tdSLA = `<td>${res.slaCount || 0}</td>`;
-    const tdDurasi = `<td>${(res.durasiSLA !== undefined && res.durasiSLA !== null && res.durasiSLA !== "") ? escapeHtml(res.durasiSLA) : '0'}</td>`;
-    const tdInProg = `<td>${res.inProgressCount || 0}</td>`;
-    const tdRelasi = `<td>${res.relasiResolved || 0}</td>`;
-
-    tr.innerHTML = `${tdNo}${tdNama}${tdShift}${tdLast}${tdIndex}${tdTotal}${tdSLA}${tdDurasi}${tdInProg}${tdRelasi}`;
+    tr.innerHTML = `
+      <td>${index + 1}</td>
+      <td style="text-align:left">${nameHtml}</td>
+      <td>${escapeHtml(k.shift || '-')}</td>
+      <td>${escapeHtml(res.lastTime)}</td>
+      <td>${avg}</td>
+      <td>${res.count || 0}</td>
+      <td>${res.slaCount || 0}</td>
+      <td>${escapeHtml((res.durasiSLA !== undefined && res.durasiSLA !== null && res.durasiSLA !== "") ? res.durasiSLA : '0')}</td>
+      <td>${res.inProgressCount || 0}</td>
+      <td>${res.relasiResolved || 0}</td>
+    `;
     tbody.appendChild(tr);
   });
 
@@ -640,17 +640,16 @@ function renderTable(results){
   });
 }
 
-/* small helper to avoid XSS-ish issues when injecting text */
-function escapeHtml(str){
-  if(str === null || str === undefined) return "";
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+/* ====== small helper: escape HTML to avoid injection from CSV data ====== */
+function escapeHtml(s){
+  if(s === null || s === undefined) return "";
+  return String(s)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#39;");
 }
-
 
 /* ====== SORTING helpers ====== */
 function resetAllHeaderArrows(){
@@ -759,4 +758,3 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </script>
 </body>
 </html>
-
