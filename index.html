@@ -11,6 +11,7 @@
   <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='32' fill='%23b71c1c'/><text x='50%25' y='50%25' fill='white' font-family='Arial, Helvetica, sans-serif' font-weight='700' font-size='28' text-anchor='middle' dominant-baseline='central'>R3</text></svg>">
   <meta name="theme-color" content="#1976d2">
 
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -28,115 +29,98 @@
       align-items:center;
       gap:14px;
     }
-    .site-top .title { margin:0; font-size:18px; font-weight:700; letter-spacing:0.5px; white-space:nowrap; color:#fff; }
+    .site-top .title { margin:0; font-size:18px; font-weight:700; }
 
-    /* ===== SMOOTH MARQUEE ===== */
-    .marquee-wrap { overflow: hidden; flex: 1; position: relative; min-width: 120px; }
+    /* ===== Smooth Marquee ===== */
+    .marquee-wrap { overflow: hidden; flex: 1; min-width: 120px; }
     .marquee {
       display: flex;
       width: max-content;
       white-space: nowrap;
-      --marquee-duration: 30s; /* durasi default, bisa diubah inline */
+      --marquee-duration: 30s;
       animation: marqueeScroll var(--marquee-duration) linear infinite;
-      will-change: transform;
-      font-weight:700; font-size:14px; color: #fff;
-      align-items: center;
+      font-weight:700; font-size:14px; color:#fff;
     }
-    /* setiap item diberi jarak, tetap gunakan span agar kompatibel */
-    .marquee .item { display:inline-block; padding-right: 60px; }
-    /* duplikasi konten membuat loop seamless; saat hover -> pause */
+    .marquee .item { padding-right: 60px; }
     .marquee-wrap:hover .marquee { animation-play-state: paused; }
 
     @keyframes marqueeScroll {
       0% { transform: translateX(0); }
-      100% { transform: translateX(-50%); } /* bergeser sebanyak setengah lebar (karena isi diduplikasi) */
+      100% { transform: translateX(-50%); }
     }
-    /* ===== END MARQUEE ===== */
 
     .content-area { padding:20px 25px; }
-    #judulLaporan { font-weight: 700; font-size: 18px; text-align: center; margin-bottom: 8px; color:#000; }
+    #judulLaporan { font-weight:700; font-size:18px; text-align:center; margin-bottom:8px; }
 
-    /* ===== TABLE STYLING & THIN LINES ===== */
+    /* ===== Thin Border Table ===== */
     #resultTable { border-collapse: collapse; border-spacing: 0; }
-    /* override agar border selalu tipis terlihat, tidak hilang saat striping */
     #resultTable th, #resultTable td {
-      border: 1px solid rgba(0,0,0,0.08) !important; /* garis tipis, lembut */
-      vertical-align: middle;
+      border: 1px solid rgba(0,0,0,0.08) !important;
       padding: 8px;
+      vertical-align: middle;
     }
-    /* sedikit penyesuaian header supaya tetap tegas */
-    #resultTable.table thead tr th {
-      background-color: #1976d2 !important; color: #fff !important; text-align: center !important;
-      font-weight: 700; cursor: pointer; padding: 10px; user-select: none; vertical-align: middle;
-      border-color: rgba(0,0,0,0.12) !important;
+
+    #resultTable thead th {
+      background:#1976d2 !important;
+      color:#fff !important;
+      text-align:center;
+      border-color:rgba(0,0,0,0.12) !important;
+      cursor:pointer;
     }
-    #resultTable.table thead tr th:hover { background-color: #1565c0 !important; }
-    #resultArea.is-history thead tr th { background-color: #9e9e9e !important; border-color: #757575 !important; color: #fff !important; }
 
-    /* warna baris per kondisi (tidak diubah) */
-    .table-danger td { background-color: #ffeaea !important; color: #000 !important; }
-    .table-index-warning td { background-color: #ffcc80 !important; color: #000 !important; }
+    .table-danger td { background:#ffeaea !important; }
+    .table-index-warning td { background:#ffcc80 !important; }
 
-    .hdr-arrow { font-weight: 700; margin-left: 6px; font-size: 0.9em; }
+    /* Bold Line for shift Siang orang yg punya data jam 00–06 */
+    .bold-siang { font-weight:700 !important; }
 
-    #copyright { text-align: center; font-size: 13px; color: #666; margin: 18px 0; padding-bottom: 14px; }
-
-    @media (max-width: 600px){
-      .site-top .title { font-size:16px; } .site-top { padding:10px; gap:10px; } .content-area { padding:12px; }
-      .marquee { font-size:13px; --marquee-duration: 12s; } #resultTable td { font-size: 0.85rem; }
-    }
   </style>
 </head>
 
 <body>
 <div class="container">
-  <div class="site-top" role="banner" aria-label="Header Pengumuman">
+  <div class="site-top">
     <h1 class="title"></h1>
-    <div class="marquee-wrap" aria-hidden="false" role="region" aria-label="Pengumuman penting">
-      <!--
-         Duplikasi konten (set A + set A lagi) → membuat animasi translateX(-50%) menjadi seamless.
-         Untuk ubah kecepatan: set inline style --marquee-duration di elemen .marquee,
-         misal: <div class="marquee" style="--marquee-duration:20s">
-      -->
-      <div class="marquee" id="mainMarquee" aria-live="polite" style="--marquee-duration:30s;">
-        <!-- SET A -->
-        <span class="item">JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
-        <span class="item">HIGHLIGHT MERAH UNTUK SLA &nbsp; • &nbsp;</span>
-        <span class="item">HIGHLIGHT KUNING UNTUK INDEX DIATAS 0.35 &nbsp; • &nbsp;</span>
-        <span class="item">CHECKLIST HITUNG SLA MULAI ≥ 13:00 HANYA UNTUK MENAMPILkan PENGHITUNGAN PASCA SHIFT MALAM MASUK SIANG, HILANGKAN CHECKLIST UNTUK MENGHITUNG INDEX TOTALNYA &nbsp; • &nbsp;</span>
-        <!-- SET A DUPLIKAT (harus sama persis untuk seamless) -->
-        <span class="item">JANGAN LUPA SELALU CEK INDEX HARI INI &nbsp; • &nbsp;</span>
-        <span class="item">HIGHLIGHT MERAH UNTUK SLA &nbsp; • &nbsp;</span>
-        <span class="item">HIGHLIGHT KUNING UNTUK INDEX DIATAS 0.35 &nbsp; • &nbsp;</span>
-        <span class="item">CHECKLIST HITUNG SLA MULAI ≥ 13:00 HANYA UNTUK MENAMPILkan PENGHITUNGAN PASCA SHIFT MALAM MASUK SIANG, HILANGKAN CHECKLIST UNTUK MENGHITUNG INDEX TOTALNYA &nbsp; • &nbsp;</span>
+    <div class="marquee-wrap">
+      <div class="marquee" style="--marquee-duration:30s;">
+        <span class="item">JANGAN LUPA SELALU CEK INDEX HARI INI •</span>
+        <span class="item">HIGHLIGHT MERAH UNTUK SLA •</span>
+        <span class="item">HIGHLIGHT KUNING INDEX > 0.35 •</span>
+        <span class="item">CHECKLIST HITUNG SIANG ≥13:00 JIKA PERLU •</span>
+
+        <!-- duplicate -->
+        <span class="item">JANGAN LUPA SELALU CEK INDEX HARI INI •</span>
+        <span class="item">HIGHLIGHT MERAH UNTUK SLA •</span>
+        <span class="item">HIGHLIGHT KUNING INDEX > 0.35 •</span>
+        <span class="item">CHECKLIST HITUNG SIANG ≥13:00 JIKA PERLU •</span>
       </div>
     </div>
   </div>
 
   <div class="content-area">
-    <p style="margin:0 0 12px 0;color:#333">Pilih shift → Generate Jadwal → Upload CSV → Hitung Index</p>
+    <p>Pilih shift → Generate Jadwal → Upload CSV → Hitung Index</p>
 
-    <div class="mb-3 row align-items-end">
+    <div class="row mb-3">
       <div class="col-auto">
-        <label class="form-label">Mode</label><br />
-        <select id="shiftInput" class="form-select w-auto d-inline-block">
+        <label class="form-label">Mode</label><br>
+        <select id="shiftInput" class="form-select w-auto">
           <option value="">Pilih Shift</option>
-          <option value="IDX">Index hari ini</option>
+          <option value="IDX">Index Hari Ini</option>
           <option value="P">P (Pagi)</option>
           <option value="S">S (Siang)</option>
           <option value="M">M (Malam)</option>
-          <option value="MH1">M H-1 (Malam H-1)</option>
+          <option value="MH1">M H-1</option>
         </select>
-        <div id="modeNote" class="form-text text-muted mt-1"></div>
+        <div id="modeNote" class="form-text"></div>
       </div>
 
       <div class="col-md-5">
-        <label class="form-label">&nbsp;</label><br />
+        <label class="form-label">&nbsp;</label><br>
         <button id="ambilNamaBtn" class="btn btn-primary">Generate Jadwal</button>
       </div>
 
       <div class="col-md-4 text-end">
-        <label class="form-label">Tanggal dicek:</label>
+        <label class="form-label">Tanggal Dicek:</label>
         <p id="tanggalCek"></p>
       </div>
     </div>
@@ -145,25 +129,25 @@
 
     <div class="mb-3">
       <label class="form-label">Upload CSV</label>
-      <input type="file" id="csvFile" class="form-control" accept=".csv" />
+      <input type="file" id="csvFile" class="form-control" accept=".csv">
     </div>
 
-    <button id="generateBtn" class="btn btn-success mb-1" disabled>Hitung Index</button>
+    <button id="generateBtn" class="btn btn-success" disabled>Hitung Index</button>
     <span id="statusText" class="ms-2 text-muted"></span>
 
     <div class="form-check mt-2">
-      <input class="form-check-input" type="checkbox" id="toggleSiang14" disabled>
-      <label class="form-check-label text-muted" for="toggleSiang14" id="labelToggleSiang14">Hitung Siang mulai ≥ 13:00</label>
+      <input type="checkbox" id="toggleSiang14" class="form-check-input" disabled>
+      <label id="labelToggleSiang14" class="form-check-label text-muted">Hitung Siang ≥ 13:00</label>
     </div>
 
     <div id="judulLaporan" class="mt-2"></div>
 
-    <div id="resultArea" class="mt-2">
+    <div id="resultArea">
       <table id="resultTable" class="table table-bordered table-striped">
         <thead>
           <tr>
             <th>No</th>
-            <th id="sortNama">Nama Karyawan</th>
+            <th id="sortNama">Nama</th>
             <th>Shift</th>
             <th id="sortLastCO">LastCO</th>
             <th id="sortIndexCO">IndexCO</th>
@@ -184,46 +168,439 @@
     </div>
   </div>
 
-  <div id="copyright">© 2025 EDP Fai</div>
+  <footer class="text-center mt-4">© 2025 EDP Fai</footer>
 </div>
 
 <!-- Modal History -->
-<div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="historyModal">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title">History Laporan (10 terakhir)</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body"><div id="historyList" class="list-group"></div></div>
-      <div class="modal-footer"><button type="button" class="btn btn-primary" data-bs-dismiss="modal">Tutup</button></div>
+      <div class="modal-body">
+        <div id="historyList" class="list-group"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" data-bs-dismiss="modal">Tutup</button>
+      </div>
     </div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
+<!-- SCRIPT AKAN DIMULAI DI BAGIAN 3 -->
 <script>
-/* ====== KONFIG / STATE ====== */
+/* ===== KONFIGURASI ===== */
 const GAS_URL = "https://script.google.com/macros/s/AKfycbx4dWdi4tSGqHN3WQ89Za1wyklGj1eLfcNPwqBeLa15aLUKrzjncKvySo07-9GuqxPD0g/exec";
 const HISTORY_GAS_URL = "https://script.google.com/macros/s/AKfycbwrXZlIB4nyiQtb-MM79c8rm1rDuoVyEZRxdk4-yTHaM_teOWR-XxC_BK50RsVlmo-P/exec";
 
-let sheetData = [], csvData = [], lastResults = [];
+let csvData = [];
+let sheetData = [];
+let lastResults = [];
 let shiftLabel = "";
 
-let sortAscNama=true, sortAscLastCO=false, sortAscIndexCO=false, sortAscTotalCO=true,
-    sortAscSLA=false, sortAscDurasiSLA=false, sortAscInProgress=false, sortAscRelasiResolved=false;
+let sortAscNama = true, sortAscLastCO = false, sortAscIndexCO = false,
+    sortAscTotalCO = true, sortAscSLA = false, sortAscDurasiSLA = false,
+    sortAscInProgress = false, sortAscRelasiResolved = false;
 
 const originalHeaderText = {};
 
-/* ====== INIT ====== */
-document.getElementById("tanggalCek").textContent = new Date().toLocaleDateString("id-ID", {day:"numeric",month:"long",year:"numeric"});
-
-/* ====== UTIL ====== */
-function normKey(s){ return (s||"").toString().toLowerCase().replace(/[^a-z0-9]/g,''); }
-function normalizeName(s){ return (s||"").toString().toLowerCase().replace(/\s+/g,' ').replace(/[^\w\s]/g,'').trim(); }
-function durasiKeDetik(v){
-  if(!v) return 0;
+/* ========================== UTILITAS ========================== */
+function normalizeName(s) {
+  return (s || "").toLowerCase().replace(/\s+/g, " ").replace(/[^\w\s]/g, "").trim();
+}
+function normalizeStatus(s) {
+  if (!s) return "";
+  return s.replace(/\u00A0/g, " ").replace(/[_\-]/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+}
+function isAcceptedStatus(norm) {
+  return norm.includes("resolved") || norm.includes("closed") || norm.includes("inprogress") ||
+         norm.includes("in progress") || norm.includes("pending");
+}
+function jamMenitDariTanggal(s) {
+  const r = (s || "").match(/(\d{2}):(\d{2})/);
+  if (!r) return null;
+  return { h: Number(r[1]), m: Number(r[2]) };
+}
+function ambilJamDariTanggal(s) {
+  const r = (s || "").match(/(\d{2}):(\d{2})/);
+  return r ? `${r[1]}:${r[2]}` : "-";
+}
+function durasiKeDetik(v) {
+  if (!v) return 0;
   const s = v.toString().trim();
-  const m1 = s.match(/(\d+) d (\d{1,2}):(\d{2}):(\d{2})/i);
-  if(m1) return (+m1[1])*86400 + (+m1[2])*3600 + (+m1[3])*60 + (+m1[4]);
+  const m = s.match(/(\d+)\s*d\s*(\d{1,2}):(\d{2}):(\d{2})/i);
+  if (m) return m[1] * 86400 + m[2] * 3600 + m[3] * 60 + m[4];
+  const m2 = s.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+  if (m2) return m2[1] * 3600 + m2[2] * 60 + m2[3];
+  return 0;
+}
+
+/* ====== FILTER KHUSUS SHIFT SIANG ≥ 13:00 ====== */
+function lolosFilterShiftSiang(record) {
+  const mode = document.getElementById("shiftInput").value.trim().toUpperCase();
+  if (mode !== "S") return true;
+
+  const toggle = document.getElementById("toggleSiang14").checked;
+  if (!toggle) return true;
+
+  const jm = jamMenitDariTanggal(record.tanggalDiambil);
+  if (!jm) return false;
+
+  return (jm.h > 13) || (jm.h === 13 && jm.m >= 0);
+}
+
+/* =========== BOLD KHUSUS SHIFT SIANG: CO jam 00–06 =========== */
+function punyaCOJam0006(matches) {
+  for (const r of matches) {
+    const jm = jamMenitDariTanggal(r.tanggalDiambil);
+    if (!jm) continue;
+    if (jm.h >= 0 && jm.h <= 6) return true;
+  }
+  return false;
+}
+
+/* ========================== CSV PARSE ========================== */
+document.getElementById("csvFile").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  Papa.parse(file, {
+    header: true,
+    delimiter: ";",
+    skipEmptyLines: true,
+    complete: res => {
+      const headerMap = {};
+      (res.meta.fields || []).forEach(col => headerMap[col.toLowerCase().replace(/\s+/g, "")] = col);
+
+      function getColumn(row, keys) {
+        for (const k of keys) {
+          for (const mapKey in headerMap) {
+            if (mapKey.includes(k)) {
+              return row[headerMap[mapKey]] || "";
+            }
+          }
+        }
+        return "";
+      }
+
+      csvData = res.data.map(r => {
+        const umur = getColumn(r, ["umur"]);
+        const slaNum = parseFloat((getColumn(r, ["waktusla"]) || "").replace(",", ".")) || 0;
+
+        return {
+          diambilOleh: getColumn(r, ["diambiloleh", "diambil"]),
+          durasiDetik: durasiKeDetik(getColumn(r, ["durasi"])),
+          waktuSlaDetik: slaNum * 3600,
+          statusNorm: normalizeStatus(getColumn(r, ["status"])),
+          statusSla: getColumn(r, ["statussla"]),
+          tanggalDiambil: getColumn(r, ["tanggaldiambil"]),
+          tipeLokasi: getColumn(r, ["tipelokasi"]),
+          umurRaw: umur
+        };
+      });
+
+      document.getElementById("statusText").textContent = 
+        `CSV terbaca: ${csvData.length} baris.`;
+
+      if (document.getElementById("shiftInput").value === "IDX") {
+        sheetData = buildUniqueNamesFromCSV(csvData);
+        document.getElementById("generateBtn").disabled = sheetData.length === 0;
+      }
+    }
+  });
+});
+
+/* ========= MODE INDEX: build nama unik dari CSV ========= */
+function buildUniqueNamesFromCSV(rows) {
+  const m = new Map();
+  for (const r of rows) {
+    const raw = (r.diambilOleh || "").trim();
+    if (!raw) continue;
+    const key = normalizeName(raw);
+    if (!m.has(key)) m.set(key, raw);
+  }
+  return Array.from(m.values()).map(n => ({ nama: n, shift: "Index" }));
+}
+
+/* ====================== AMBIL NAMA GSHEET ====================== */
+document.getElementById("ambilNamaBtn").addEventListener("click", async () => {
+  const mode = document.getElementById("shiftInput").value.toUpperCase();
+  if (!mode) return alert("Pilih shift terlebih dahulu!");
+
+  if (mode === "IDX") {
+    document.getElementById("statusText").textContent = 
+      "Mode Index: langsung upload CSV dan Hitung Index.";
+    return;
+  }
+
+  document.getElementById("statusText").textContent = "Mengambil nama dari GSheet…";
+
+  try {
+    let tanggal = new Date();
+    let shifts = [mode];
+
+    if (mode === "MH1") {
+      tanggal.setDate(tanggal.getDate() - 1);
+    }
+    if (mode === "P") shifts = ["P", "P1"];
+
+    shiftLabel = { P:"Shift 1", S:"Shift 2", M:"Shift 3", MH1:"Shift 3" }[mode] || mode;
+    let all = [];
+
+    for (const s of shifts) {
+      const res = await fetch(`${GAS_URL}?shift=${s}`);
+      const j = await res.json();
+      if (!j.ok) throw new Error(j.error);
+      all = all.concat((j.karyawan || []).map(k => ({
+        nama: k.nama.trim(),
+        shift: k.shift
+      })));
+    }
+
+    sheetData = all.filter((obj, idx, arr) => idx === arr.findIndex(x => x.nama === obj.nama));
+
+    document.getElementById("generateBtn").disabled = false;
+    document.getElementById("statusText").textContent =
+      `✔ ${sheetData.length} nama ditemukan (${shiftLabel}).`;
+
+  } catch (e) {
+    alert("Gagal ambil data GSheet: " + e.message);
+    document.getElementById("statusText").textContent = "Gagal ambil data GSheet!";
+  }
+});
+
+/* ========================== SIMILARITY ========================== */
+function similarity(a, b) {
+  a = normalizeName(a);
+  b = normalizeName(b);
+  if (!a || !b) return 0;
+  const max = Math.max(a.length, b.length);
+  let mismatch = 0;
+  for (let i = 0; i < max; i++) {
+    if (a[i] !== b[i]) mismatch++;
+  }
+  return 1 - mismatch / max;
+}
+
+/* ========================== PERHITUNGAN ========================== */
+function computeC(row) {
+  return row.waktuSlaDetik > 0 ? row.durasiDetik / row.waktuSlaDetik : 0;
+}
+
+function rataRata_byName(nama) {
+  const key = normalizeName(nama);
+  const mode = document.getElementById("shiftInput").value.toUpperCase();
+
+  const matches = csvData.filter(r => {
+    if (!isAcceptedStatus(r.statusNorm)) return false;
+    if (r.tipeLokasi.toLowerCase() === "branch") return false;
+    if (!lolosFilterShiftSiang(r)) return false;
+
+    return mode === "IDX"
+      ? normalizeName(r.diambilOleh) === key
+      : similarity(nama, r.diambilOleh) >= 0.85;
+  });
+
+  if (!matches.length) {
+    return { avg: null, count: 0, lastTime:"-", slaCount:0, durasiSLA:"0",
+             inProgressCount:0, relasiResolved:0, bold:false };
+  }
+
+  const sum = matches.reduce((a, b) => a + computeC(b), 0);
+  const last = matches.map(m => m.tanggalDiambil).filter(Boolean).sort().pop();
+  const slaCount = matches.filter(m => (m.statusSla || "").toLowerCase().includes("lewat")).length;
+
+  // Durasi SLA (ambil right(8) umurRaw untuk baris SLA lewat terbaru)
+  let durasiSLA = "0";
+  const lewatRows = matches.filter(m => (m.statusSla || "").toLowerCase().includes("lewat"));
+  if (lewatRows.length) {
+    lewatRows.sort((a,b) => (a.tanggalDiambil > b.tanggalDiambil ? -1 : 1));
+    const u = lewatRows[0].umurRaw || "";
+    durasiSLA = u.slice(-8).trim() || "0";
+  }
+
+  // BOLD SHIFT SIANG jika punya CO jam 00–06
+  const bold = document.getElementById("shiftInput").value === "S"
+                && punyaCOJam0006(matches);
+
+  return {
+    avg: sum / matches.length,
+    count: matches.length,
+    lastTime: ambilJamDariTanggal(last),
+    slaCount,
+    durasiSLA,
+    inProgressCount: matches.filter(m => m.statusNorm.includes("inprogress")).length,
+    relasiResolved: matches.filter(m => m.statusNorm.includes("pending")).length,
+    bold
+  };
+}
+
+/* ========================== GENERATE ========================== */
+document.getElementById("generateBtn").addEventListener("click", async () => {
+  if (!csvData.length) return alert("Upload CSV terlebih dahulu!");
+
+  const mode = document.getElementById("shiftInput").value.toUpperCase();
+  if (mode === "IDX" && !sheetData.length) {
+    sheetData = buildUniqueNamesFromCSV(csvData);
+  }
+
+  let results = sheetData.map(k => ({ k, res: rataRata_byName(k.nama) }));
+
+  // Sort index descending
+  results.sort((a, b) => (b.res.avg || -9) - (a.res.avg || -9));
+
+  lastResults = results;
+  renderTable(results);
+
+  let tgl = new Date().toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});
+  document.getElementById("judulLaporan").textContent =
+    mode === "IDX"
+      ? `Laporan Index - Index Hari Ini (${tgl})`
+      : `Laporan Index ${shiftLabel} (${tgl})`;
+
+  document.getElementById("statusText").textContent = "✔ Perhitungan selesai.";
+
+  saveHistoryEntry({
+    ts: Date.now(),
+    mode,
+    shiftLabel,
+    tanggal: tgl,
+    toggleSiang14: document.getElementById("toggleSiang14").checked,
+    results
+  });
+});
+
+/* ========================== RENDER TABLE ========================== */
+function renderTable(data) {
+  const tbody = document.querySelector("#resultTable tbody");
+  tbody.innerHTML = "";
+
+  data.forEach((item, i) => {
+    const { k, res } = item;
+    let tr = document.createElement("tr");
+
+    if (res.slaCount > 0) tr.classList.add("table-danger");
+
+    if (res.avg !== null && Number(res.avg) > 0.35)
+      tr.classList.add("table-index-warning");
+
+    if (res.bold) tr.classList.add("bold-siang");
+
+    tr.innerHTML = `
+      <td>${i+1}</td>
+      <td>${k.nama}</td>
+      <td>${k.shift || "-"}</td>
+      <td>${res.lastTime}</td>
+      <td>${res.avg === null ? "-" : Number(res.avg).toFixed(2)}</td>
+      <td>${res.count}</td>
+      <td>${res.slaCount}</td>
+      <td>${res.durasiSLA}</td>
+      <td>${res.inProgressCount}</td>
+      <td>${res.relasiResolved}</td>
+    `;
+
+    tbody.appendChild(tr);
+  });
+}
+
+/* ========================== HISTORY ========================== */
+async function saveHistoryEntry(entry) {
+  const compact = entry.results.map(r => ({
+    nama: r.k.nama,
+    shift: r.k.shift,
+    avg: r.res.avg,
+    count: r.res.count,
+    lastTime: r.res.lastTime,
+    slaCount: r.res.slaCount,
+    durasiSLA: r.res.durasiSLA,
+    inProgressCount: r.res.inProgressCount,
+    relasiResolved: r.res.relasiResolved
+  }));
+
+  const payload = {
+    action: "saveHistory",
+    ts: entry.ts,
+    mode: entry.mode,
+    shiftLabel: entry.shiftLabel,
+    tanggal: entry.tanggal,
+    toggleSiang14: entry.toggleSiang14,
+    rows: compact
+  };
+
+  try {
+    await fetch(HISTORY_GAS_URL, {
+      method:"POST",
+      headers:{"Content-Type":"text/plain"},
+      body: JSON.stringify(payload)
+    });
+  } catch(e) { console.warn("Gagal simpan history:", e); }
+}
+
+document.getElementById("historyBtn").addEventListener("click", loadHistory);
+
+async function loadHistory() {
+  const list = document.getElementById("historyList");
+  list.innerHTML = "Memuat…";
+
+  try {
+    const res = await fetch(`${HISTORY_GAS_URL}?action=getHistory`);
+    const j = await res.json();
+    list.innerHTML = "";
+
+    j.items.forEach(h => {
+      const btn = document.createElement("button");
+      btn.className = "list-group-item list-group-item-action";
+      btn.innerHTML = `
+        <strong>${h.shiftLabel}</strong>  
+        <div>Tanggal: ${h.tanggal} • Personil: ${h.rows.length}</div>
+      `;
+      btn.onclick = () => {
+        lastResults = h.rows.map(r => ({
+          k:{ nama:r.nama, shift:r.shift },
+          res:{
+            avg:r.avg, count:r.count, lastTime:r.lastTime,
+            slaCount:r.slaCount, durasiSLA:r.durasiSLA,
+            inProgressCount:r.inProgressCount, relasiResolved:r.relasiResolved,
+            bold:false
+          }
+        }));
+        renderTable(lastResults);
+
+        document.getElementById("judulLaporan").textContent =
+          `[HISTORY] ${h.shiftLabel} — ${h.tanggal}`;
+      };
+      list.appendChild(btn);
+    });
+
+    new bootstrap.Modal("#historyModal").show();
+
+  } catch(e) {
+    list.innerHTML = `<span class="text-danger">Gagal load history: ${e.message}</span>`;
+  }
+}
+
+/* ========================== TOGGLE SIANG ========================== */
+function syncToggleSiang() {
+  const mode = document.getElementById("shiftInput").value.toUpperCase();
+  const cb = document.getElementById("toggleSiang14");
+
+  cb.disabled = mode !== "S";
+  cb.checked = mode === "S" && new Date().getHours() >= 13;
+}
+document.getElementById("shiftInput").addEventListener("change", syncToggleSiang);
+syncToggleSiang();
+
+/* ========================== DOWNLOAD JPG ========================== */
+document.getElementById("downloadBtn").addEventListener("click", async () => {
+  const area = document.getElementById("resultArea");
+  const canvas = await html2canvas(area, { scale: 2 });
+  const link = document.createElement("a");
+  link.download = "Laporan_Index.jpg";
+  link.href = canvas.toDataURL("image/jpeg");
+  link.click();
+});
+</script>
