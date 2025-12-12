@@ -221,12 +221,11 @@ function prettyDateTime(ts){ const d=new Date(ts); return d.toLocaleString("id-I
 /* ====== Parse tolerant tanggal+waktu dari CSV ====== */
 function parseDateTime(s){
   if(!s) return null;
-  // try straight Date constructor (handles ISO, some locales)
   const d1 = new Date(s);
   if(!isNaN(d1)) return d1;
 
   const str = s.toString().trim();
-  // try dd/mm/yyyy or dd-mm-yyyy [ hh:mm]
+  // dd/mm/yyyy or dd-mm-yyyy [ hh:mm]
   let m = str.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?/);
   if(m){
     let day = parseInt(m[1],10), mon = parseInt(m[2],10)-1, yr = parseInt(m[3],10);
@@ -235,7 +234,7 @@ function parseDateTime(s){
     return new Date(yr, mon, day, hh, mm);
   }
 
-  // try "dd MonthName yyyy hh:mm" e.g. "9 Dec 2025 02:15" or "9 Des 2025 02:15"
+  // "dd MonthName yyyy hh:mm"
   m = str.match(/(\d{1,2})\s+([A-Za-z\u00C0-\u017F]+)\s+(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
   if(m){
     const day = parseInt(m[1],10);
@@ -243,7 +242,6 @@ function parseDateTime(s){
     const yr = parseInt(m[3],10);
     const hh = parseInt(m[4] || "0",10);
     const mm = parseInt(m[5] || "0",10);
-    // try letting Date parse month name (fallback)
     const tryDate = new Date(`${monName} 1, ${yr}`);
     if(!isNaN(tryDate)){
       const monIdx = tryDate.getMonth();
@@ -251,7 +249,6 @@ function parseDateTime(s){
     }
   }
 
-  // if all fails return null
   return null;
 }
 
@@ -454,7 +451,10 @@ document.getElementById("ambilNamaBtn").addEventListener("click", async ()=>{
 function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik / r.waktuSlaDetik : 0; }
 
 /* rataRata_byName - DurasiSLA diambil dari right(8) umurRaw **hanya** untuk baris yang statusSLA mengandung "lewat".
-   Jika tidak ada nilai, durasiSLA akan menjadi "0" */
+   Jika tidak ada nilai, durasiSLA akan menjadi "0"
+   Perubahan: earlyMorning deteksi dilakukan DENGAN MEMINDAI csvData (tidak bergantung pada filter siang),
+   sehingga bold tetap aktif meskipun toggle Siang >=13:00 dicentang.
+*/
 function rataRata_byName(nama,thr=0.85){
   const matches=[];
   const keyNama = normalizeName(nama);
@@ -470,7 +470,7 @@ function rataRata_byName(nama,thr=0.85){
     }
     matches.push(r);
   }
-  if(!matches.length) return { avg:null, count:0, lastTime:"-", slaCount:0, durasiSLA:"0", inProgressCount:0, relasiResolved:0, earlyMorning: false };
+  if(!matches.length) return { avg:null, count:0, lastTime:"-", slaCount:0, durasiSLA:"0", inProgressCount:0, relasiResolved:0, earlyMorning:false };
 
   const sum = matches.reduce((a,b)=>a+computeC(b),0);
   const latest = matches.map(r=>r.tanggalDiambil).filter(Boolean).sort().pop();
@@ -491,15 +491,23 @@ function rataRata_byName(nama,thr=0.85){
     chosenDurasiSLA = extracted ? extracted : "0";
   }
 
-  // ===== DETEKSI EARLY MORNING (00:00–06:00) PADA TANGGAL HARI INI - hanya untuk shift Siang =====
+  // ===== DETEKSI EARLY MORNING (00:00–06:00) PADA TANGGAL HARI INI
+  // Important: lakukan pemindaian pada seluruh csvData (bukan matches) sehingga toggle Siang tidak mempengaruhi.
   let earlyMorningFlag = false;
   const modeNow = document.getElementById("shiftInput").value.trim().toUpperCase();
   if(modeNow === "S"){
     const today = new Date();
-    for(const r of matches){
+    for(const r of csvData){
+      // match nama: sama aturan seperti di atas (IDX exact, else similarity threshold)
+      if(modeNow === "IDX"){
+        // unreachable here, but keep consistent
+        if(normalizeName(r.diambilOleh) !== keyNama) continue;
+      } else {
+        if(similarity(nama, r.diambilOleh) < thr) continue;
+      }
+      // parse tanggalDiambil
       const parsed = parseDateTime(r.tanggalDiambil);
       if(!parsed || isNaN(parsed)) continue;
-      // sama tanggal (local)
       if(parsed.getFullYear() === today.getFullYear() && parsed.getMonth() === today.getMonth() && parsed.getDate() === today.getDate()){
         const h = parsed.getHours();
         if(h >= 0 && h <= 6){
