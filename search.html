@@ -41,6 +41,14 @@
 </div>
 
 <script>
+  // ===== ENTER TO SEARCH =====
+  document.getElementById("qInput").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault(); // cegah reload / submit default
+      doSearch();
+    }
+  });
+</script>
 /* =========================
    CONFIG
 ========================= */
@@ -191,5 +199,6 @@ function esc(v) {
 
 </body>
 </html>
+
 
 
