@@ -73,10 +73,10 @@ document.getElementById("kodeInput").addEventListener("keydown", e => {
 ====================================================== */
 async function doSearch() {
   const kode = document.getElementById("kodeInput").value.trim();
-  if (!kode) {
-    alert("Masukkan Kode Toko);
-    return;
-  }
+ if (!kode) {
+  alert("Masukkan Kode Toko");
+  return;
+}
 
   document.getElementById("infoText").textContent = "🔄 Mencari data...";
   document.getElementById("resultArea").innerHTML = "";
@@ -219,4 +219,5 @@ function esc(v) {
 
 </body>
 </html>
+
 
