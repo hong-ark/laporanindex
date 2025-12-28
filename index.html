@@ -187,6 +187,8 @@
 /* ====== KONFIG / STATE ====== */
 const GAS_URL = "https://script.google.com/macros/s/AKfycbx4dWdi4tSGqHN3WQ89Za1wyklGj1eLfcNPwqBeLa15aLUKrzjncKvySo07-9GuqxPD0g/exec";
 const HISTORY_GAS_URL = "https://script.google.com/macros/s/AKfycbwrXZlIB4nyiQtb-MM79c8rm1rDuoVyEZRxdk4-yTHaM_teOWR-XxC_BK50RsVlmo-P/exec";
+const DATA_GAS_URL = "https://script.google.com/macros/s/AKfycbzMPyCbWeahV6eu_JJadNOfvEgEEPauzMZhc6Zm03xL2edud0wlX6k6V8ohpHK8Q-xF/exec"; // SHEET = DATA
+
 
 let sheetData = [], csvData = [], lastResults = [];
 let shiftLabel = "";
@@ -347,6 +349,73 @@ async function renderHistoryList(){
 }
 
 /* ====== CSV LOAD ====== */
+  async function kirimCsvKeGoogleSheetDATA(csvRows) {
+  if (!csvRows || !csvRows.length) return;
+
+  const sheetRows = csvRows.map(r => [
+    "",
+    r["No Komplain"] || "",
+    r["Jenis Komplain"] || "",
+    r["Kategori Masalah"] || "",
+    r["Masalah"] || "",
+    r["Sub Masalah"] || "",
+    r["Umur Komplain"] || "",
+    r["Durasi Komplain"] || "",
+    r["Waktu SLA"] || "",
+    r["Bisnis Unit Asal"] || "",
+    r["Tipe Lokasi Asal"] || "",
+    r["Kode Lokasi Asal"] || "",
+    r["Nama Lokasi Asal"] || "",
+    r["Cabang Lokasi Asal"] || "",
+    r["Nama Area Supervisor"] || "",
+    r["Nama Area Manager"] || "",
+    r["Bagian Asal"] || "",
+    r["Tanggal Buat"] || "",
+    r["Dibuat Oleh"] || "",
+    r["Tanggal Diambil"] || "",
+    r["Diambil Oleh"] || "",
+    r["NIK Pengambil"] || "",
+    r["Tanggal Selesai"] || "",
+    r["Diselesaikan Oleh"] || "",
+    r["Tanggal Tutup"] || "",
+    r["Ditutup Oleh"] || "",
+    r["Ditutup Melalui"] || "",
+    r["Bisnis Unit Tujuan"] || "",
+    r["Tipe Lokasi Tujuan"] || "",
+    r["Kode Lokasi Tujuan"] || "",
+    r["Nama Lokasi Tujuan"] || "",
+    r["Bagian Tujuan"] || "",
+    r["Tujuan Relasi Komplain"] || "",
+    r["Status Komplain"] || "",
+    r["Status SLA"] || "",
+    r["No. Aktiva"] || "",
+    r["Nama Aktiva"] || "",
+    r["Status Perbaikan AT"] || "",
+    r["Deskripsi"] || "",
+    r["Solusi"] || "",
+    r["Asal Relasi - Lokasi"] || ""
+  ]);
+
+  try {
+    const res = await fetch(DATA_GAS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ rows: sheetRows })
+    });
+
+    const json = await res.json();
+
+    if (json.ok) {
+      document.getElementById("statusText").textContent =
+        `✅ DATA tersimpan (${json.inserted} baru, ${json.skipped || 0} duplikat)`;
+    } else {
+      alert("❌ Gagal simpan ke Google Sheet DATA");
+    }
+  } catch (err) {
+    alert("❌ Error kirim DATA: " + err.message);
+  }
+}
+
 document.getElementById("csvFile").addEventListener("change",(e)=>{
   const file = e.target.files[0]; if(!file) return;
   Papa.parse(file,{header:true,delimiter:";",skipEmptyLines:true,
@@ -394,6 +463,7 @@ document.getElementById("csvFile").addEventListener("change",(e)=>{
         document.getElementById("modeNote").textContent = sheetData.length ? " " : "(Mode Index) Tidak ada nama pada kolom 'Diambil oleh'.";
       }
       document.getElementById("statusText").textContent = `File CSV terbaca: ${csvData.length} baris.`;
+      kirimCsvKeGoogleSheetDATA(res.data);
     }});
 });
 
@@ -766,3 +836,4 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </script>
 </body>
 </html>
+
