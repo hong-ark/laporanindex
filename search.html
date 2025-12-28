@@ -32,10 +32,6 @@
       font-family: monospace;
       font-size: 0.95rem;
     }
-    .small-label {
-      font-size: 0.8rem;
-      color: #666;
-    }
   </style>
 </head>
 
@@ -44,7 +40,7 @@
 
   <h4 class="mb-3">🔍 Search Komplain (Kode Lokasi Asal)</h4>
 
-  <!-- SEARCH BOX -->
+  <!-- SEARCH -->
   <div class="input-group mb-3">
     <input type="text" id="kodeInput" class="form-control"
            placeholder="Contoh: STORE-T70X-RING ROAD 99">
@@ -65,7 +61,7 @@
 const SEARCH_GAS_URL = "https://script.google.com/macros/s/AKfycbzLvr6F3WD_BTTC_fYjbL1Di92PNdm2Hp77mveJalrkV3p094PnxteJb7jqupsBqzKgKQ/exec";
 
 /* ======================================================
-   EVENT SEARCH
+   EVENT
 ====================================================== */
 document.getElementById("searchBtn").addEventListener("click", doSearch);
 document.getElementById("kodeInput").addEventListener("keydown", e => {
@@ -73,7 +69,7 @@ document.getElementById("kodeInput").addEventListener("keydown", e => {
 });
 
 /* ======================================================
-   SEARCH FUNCTION
+   SEARCH
 ====================================================== */
 async function doSearch() {
   const kode = document.getElementById("kodeInput").value.trim();
@@ -116,15 +112,15 @@ function renderCards(rows) {
     const statusClass = getStatusClass(r);
 
     const card = document.createElement("div");
-    card.className = `card card-komplain shadow-sm mb-3 ${statusClass}`;
+    card.className = `card shadow-sm mb-3 card-komplain ${statusClass}`;
 
     card.innerHTML = `
       <div class="card-body">
 
-        <h6 class="fw-bold mb-1">${escapeHtml(r.cabang || "-")}</h6>
+        <h6 class="fw-bold mb-1">${esc(r.cabang)}</h6>
         <div class="text-muted small">
-          dr: ${escapeHtml(r.lokasiAsal || "-")}<br>
-          ke: ${escapeHtml(r.lokasiTujuan || "-")}
+          dr: ${esc(r.lokasiAsal)}<br>
+          ke: ${esc(r.lokasiTujuan)}
         </div>
 
         <hr class="my-2">
@@ -134,31 +130,32 @@ function renderCards(rows) {
           <div class="col">Tanggal Buat</div>
         </div>
         <div class="row mb-2">
-          <div class="col kode">${escapeHtml(r.noKomplain)}</div>
-          <div class="col">${escapeHtml(r.tanggalBuat)}</div>
+          <div class="col kode">${esc(r.noKomplain)}</div>
+          <div class="col">${esc(r.tanggalBuat)}</div>
         </div>
 
         <hr class="my-2">
 
         <div class="small">
-          <div><strong>Dibuat</strong> : ${escapeHtml(r.dibuatOleh)}</div>
-          <div><strong>Diambil</strong> : ${escapeHtml(r.diambilOleh)}</div>
-          <div>
-            <strong>Status</strong> :
-            <span class="fw-semibold">${escapeHtml(r.statusKomplain)}</span>
-            <span class="text-muted">(${escapeHtml(r.statusSLA)})</span>
-          </div>
-          <div><strong>Umur CO</strong> : ${escapeHtml(r.umurKomplain)}</div>
+          <div><strong>Dibuat</strong>  : ${esc(r.dibuatOleh)}</div>
+          <div><strong>Diambil</strong> : ${esc(r.diambilOleh)}</div>
+          <div><strong>Status</strong>  : ${esc(r.statusKomplain)} - ${esc(r.statusSLA)}</div>
+          <div><strong>Umur CO</strong> : ${esc(r.umurKomplain)}</div>
         </div>
 
         <hr class="my-2">
 
         <div class="small">
-          <div><strong>Kategori</strong> : ${escapeHtml(r.kategoriMasalah)}</div>
-          <div><strong>Masalah</strong> : ${escapeHtml(r.masalah)}</div>
-          <div><strong>Detail</strong> : ${escapeHtml(r.deskripsi)}</div>
-          <div><strong>Solusi</strong> : ${escapeHtml(r.solusi)}</div>
+          <div><strong>Kategori</strong> : ${esc(r.kategoriMasalah)}</div>
+          <div><strong>Masalah</strong>  : ${esc(r.masalah)}</div>
+          <div><strong>Detail</strong>   : ${esc(r.deskripsi)}</div>
+          <div><strong>Solusi</strong>   : ${esc(r.solusi)}</div>
         </div>
+
+        <button class="btn btn-sm btn-outline-primary mt-3 w-100"
+                onclick='copyKomplain(${JSON.stringify(r)})'>
+          📋 Copy ke WhatsApp
+        </button>
 
       </div>
     `;
@@ -168,24 +165,53 @@ function renderCards(rows) {
 }
 
 /* ======================================================
-   STATUS CLASS
+   COPY TO CLIPBOARD (WA FORMAT)
+====================================================== */
+function copyKomplain(r) {
+  const text = `
+${r.cabang || "-"}
+dr: ${r.lokasiAsal || "-"}
+ke: ${r.lokasiTujuan || "-"}
+-----------------------------------
+No Komplain | Tanggal Buat
+-----------------------------------
+${r.noKomplain || "-"} | ${r.tanggalBuat || "-"}
+-----------------------------------
+Dibuat  : ${r.dibuatOleh || "-"}
+Diambil : ${r.diambilOleh || "-"}
+Status  : ${r.statusKomplain || "-"} - ${r.statusSLA || "-"}
+Umur CO : ${r.umurKomplain || "-"}
+Kategori: ${r.kategoriMasalah || "-"}
+Masalah : ${r.masalah || "-"}
+Detail  : ${r.deskripsi || "-"}
+Solusi  : ${r.solusi || "-"}
+-----------------------------------
+`.trim();
+
+  navigator.clipboard.writeText(text)
+    .then(() => alert("✅ Data berhasil dicopy!\nSiap paste ke WhatsApp"))
+    .catch(err => alert("❌ Gagal copy: " + err.message));
+}
+
+/* ======================================================
+   STATUS COLOR
 ====================================================== */
 function getStatusClass(r) {
-  const status = (r.statusKomplain || "").toLowerCase();
+  const s = (r.statusKomplain || "").toLowerCase();
   const sla = (r.statusSLA || "").toLowerCase();
 
-  if (status.includes("resolved") && sla.includes("sesuai")) return "resolved-sla";
-  if (status.includes("resolved") && sla.includes("lewat")) return "resolved-lewat";
-  if (status.includes("progress")) return "in-progress";
+  if (s.includes("resolved") && sla.includes("sesuai")) return "resolved-sla";
+  if (s.includes("resolved") && sla.includes("lewat")) return "resolved-lewat";
+  if (s.includes("progress")) return "in-progress";
   return "";
 }
 
 /* ======================================================
-   HELPER
+   ESCAPE
 ====================================================== */
-function escapeHtml(s) {
-  if (s === null || s === undefined) return "";
-  return String(s)
+function esc(v) {
+  if (v === null || v === undefined) return "-";
+  return String(v)
     .replace(/&/g,"&amp;")
     .replace(/</g,"&lt;")
     .replace(/>/g,"&gt;")
@@ -196,4 +222,3 @@ function escapeHtml(s) {
 
 </body>
 </html>
-
