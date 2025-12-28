@@ -412,23 +412,22 @@ async function renderHistoryList(){
 
   try {
     await fetch(DATA_GAS_URL, {
-  method: "POST",
-  mode: "no-cors", // 🔥 FIX UTAMA
-  headers: {
-    "Content-Type": "text/plain;charset=utf-8"
-  },
-  body: JSON.stringify({ rows: sheetRows })
-});
+      method: "POST",
+      mode: "no-cors", // aman untuk GitHub Pages
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      body: JSON.stringify({ rows: sheetRows })
+    });
 
-// Karena no-cors → tidak bisa baca response
-document.getElementById("statusText").textContent =
-  "✅ DATA berhasil dikirim ke Google Sheet DATA"; else {
-      alert("❌ Gagal simpan ke Google Sheet DATA");
-    }
+    document.getElementById("statusText").textContent =
+      "✅ DATA berhasil dikirim ke Google Sheet DATA";
+
   } catch (err) {
     alert("❌ Error kirim DATA: " + err.message);
   }
 }
+
 
 document.getElementById("csvFile").addEventListener("change",(e)=>{
   const file = e.target.files[0]; if(!file) return;
@@ -850,6 +849,7 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </script>
 </body>
 </html>
+
 
 
 
