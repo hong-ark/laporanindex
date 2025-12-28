@@ -411,18 +411,18 @@ async function renderHistoryList(){
   ]);
 
   try {
-    const res = await fetch(DATA_GAS_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ rows: sheetRows })
-    });
+    await fetch(DATA_GAS_URL, {
+  method: "POST",
+  mode: "no-cors", // 🔥 FIX UTAMA
+  headers: {
+    "Content-Type": "text/plain;charset=utf-8"
+  },
+  body: JSON.stringify({ rows: sheetRows })
+});
 
-    const json = await res.json();
-
-    if (json.ok) {
-      document.getElementById("statusText").textContent =
-        `✅ DATA tersimpan (${json.inserted} baru, ${json.skipped || 0} duplikat)`;
-    } else {
+// Karena no-cors → tidak bisa baca response
+document.getElementById("statusText").textContent =
+  "✅ DATA berhasil dikirim ke Google Sheet DATA"; else {
       alert("❌ Gagal simpan ke Google Sheet DATA");
     }
   } catch (err) {
@@ -850,6 +850,7 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </script>
 </body>
 </html>
+
 
 
 
