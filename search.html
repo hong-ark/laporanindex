@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Search Komplain - DATA</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body {
+      background: #f6f7fb;
+      padding: 20px;
+      font-family: "Segoe UI", Roboto, Arial;
+    }
+    .container {
+      max-width: 900px;
+    }
+    .card-komplain {
+      border-left: 6px solid #1976d2;
+    }
+    .card-komplain.resolved-sla {
+      border-left-color: #2e7d32;
+    }
+    .card-komplain.resolved-lewat {
+      border-left-color: #c62828;
+    }
+    .card-komplain.in-progress {
+      border-left-color: #f9a825;
+    }
+    .kode {
+      font-family: monospace;
+      font-size: 0.95rem;
+    }
+    .small-label {
+      font-size: 0.8rem;
+      color: #666;
+    }
+  </style>
+</head>
+
+<body>
+<div class="container">
+
+  <h4 class="mb-3">🔍 Search Komplain (Kode Lokasi Asal)</h4>
+
+  <!-- SEARCH BOX -->
+  <div class="input-group mb-3">
+    <input type="text" id="kodeInput" class="form-control"
+           placeholder="Contoh: STORE-T70X-RING ROAD 99">
+    <button class="btn btn-primary" id="searchBtn">Cari</button>
+  </div>
+
+  <div id="infoText" class="text-muted mb-3"></div>
+
+  <!-- RESULT -->
+  <div id="resultArea"></div>
+
+</div>
+
+<script>
+/* ======================================================
+   CONFIG
+====================================================== */
+const SEARCH_GAS_URL = "https://script.google.com/macros/s/XXXXXXX/exec";
+
+/* ======================================================
+   EVENT SEARCH
+====================================================== */
+document.getElementById("searchBtn").addEventListener("click", doSearch);
+document.getElementById("kodeInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") doSearch();
+});
+
+/* ======================================================
+   SEARCH FUNCTION
+====================================================== */
+async function doSearch() {
+  const kode = document.getElementById("kodeInput").value.trim();
+  if (!kode) {
+    alert("Masukkan Kode Lokasi Asal");
+    return;
+  }
+
+  document.getElementById("infoText").textContent = "🔄 Mencari data...";
+  document.getElementById("resultArea").innerHTML = "";
+
+  try {
+    const url = `${SEARCH_GAS_URL}?kode=${encodeURIComponent(kode)}`;
+    const res = await fetch(url);
+    const json = await res.json();
+
+    if (!json.ok) throw new Error(json.error || "Gagal search");
+
+    renderCards(json.data || []);
+    document.getElementById("infoText").textContent =
+      `Ditemukan ${json.data.length} data untuk kode "${kode}"`;
+
+  } catch (err) {
+    document.getElementById("infoText").textContent = "";
+    alert("❌ Error: " + err.message);
+  }
+}
+
+/* ======================================================
+   RENDER CARD
+====================================================== */
+function renderCards(rows) {
+  const area = document.getElementById("resultArea");
+  if (!rows.length) {
+    area.innerHTML = `<div class="text-muted">Tidak ada data.</div>`;
+    return;
+  }
+
+  rows.forEach(r => {
+    const statusClass = getStatusClass(r);
+
+    const card = document.createElement("div");
+    card.className = `card card-komplain shadow-sm mb-3 ${statusClass}`;
+
+    card.innerHTML = `
+      <div class="card-body">
+
+        <h6 class="fw-bold mb-1">${escapeHtml(r.cabang || "-")}</h6>
+        <div class="text-muted small">
+          dr: ${escapeHtml(r.lokasiAsal || "-")}<br>
+          ke: ${escapeHtml(r.lokasiTujuan || "-")}
+        </div>
+
+        <hr class="my-2">
+
+        <div class="row small fw-semibold">
+          <div class="col">No Komplain</div>
+          <div class="col">Tanggal Buat</div>
+        </div>
+        <div class="row mb-2">
+          <div class="col kode">${escapeHtml(r.noKomplain)}</div>
+          <div class="col">${escapeHtml(r.tanggalBuat)}</div>
+        </div>
+
+        <hr class="my-2">
+
+        <div class="small">
+          <div><strong>Dibuat</strong> : ${escapeHtml(r.dibuatOleh)}</div>
+          <div><strong>Diambil</strong> : ${escapeHtml(r.diambilOleh)}</div>
+          <div>
+            <strong>Status</strong> :
+            <span class="fw-semibold">${escapeHtml(r.statusKomplain)}</span>
+            <span class="text-muted">(${escapeHtml(r.statusSLA)})</span>
+          </div>
+          <div><strong>Umur CO</strong> : ${escapeHtml(r.umurKomplain)}</div>
+        </div>
+
+        <hr class="my-2">
+
+        <div class="small">
+          <div><strong>Kategori</strong> : ${escapeHtml(r.kategoriMasalah)}</div>
+          <div><strong>Masalah</strong> : ${escapeHtml(r.masalah)}</div>
+          <div><strong>Detail</strong> : ${escapeHtml(r.deskripsi)}</div>
+          <div><strong>Solusi</strong> : ${escapeHtml(r.solusi)}</div>
+        </div>
+
+      </div>
+    `;
+
+    area.appendChild(card);
+  });
+}
+
+/* ======================================================
+   STATUS CLASS
+====================================================== */
+function getStatusClass(r) {
+  const status = (r.statusKomplain || "").toLowerCase();
+  const sla = (r.statusSLA || "").toLowerCase();
+
+  if (status.includes("resolved") && sla.includes("sesuai")) return "resolved-sla";
+  if (status.includes("resolved") && sla.includes("lewat")) return "resolved-lewat";
+  if (status.includes("progress")) return "in-progress";
+  return "";
+}
+
+/* ======================================================
+   HELPER
+====================================================== */
+function escapeHtml(s) {
+  if (s === null || s === undefined) return "";
+  return String(s)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#39;");
+}
+</script>
+
+</body>
+</html>
