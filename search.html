@@ -110,9 +110,9 @@ function renderCards(rows) {
 
         <h6 class="fw-bold mb-1">${esc(r.cabang)}</h6>
         <div class="text-muted small">
-          dr: ${esc(r.lokasiAsal)}<br>
-          ke: ${esc(r.lokasiTujuan)}
-        </div>
+  dr: <strong>${esc(r.kodeLokasiAsal)} - ${esc(r.lokasiAsal)}</strong><br>
+  ke: ${esc(r.lokasiTujuan)}
+</div>
 
         <hr>
 
@@ -207,6 +207,7 @@ function esc(v) {
 
 </body>
 </html>
+
 
 
 
