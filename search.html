@@ -29,12 +29,13 @@
   <h4 class="mb-3">🔍 Tracking Complaint</h4>
 
   <!-- SEARCH -->
-  <div class="input-group mb-3">
-    <input id="qInput" class="form-control"
-           placeholder="Masukkan Kode Toko atau No Komplain">
-    <button class="btn btn-primary" id="searchBtn">Cari</button>
-  </div>
+  <div class="input-group mb-2">
+  <input id="qInput" class="form-control"
+         placeholder="Masukkan Kode Lokasi Asal atau No Komplain">
+  <button class="btn btn-primary" onclick="doSearch()">Cari</button>
+</div>
 
+<div id="lastUpdate" class="text-muted small mb-3"></div>
   <div id="infoText" class="text-muted mb-3"></div>
   <div id="resultArea"></div>
 
@@ -207,6 +208,7 @@ function esc(v) {
 
 </body>
 </html>
+
 
 
 
