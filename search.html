@@ -30,12 +30,14 @@
 
   <!-- SEARCH -->
   <div class="input-group mb-2">
-  <input id="qInput" class="form-control"
-         placeholder="Masukkan Kode Lokasi Asal atau No Komplain">
-  <button class="btn btn-primary" onclick="doSearch()">Cari</button>
-</div>
+    <input id="qInput" class="form-control"
+           placeholder="Masukkan Kode Lokasi Asal atau No Komplain">
+    <button class="btn btn-primary" onclick="doSearch()">Cari</button>
+  </div>
 
-<div id="lastUpdate" class="text-muted small mb-3"></div>
+  <!-- LAST UPDATE -->
+  <div id="lastUpdate" class="text-muted small mb-2"></div>
+
   <div id="infoText" class="text-muted mb-3"></div>
   <div id="resultArea"></div>
 
@@ -48,20 +50,16 @@
 const GAS_URL = "https://script.google.com/macros/s/AKfycbxrtmp4K_AHlN1z_7bXqz32guTB_mrDpj4ZxwKd-QjioE7v6sCWNDO0nROxBT_v1EZpXQ/exec";
 
 /* =========================
-   INIT (ENTER TO SEARCH)
+   ENTER TO SEARCH
 ========================= */
 document.addEventListener("DOMContentLoaded", () => {
-  const input = document.getElementById("qInput");
-  const btn = document.getElementById("searchBtn");
-
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      doSearch();
-    }
-  });
-
-  btn.addEventListener("click", doSearch);
+  document.getElementById("qInput")
+    .addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        doSearch();
+      }
+    });
 });
 
 /* =========================
@@ -73,12 +71,18 @@ async function doSearch() {
 
   document.getElementById("infoText").textContent = "🔄 Mencari data...";
   document.getElementById("resultArea").innerHTML = "";
+  document.getElementById("lastUpdate").textContent = "";
 
   try {
     const res = await fetch(`${GAS_URL}?kode=${encodeURIComponent(q)}`);
     const json = await res.json();
 
     if (!json.ok) throw new Error(json.error || "Gagal mengambil data");
+
+    if (json.lastUpdate) {
+      document.getElementById("lastUpdate").textContent =
+        "📌 Update terakhir data: " + json.lastUpdate;
+    }
 
     document.getElementById("infoText").textContent =
       `Ditemukan ${json.data.length} data`;
@@ -100,8 +104,9 @@ function renderCards(rows) {
     return;
   }
 
-  rows.forEach(r => {
+  rows.forEach((r, i) => {
     const cls = statusClass(r);
+    const btnId = `copyBtn_${i}`;
 
     const card = document.createElement("div");
     card.className = `card mb-3 shadow-sm card-komplain ${cls}`;
@@ -111,9 +116,9 @@ function renderCards(rows) {
 
         <h6 class="fw-bold mb-1">${esc(r.cabang)}</h6>
         <div class="text-muted small">
-  dr: <strong>${esc(r.kodeLokasiAsal)} - ${esc(r.lokasiAsal)}</strong><br>
-  ke: ${esc(r.lokasiTujuan)}
-</div>
+          dr: <strong>${esc(r.kodeLokasiAsal)} - ${esc(r.lokasiAsal)}</strong><br>
+          ke: ${esc(r.lokasiTujuan)}
+        </div>
 
         <hr>
 
@@ -144,8 +149,8 @@ function renderCards(rows) {
           <div><strong>Solusi</strong>   : ${esc(r.solusi)}</div>
         </div>
 
-        <button class="btn btn-sm btn-outline-primary mt-3 w-100"
-          onclick='copyWA(${JSON.stringify(r)})'>
+        <button id="${btnId}" class="btn btn-sm btn-outline-primary mt-3 w-100"
+          onclick='copyWA(${JSON.stringify(r)}, "${btnId}")'>
           📋 Copy text
         </button>
 
@@ -157,12 +162,12 @@ function renderCards(rows) {
 }
 
 /* =========================
-   COPY WA
+   COPY WA + FEEDBACK
 ========================= */
-function copyWA(r) {
+function copyWA(r, btnId) {
   const text = `
 ${r.cabang}
-dr: ${r.lokasiAsal}
+dr: ${r.kodeLokasiAsal} - ${r.lokasiAsal}
 ke: ${r.lokasiTujuan}
 -----------------------------------
 No Komplain | Tanggal Buat
@@ -180,15 +185,26 @@ Solusi  : ${r.solusi}
 -----------------------------------
 `.trim();
 
-  navigator.clipboard.writeText(text).catch(()=>{});
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById(btnId);
+    btn.classList.remove("btn-outline-primary");
+    btn.classList.add("btn-success");
+    btn.textContent = "✅ Berhasil dicopy";
+
+    setTimeout(() => {
+      btn.classList.remove("btn-success");
+      btn.classList.add("btn-outline-primary");
+      btn.textContent = "📋 Copy text";
+    }, 2000);
+  });
 }
 
 /* =========================
    HELPERS
 ========================= */
 function statusClass(r) {
-  const s = (r.statusKomplain||"").toLowerCase();
-  const sla = (r.statusSLA||"").toLowerCase();
+  const s = (r.statusKomplain || "").toLowerCase();
+  const sla = (r.statusSLA || "").toLowerCase();
   if (s.includes("resolved") && sla.includes("sesuai")) return "resolved-sla";
   if (s.includes("resolved") && sla.includes("lewat")) return "resolved-lewat";
   if (s.includes("progress")) return "in-progress";
@@ -208,16 +224,3 @@ function esc(v) {
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
