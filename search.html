@@ -19,14 +19,17 @@
     .resolved-lewat { border-left-color: #c62828; }
     .in-progress { border-left-color: #f9a825; }
     .kode { font-family: monospace; font-size: 0.95rem; }
-    pre { white-space: pre-wrap; }
+    .copied {
+      background: #2e7d32 !important;
+      color: #fff !important;
+    }
   </style>
 </head>
 
 <body>
 <div class="container">
 
-  <h4 class="mb-3">🔍 Tracking Complaint</h4>
+  <h4 class="mb-2">🔍 Tracking Complaint</h4>
 
   <!-- SEARCH -->
   <div class="input-group mb-2">
@@ -52,14 +55,11 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbxoSzU-cN-Wkza8op6nQpe3
 /* =========================
    ENTER TO SEARCH
 ========================= */
-document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("qInput")
-    .addEventListener("keydown", e => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        doSearch();
-      }
-    });
+document.getElementById("qInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    doSearch();
+  }
 });
 
 /* =========================
@@ -71,7 +71,6 @@ async function doSearch() {
 
   document.getElementById("infoText").textContent = "🔄 Mencari data...";
   document.getElementById("resultArea").innerHTML = "";
-  document.getElementById("lastUpdate").textContent = "";
 
   try {
     const res = await fetch(`${GAS_URL}?kode=${encodeURIComponent(q)}`);
@@ -79,9 +78,10 @@ async function doSearch() {
 
     if (!json.ok) throw new Error(json.error || "Gagal mengambil data");
 
+    // LAST UPDATE (STATIS DARI GAS)
     if (json.lastUpdate) {
       document.getElementById("lastUpdate").textContent =
-        "📌 Update terakhir data: " + json.lastUpdate;
+        `Last update data: ${json.lastUpdate}`;
     }
 
     document.getElementById("infoText").textContent =
@@ -95,7 +95,7 @@ async function doSearch() {
 }
 
 /* =========================
-   RENDER
+   RENDER CARD
 ========================= */
 function renderCards(rows) {
   const area = document.getElementById("resultArea");
@@ -149,20 +149,20 @@ function renderCards(rows) {
           <div><strong>Solusi</strong>   : ${esc(r.solusi)}</div>
         </div>
 
-        <button id="${btnId}" class="btn btn-sm btn-outline-primary mt-3 w-100"
+        <button id="${btnId}"
+          class="btn btn-sm btn-outline-primary mt-3 w-100"
           onclick='copyWA(${JSON.stringify(r)}, "${btnId}")'>
           📋 Copy text
         </button>
 
       </div>
     `;
-
     area.appendChild(card);
   });
 }
 
 /* =========================
-   COPY WA + FEEDBACK
+   COPY TEXT + FEEDBACK UI
 ========================= */
 function copyWA(r, btnId) {
   const text = `
@@ -187,14 +187,12 @@ Solusi  : ${r.solusi}
 
   navigator.clipboard.writeText(text).then(() => {
     const btn = document.getElementById(btnId);
-    btn.classList.remove("btn-outline-primary");
-    btn.classList.add("btn-success");
-    btn.textContent = "✅ Berhasil dicopy";
+    btn.textContent = "✅ Tersalin";
+    btn.classList.add("copied");
 
     setTimeout(() => {
-      btn.classList.remove("btn-success");
-      btn.classList.add("btn-outline-primary");
       btn.textContent = "📋 Copy text";
+      btn.classList.remove("copied");
     }, 2000);
   });
 }
@@ -203,8 +201,8 @@ Solusi  : ${r.solusi}
    HELPERS
 ========================= */
 function statusClass(r) {
-  const s = (r.statusKomplain || "").toLowerCase();
-  const sla = (r.statusSLA || "").toLowerCase();
+  const s = (r.statusKomplain||"").toLowerCase();
+  const sla = (r.statusSLA||"").toLowerCase();
   if (s.includes("resolved") && sla.includes("sesuai")) return "resolved-sla";
   if (s.includes("resolved") && sla.includes("lewat")) return "resolved-lewat";
   if (s.includes("progress")) return "in-progress";
@@ -224,4 +222,3 @@ function esc(v) {
 
 </body>
 </html>
-
