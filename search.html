@@ -69,8 +69,10 @@ async function doSearch() {
   const q = document.getElementById("qInput").value.trim();
   if (!q) return;
 
+  // RESET UI
   document.getElementById("infoText").textContent = "🔄 Mencari data...";
   document.getElementById("resultArea").innerHTML = "";
+  document.getElementById("lastUpdate").textContent = ""; // 🔴 reset dulu
 
   try {
     const res = await fetch(`${GAS_URL}?kode=${encodeURIComponent(q)}`);
@@ -78,16 +80,20 @@ async function doSearch() {
 
     if (!json.ok) throw new Error(json.error || "Gagal mengambil data");
 
-    // LAST UPDATE (STATIS DARI GAS)
+    // ✅ SET LAST UPDATE (TIDAK TERGANTUNG DATA PANJANG)
     if (json.lastUpdate) {
       document.getElementById("lastUpdate").textContent =
-        `Last update data: ${json.lastUpdate}`;
+        `🕒 Last update data: ${json.lastUpdate}`;
+    } else {
+      document.getElementById("lastUpdate").textContent =
+        "🕒 Last update data: -";
     }
 
     document.getElementById("infoText").textContent =
       `Ditemukan ${json.data.length} data`;
 
     renderCards(json.data || []);
+
   } catch (err) {
     document.getElementById("infoText").textContent = "";
     alert("❌ Error: " + err.message);
@@ -222,5 +228,6 @@ function esc(v) {
 
 </body>
 </html>
+
 
 
