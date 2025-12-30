@@ -40,9 +40,8 @@
 
   <!-- LAST UPDATE -->
   <div id="lastUpdate" class="text-muted small mb-2">
-  🕒 Last update data: -
-</div>
-
+    🕒 Last update data: -
+  </div>
 
   <div id="infoText" class="text-muted mb-3"></div>
   <div id="resultArea"></div>
@@ -56,23 +55,28 @@
 const GAS_URL = "https://script.google.com/macros/s/AKfycbyv6_ERRn2OQKyD86PfSlq7o-CdK4n8wPNWZOy3ikWWXMYJftIsR-P_mf5EOPGRVMAKSQ/exec";
 
 /* =========================
-   LOAD LAST UPDATE
+   LOAD LAST UPDATE (GLOBAL)
 ========================= */
 async function loadLastUpdate() {
   try {
     const res = await fetch(GAS_URL);
     const json = await res.json();
 
- 
+    if (json.ok && json.lastUpdate) {
+      document.getElementById("lastUpdate").textContent =
+        `🕒 Last update data: ${json.lastUpdate}`;
+    }
+  } catch (e) {
+    console.warn("Gagal load last update");
   }
 }
 
 /* =========================
-   AUTO LOAD & AUTO REFRESH
+   INIT
 ========================= */
 document.addEventListener("DOMContentLoaded", () => {
-  loadLastUpdate();                 // saat page load
-  setInterval(loadLastUpdate, 600000); // tiap 1 menit
+  loadLastUpdate();                    // tampil saat page load
+  setInterval(loadLastUpdate, 600000); // refresh tiap 10 menit
 });
 
 /* =========================
@@ -238,5 +242,3 @@ function esc(v) {
 
 </body>
 </html>
-
-
