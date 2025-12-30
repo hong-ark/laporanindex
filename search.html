@@ -55,28 +55,28 @@
 const GAS_URL = "https://script.google.com/macros/s/AKfycbwX3fJVDhNxYOP_bbykuVB7BfW3aJxqLbpeIlgKbcOW_9xpCulBa-RYuomP104UX1Lb_A/exec";
 
 /* =========================
-   LOAD LAST UPDATE (GLOBAL)
+   LOAD LAST UPDATE
 ========================= */
 async function loadLastUpdate() {
   try {
-    const res = await fetch(GAS_URL);
+    const res = await fetch(`${GAS_URL}?mode=lastUpdate`);
     const json = await res.json();
 
     if (json.ok && json.lastUpdate) {
       document.getElementById("lastUpdate").textContent =
         `🕒 Last update data: ${json.lastUpdate}`;
     }
-  } catch (e) {
+  } catch (err) {
     console.warn("Gagal load last update");
   }
 }
 
 /* =========================
-   INIT
+   PAGE LOAD
 ========================= */
 document.addEventListener("DOMContentLoaded", () => {
-  loadLastUpdate();                    // tampil saat page load
-  setInterval(loadLastUpdate, 600000); // refresh tiap 10 menit
+  loadLastUpdate();                    // saat page dibuka
+  setInterval(loadLastUpdate, 600000); // tiap 10 menit
 });
 
 /* =========================
@@ -115,6 +115,8 @@ async function doSearch() {
     alert("❌ Error: " + err.message);
   }
 }
+</script>
+
 
 /* =========================
    RENDER CARD
@@ -242,4 +244,5 @@ function esc(v) {
 
 </body>
 </html>
+
 
