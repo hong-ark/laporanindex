@@ -75,8 +75,8 @@ async function loadLastUpdate() {
    PAGE LOAD
 ========================= */
 document.addEventListener("DOMContentLoaded", () => {
-  loadLastUpdate();                    // saat page dibuka
-  setInterval(loadLastUpdate, 600000); // tiap 10 menit
+  loadLastUpdate();                    // load saat halaman dibuka
+  setInterval(loadLastUpdate, 600000); // refresh tiap 10 menit
 });
 
 /* =========================
@@ -115,8 +115,6 @@ async function doSearch() {
     alert("❌ Error: " + err.message);
   }
 }
-</script>
-
 
 /* =========================
    RENDER CARD
@@ -179,12 +177,13 @@ function renderCards(rows) {
         </button>
       </div>
     `;
+
     area.appendChild(card);
   });
 }
 
 /* =========================
-   COPY TEXT
+   COPY TEXT + FEEDBACK
 ========================= */
 function copyWA(r, btnId) {
   const text = `
@@ -223,8 +222,8 @@ Solusi  : ${r.solusi}
    HELPERS
 ========================= */
 function statusClass(r) {
-  const s = (r.statusKomplain||"").toLowerCase();
-  const sla = (r.statusSLA||"").toLowerCase();
+  const s = (r.statusKomplain || "").toLowerCase();
+  const sla = (r.statusSLA || "").toLowerCase();
   if (s.includes("resolved") && sla.includes("sesuai")) return "resolved-sla";
   if (s.includes("resolved") && sla.includes("lewat")) return "resolved-lewat";
   if (s.includes("progress")) return "in-progress";
@@ -244,5 +243,3 @@ function esc(v) {
 
 </body>
 </html>
-
-
