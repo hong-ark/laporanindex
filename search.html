@@ -48,9 +48,34 @@
 
 <script>
 /* =========================
+   AUTO REFRESH LAST UPDATE
+========================= */
+setInterval(loadLastUpdate, 60 * 1000); // tiap 1 menit
+</script>
+/* =========================
+   LOAD LAST UPDATE ON PAGE LOAD
+========================= */
+document.addEventListener("DOMContentLoaded", loadLastUpdate);
+
+async function loadLastUpdate() {
+  try {
+    const res = await fetch(`${GAS_URL}?mode=lastUpdate`);
+    const json = await res.json();
+
+    if (json.ok && json.lastUpdate) {
+      document.getElementById("lastUpdate").textContent =
+        `🕒 Last update data: ${json.lastUpdate}`;
+    }
+  } catch (e) {
+    console.warn("Gagal load last update");
+  }
+}
+</script>
+
+/* =========================
    CONFIG
 ========================= */
-const GAS_URL = "https://script.google.com/macros/s/AKfycbwecInjx3v6aUl_bSLxynFau_qgqzu8pPue-LOIwyAmaZcZIMQ1BgR4Ui14kpzO1pUhnQ/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbyv6_ERRn2OQKyD86PfSlq7o-CdK4n8wPNWZOy3ikWWXMYJftIsR-P_mf5EOPGRVMAKSQ/exec";
 
 /* =========================
    ENTER TO SEARCH
@@ -228,6 +253,7 @@ function esc(v) {
 
 </body>
 </html>
+
 
 
 
