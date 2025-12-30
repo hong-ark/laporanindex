@@ -39,7 +39,7 @@
   </div>
 
   <!-- LAST UPDATE -->
-  <div id="lastUpdate" class="text-muted small mb-2"></div>
+  <div id="lastUpdate" class="text-muted small mb-2">🕒 Memuat last update...</div>
 
   <div id="infoText" class="text-muted mb-3"></div>
   <div id="resultArea"></div>
@@ -48,18 +48,16 @@
 
 <script>
 /* =========================
-   AUTO REFRESH LAST UPDATE
+   CONFIG
 ========================= */
-setInterval(loadLastUpdate, 60 * 1000); // tiap 1 menit
-</script>
-/* =========================
-   LOAD LAST UPDATE ON PAGE LOAD
-========================= */
-document.addEventListener("DOMContentLoaded", loadLastUpdate);
+const GAS_URL = "https://script.google.com/macros/s/AKfycbyv6_ERRn2OQKyD86PfSlq7o-CdK4n8wPNWZOy3ikWWXMYJftIsR-P_mf5EOPGRVMAKSQ/exec";
 
+/* =========================
+   LOAD LAST UPDATE
+========================= */
 async function loadLastUpdate() {
   try {
-    const res = await fetch(`${GAS_URL}?mode=lastUpdate`);
+    const res = await fetch(GAS_URL);
     const json = await res.json();
 
     if (json.ok && json.lastUpdate) {
@@ -67,15 +65,18 @@ async function loadLastUpdate() {
         `🕒 Last update data: ${json.lastUpdate}`;
     }
   } catch (e) {
-    console.warn("Gagal load last update");
+    document.getElementById("lastUpdate").textContent =
+      "🕒 Last update data: -";
   }
 }
-</script>
 
 /* =========================
-   CONFIG
+   AUTO LOAD & AUTO REFRESH
 ========================= */
-const GAS_URL = "https://script.google.com/macros/s/AKfycbyv6_ERRn2OQKyD86PfSlq7o-CdK4n8wPNWZOy3ikWWXMYJftIsR-P_mf5EOPGRVMAKSQ/exec";
+document.addEventListener("DOMContentLoaded", () => {
+  loadLastUpdate();                 // saat page load
+  setInterval(loadLastUpdate, 60000); // tiap 1 menit
+});
 
 /* =========================
    ENTER TO SEARCH
@@ -94,25 +95,14 @@ async function doSearch() {
   const q = document.getElementById("qInput").value.trim();
   if (!q) return;
 
-  // RESET UI
   document.getElementById("infoText").textContent = "🔄 Mencari data...";
   document.getElementById("resultArea").innerHTML = "";
-  document.getElementById("lastUpdate").textContent = ""; // 🔴 reset dulu
 
   try {
     const res = await fetch(`${GAS_URL}?kode=${encodeURIComponent(q)}`);
     const json = await res.json();
 
     if (!json.ok) throw new Error(json.error || "Gagal mengambil data");
-
-    // ✅ SET LAST UPDATE (TIDAK TERGANTUNG DATA PANJANG)
-    if (json.lastUpdate) {
-      document.getElementById("lastUpdate").textContent =
-        `🕒 Last update data: ${json.lastUpdate}`;
-    } else {
-      document.getElementById("lastUpdate").textContent =
-        "🕒 Last update data: -";
-    }
 
     document.getElementById("infoText").textContent =
       `Ditemukan ${json.data.length} data`;
@@ -136,15 +126,14 @@ function renderCards(rows) {
   }
 
   rows.forEach((r, i) => {
-    const cls = statusClass(r);
     const btnId = `copyBtn_${i}`;
+    const cls = statusClass(r);
 
     const card = document.createElement("div");
     card.className = `card mb-3 shadow-sm card-komplain ${cls}`;
 
     card.innerHTML = `
       <div class="card-body">
-
         <h6 class="fw-bold mb-1">${esc(r.cabang)}</h6>
         <div class="text-muted small">
           dr: <strong>${esc(r.kodeLokasiAsal)} - ${esc(r.lokasiAsal)}</strong><br>
@@ -185,7 +174,6 @@ function renderCards(rows) {
           onclick='copyWA(${JSON.stringify(r)}, "${btnId}")'>
           📋 Copy text
         </button>
-
       </div>
     `;
     area.appendChild(card);
@@ -193,7 +181,7 @@ function renderCards(rows) {
 }
 
 /* =========================
-   COPY TEXT + FEEDBACK UI
+   COPY TEXT
 ========================= */
 function copyWA(r, btnId) {
   const text = `
@@ -253,7 +241,3 @@ function esc(v) {
 
 </body>
 </html>
-
-
-
-
