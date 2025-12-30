@@ -39,7 +39,10 @@
   </div>
 
   <!-- LAST UPDATE -->
-  <div id="lastUpdate" class="text-muted small mb-2">🕒 Memuat last update...</div>
+  <div id="lastUpdate" class="text-muted small mb-2">
+  🕒 Last update data: -
+</div>
+
 
   <div id="infoText" class="text-muted mb-3"></div>
   <div id="resultArea"></div>
@@ -60,13 +63,7 @@ async function loadLastUpdate() {
     const res = await fetch(GAS_URL);
     const json = await res.json();
 
-    if (json.ok && json.lastUpdate) {
-      document.getElementById("lastUpdate").textContent =
-        `🕒 Last update data: ${json.lastUpdate}`;
-    }
-  } catch (e) {
-    document.getElementById("lastUpdate").textContent =
-      "🕒 Last update data: -";
+ 
   }
 }
 
@@ -241,4 +238,5 @@ function esc(v) {
 
 </body>
 </html>
+
 
