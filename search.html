@@ -14,14 +14,44 @@
       font-family: "Segoe UI", Roboto, Arial;
     }
     .container { max-width: 900px; }
+
     .card-komplain { border-left: 6px solid #1976d2; }
     .resolved-sla { border-left-color: #2e7d32; }
     .resolved-lewat { border-left-color: #c62828; }
     .in-progress { border-left-color: #f9a825; }
+
     .kode { font-family: monospace; font-size: 0.95rem; }
+
     .copied {
       background: #2e7d32 !important;
       color: #fff !important;
+    }
+
+    /* ===== SAWERIA ===== */
+    .donate-box{
+      margin-top: 40px;
+      padding: 20px;
+      background: #f9fbff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      text-align: center;
+    }
+    .donate-box h6{
+      margin-bottom: 4px;
+      font-weight: 600;
+      color: #1f2937;
+    }
+    .donate-box p{
+      font-size: 13px;
+      color: #6b7280;
+      margin-bottom: 12px;
+    }
+    .donate-box iframe{
+      width: 100%;
+      max-width: 420px;
+      height: 300px;
+      border: none;
+      border-radius: 10px;
     }
   </style>
 </head>
@@ -45,6 +75,16 @@
 
   <div id="infoText" class="text-muted mb-3"></div>
   <div id="resultArea"></div>
+
+  <!-- ===== SAWERIA SUPPORT ===== -->
+  <div class="donate-box">
+    <h6>☕ Dukung Pengembangan</h6>
+    <p>Jika halaman ini membantu, kamu bisa memberikan dukungan.</p>
+    <iframe
+      src="https://saweria.co/arifai"
+      loading="lazy">
+    </iframe>
+  </div>
 
 </div>
 
@@ -75,8 +115,8 @@ async function loadLastUpdate() {
    PAGE LOAD
 ========================= */
 document.addEventListener("DOMContentLoaded", () => {
-  loadLastUpdate();                    // load saat halaman dibuka
-  setInterval(loadLastUpdate, 600000); // refresh tiap 10 menit
+  loadLastUpdate();
+  setInterval(loadLastUpdate, 600000);
 });
 
 /* =========================
@@ -183,7 +223,7 @@ function renderCards(rows) {
 }
 
 /* =========================
-   COPY TEXT + FEEDBACK
+   COPY TEXT
 ========================= */
 function copyWA(r, btnId) {
   const text = `
@@ -243,4 +283,3 @@ function esc(v) {
 
 </body>
 </html>
-
