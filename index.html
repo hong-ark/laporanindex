@@ -152,9 +152,12 @@
       <label class="form-check-label text-muted" for="toggleSiang14" id="labelToggleSiang14">Hitung Siang mulai ≥ 13:00</label>
     </div>
 
-    <div id="judulLaporan" class="mt-2"></div>
+   <div id="shareArea" class="mt-2">
 
-    <div id="resultArea" class="mt-2">
+  <div id="judulLaporan"></div>
+
+  <div id="resultArea">
+    </div>
   <table id="resultTable" class="table table-bordered table-striped">
         <thead>
           <tr>
@@ -839,17 +842,15 @@ const cropY = rectJudul.top - rectArea.top;
 // tinggi area yang ingin di-capture
 const cropHeight = resultArea.scrollHeight - cropY;
 
-const canvas = await html2canvas(resultArea, {
+const shareArea = document.getElementById("shareArea");
+
+const canvas = await html2canvas(shareArea, {
   backgroundColor: "#ffffff",
   scale: 2,
-
-  x: 0,
-  y: cropY,
-  width: resultArea.scrollWidth,
-  height: cropHeight,
-
-  windowWidth: resultArea.scrollWidth,
-  windowHeight: resultArea.scrollHeight
+  width: shareArea.scrollWidth,
+  height: shareArea.scrollHeight,
+  windowWidth: shareArea.scrollWidth,
+  windowHeight: shareArea.scrollHeight
 });
 
 
@@ -963,6 +964,7 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </script>
 </body>
 </html>
+
 
 
 
