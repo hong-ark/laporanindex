@@ -58,24 +58,6 @@
     }
     #resultTable.table thead tr th:hover { background-color: #1565c0 !important; }
     #resultArea.is-history thead tr th { background-color: #9e9e9e !important; border-color: #757575 !important; color: #fff !important; }
-/* default tampilan halaman */
-#shareArea {
-  display: block;
-  width: 100%;
-}
-
-/* KHUSUS saat share */
-#shareArea.share-mode {
-  display: inline-block;
-  width: auto;
-}
-#resultArea {
-  display: inline-block;
-}
-
-#resultTable {
-  width: auto !important;
-}
 
     .table-danger td { background-color: #ffeaea !important; color: #000 !important; }
     .table-index-warning td { background-color: #ffcc80 !important; color: #000 !important; }
@@ -170,34 +152,31 @@
       <label class="form-check-label text-muted" for="toggleSiang14" id="labelToggleSiang14">Hitung Siang mulai ≥ 13:00</label>
     </div>
 
- <div id="shareArea">
-  <div id="judulLaporan" class="mt-2"></div>
+    <div id="judulLaporan" class="mt-2"></div>
 
-  <div id="resultArea" class="mt-2">
-    <table id="resultTable" class="table table-bordered table-striped">
-      <thead>
-        <tr>
-          <th>No</th>
-          <th id="sortNama">Nama Karyawan</th>
-          <th>Shift</th>
-          <th id="sortLastCO">LastCO</th>
-          <th id="sortIndexCO">IndexCO</th>
-          <th id="sortTotalCO">TotalCO</th>
-          <th id="sortSLA">SLA</th>
-          <th id="sortDurasiSLA">DurasiSLA</th>
-          <th id="sortInProgress">InProgress</th>
-          <th id="sortRelasiResolved">Relasi</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <div id="resultArea" class="mt-2">
+  <table id="resultTable" class="table table-bordered table-striped">
+        <thead>
+          <tr>
+            <th>No</th>
+            <th id="sortNama">Nama Karyawan</th>
+            <th>Shift</th>
+            <th id="sortLastCO">LastCO</th>
+            <th id="sortIndexCO">IndexCO</th>
+            <th id="sortTotalCO">TotalCO</th>
+            <th id="sortSLA">SLA</th>
+            <th id="sortDurasiSLA">DurasiSLA</th>
+            <th id="sortInProgress">InProgress</th>
+            <th id="sortRelasiResolved">Relasi</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
 
-    <div id="lastUpdate" class="last-update-text">
-      Last update data: -
-    </div>
+  <div id="lastUpdate" class="last-update-text">
+    Last update data: -
   </div>
 </div>
-
        <div class="d-flex justify-content-end gap-2 mt-3">
       <button id="historyBtn" class="btn btn-secondary">History</button>
       <button id="shareBtn" class="btn btn-success">Share ke WhatsApp</button>
@@ -833,39 +812,77 @@ function sortColumn(key){
   setHeaderArrow(`sort${key}`, asc ? "↑" : "↓");
 }
 
-/* ====== DOWNLOAD JPG (DISABLED) ======
+/* ====== DOWNLOAD JPG ====== */
 document.getElementById("downloadBtn").addEventListener("click", async () => {
-  ...
+  const area = document.querySelector("#resultArea");
+  const canvas = await html2canvas(area, { scale: 2 });
+  const link = document.createElement("a");
+  link.download = "Laporan_Index_Shift.jpg";
+  link.href = canvas.toDataURL("image/jpeg");
+  link.click();
 });
-*/
-/* ====== SHARE: MOBILE = WA APP | PC = COPY PASTE ====== */
+/* ====== SHARE WHATSAPP (TANPA MENGUBAH LAYOUT) ====== */
 document.getElementById("shareBtn").addEventListener("click", async () => {
-  const shareArea = document.getElementById("shareArea");
+  const judul = document.getElementById("judulLaporan");
+  const resultArea = document.getElementById("resultArea");
   const statusText = document.getElementById("statusText");
 
-  statusText.textContent = "Menyiapkan gambar...";
+  statusText.textContent = "Menyiapkan gambar untuk WhatsApp...";
 
-  // 🔥 AKTIFKAN MODE SHARE
-  shareArea.classList.add("share-mode");
+  /* === CLONE INVISIBLE (TIDAK MENGGANGGU HALAMAN) === */
+  const cloneWrapper = document.createElement("div");
+  cloneWrapper.style.position = "fixed";
+  cloneWrapper.style.left = "-99999px";
+  cloneWrapper.style.top = "0";
+  cloneWrapper.style.background = "#ffffff";
+  cloneWrapper.style.display = "inline-block";
+  cloneWrapper.style.padding = "16px";
+
+  cloneWrapper.appendChild(judul.cloneNode(true));
+  cloneWrapper.appendChild(resultArea.cloneNode(true));
+
+  document.body.appendChild(cloneWrapper);
 
   try {
-    const canvas = await html2canvas(shareArea, {
+    const canvas = await html2canvas(cloneWrapper, {
       backgroundColor: "#ffffff",
       scale: 2
     });
 
-    // (kode share WA kamu tetap, TIDAK perlu diubah)
+    document.body.removeChild(cloneWrapper);
+
+    const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+
+    if (isMobile && navigator.share) {
+      canvas.toBlob(async blob => {
+        const file = new File([blob], "Laporan_Index_CO.jpg", { type: "image/jpeg" });
+        await navigator.share({
+          files: [file],
+          title: "Laporan Index CO"
+        });
+        statusText.textContent = "✅ Berhasil dibagikan ke WhatsApp";
+      }, "image/jpeg", 0.9);
+    } else {
+      canvas.toBlob(async blob => {
+        await navigator.clipboard.write([
+          new ClipboardItem({ "image/png": blob })
+        ]);
+        alert(
+          "Gambar berhasil disalin.\n\n" +
+          "Buka WhatsApp Web / Desktop\n" +
+          "→ pilih chat\n" +
+          "→ tekan CTRL + V"
+        );
+        statusText.textContent = "✅ Gambar siap ditempel ke WhatsApp";
+      });
+    }
 
   } catch (err) {
     console.error(err);
-    statusText.textContent = "❌ Gagal membuat gambar.";
-  } finally {
-    // 🔥 BALIK KE MODE NORMAL
-    shareArea.classList.remove("share-mode");
+    statusText.textContent = "❌ Gagal share ke WhatsApp";
+    document.body.removeChild(cloneWrapper);
   }
 });
-
-
 /* ====== UI helper for toggle siang and button states ====== */
 function updateToggleSiangAvailability(){
   const mode = document.getElementById("shiftInput").value.trim().toUpperCase();
@@ -930,16 +947,6 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
 
 
 
