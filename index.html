@@ -813,14 +813,17 @@ function sortColumn(key){
 }
 
 /* ====== DOWNLOAD JPG ====== */
-document.getElementById("downloadBtn").addEventListener("click", async () => {
-  const area = document.querySelector("#resultArea");
-  const canvas = await html2canvas(area, { scale: 2 });
-  const link = document.createElement("a");
-  link.download = "Laporan_Index_Shift.jpg";
-  link.href = canvas.toDataURL("image/jpeg");
-  link.click();
-});
+const downloadBtn = document.getElementById("downloadBtn");
+if (downloadBtn) {
+  downloadBtn.addEventListener("click", async () => {
+    const area = document.querySelector("#resultArea");
+    const canvas = await html2canvas(area, { scale: 2 });
+    const link = document.createElement("a");
+    link.download = "Laporan_Index_Shift.jpg";
+    link.href = canvas.toDataURL("image/jpeg");
+    link.click();
+  });
+}
 /* ====== SHARE WHATSAPP (TANPA MENGUBAH LAYOUT) ====== */
 document.getElementById("shareBtn").addEventListener("click", async () => {
   const judul = document.getElementById("judulLaporan");
@@ -947,6 +950,7 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </script>
 </body>
 </html>
+
 
 
 
