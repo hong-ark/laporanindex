@@ -827,14 +827,31 @@ document.getElementById("shareBtn")?.addEventListener("click", async () => {
   statusText.textContent = "Menyiapkan gambar...";
 
   try {
-    const canvas = await html2canvas(resultArea, {
+    const judul = document.getElementById("judulLaporan");
+if (!judul) return alert("Judul laporan tidak ditemukan.");
+
+const rectArea  = resultArea.getBoundingClientRect();
+const rectJudul = judul.getBoundingClientRect();
+
+// jarak Y dari atas resultArea ke judul
+const cropY = rectJudul.top - rectArea.top;
+
+// tinggi area yang ingin di-capture
+const cropHeight = resultArea.scrollHeight - cropY;
+
+const canvas = await html2canvas(resultArea, {
   backgroundColor: "#ffffff",
   scale: 2,
+
+  x: 0,
+  y: cropY,
   width: resultArea.scrollWidth,
-  height: resultArea.scrollHeight,
+  height: cropHeight,
+
   windowWidth: resultArea.scrollWidth,
   windowHeight: resultArea.scrollHeight
 });
+
 
 
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -946,6 +963,7 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </script>
 </body>
 </html>
+
 
 
 
