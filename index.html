@@ -842,17 +842,19 @@ const cropY = rectJudul.top - rectArea.top;
 // tinggi area yang ingin di-capture
 const cropHeight = resultArea.scrollHeight - cropY;
 
-const shareArea = document.getElementById("shareArea");
+const shareArea  = document.getElementById("shareArea");
+const table      = document.getElementById("resultTable");
 
 const canvas = await html2canvas(shareArea, {
   backgroundColor: "#ffffff",
   scale: 2,
-  width: shareArea.scrollWidth,
+
+  width: table.scrollWidth,
   height: shareArea.scrollHeight,
-  windowWidth: shareArea.scrollWidth,
+
+  windowWidth: table.scrollWidth,
   windowHeight: shareArea.scrollHeight
 });
-
 
 
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -964,6 +966,7 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </script>
 </body>
 </html>
+
 
 
 
