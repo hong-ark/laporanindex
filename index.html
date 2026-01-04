@@ -828,9 +828,14 @@ document.getElementById("shareBtn")?.addEventListener("click", async () => {
 
   try {
     const canvas = await html2canvas(resultArea, {
-      backgroundColor: "#ffffff",
-      scale: 2
-    });
+  backgroundColor: "#ffffff",
+  scale: 2,
+  width: resultArea.scrollWidth,
+  height: resultArea.scrollHeight,
+  windowWidth: resultArea.scrollWidth,
+  windowHeight: resultArea.scrollHeight
+});
+
 
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
@@ -941,6 +946,7 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </script>
 </body>
 </html>
+
 
 
 
