@@ -561,7 +561,7 @@ function computeC(r){ return r.waktuSlaDetik>0 ? r.durasiDetik / r.waktuSlaDetik
    Perubahan: earlyMorning deteksi dilakukan DENGAN MEMINDAI csvData (tidak bergantung pada filter siang),
    sehingga bold tetap aktif meskipun toggle Siang >=13:00 dicentang.
 */
-function rataRata_byName(nama,thr=0.85){
+function rataRata_byName(nama,thr=0.95){
   const matches=[];
   const keyNama = normalizeName(nama);
   for(const r of csvData){
@@ -953,6 +953,7 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </script>
 </body>
 </html>
+
 
 
 
