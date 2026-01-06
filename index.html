@@ -126,9 +126,20 @@
     <hr>
 
     <div class="mb-3">
-      <label class="form-label">Upload CSV</label>
-      <input type="file" id="csvFile" class="form-control" accept=".csv" />
+  <label class="form-label">Upload CSV</label>
+  <input type="file" id="csvFile" class="form-control" accept=".csv" />
+  
+  <div id="progressContainer" class="mt-2 d-none">
+    <div class="d-flex justify-content-between mb-1">
+      <span id="progressLabel" class="small fw-bold" style="font-size: 11px;">Mengirim data ke Cloud...</span>
+      <span id="progressPercent" class="small" style="font-size: 11px;">0%</span>
     </div>
+    <div class="progress" style="height: 8px;">
+      <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+           role="progressbar" style="width: 0%"></div>
+    </div>
+  </div>
+</div>
 
     <div class="d-flex justify-content-between align-items-center mb-1">
   <!-- KIRI -->
@@ -386,8 +397,31 @@ async function renderHistoryList(){
   async function kirimCsvKeGoogleSheetDATA(csvRows) {
   if (!csvRows || !csvRows.length) return;
 
+  const progContainer = document.getElementById("progressContainer");
+  const progBar = document.getElementById("progressBar");
+  const progPercent = document.getElementById("progressPercent");
+  const progLabel = document.getElementById("progressLabel");
+  const statusText = document.getElementById("statusText");
+
+  // Munculkan Progress Bar
+  progContainer.classList.remove("d-none");
+  progBar.style.width = "0%";
+  progPercent.textContent = "0%";
+  progLabel.textContent = "Menyiapkan data...";
+
+  // Simulasi progress awal (saat memproses array)
+  let progress = 0;
+  const interval = setInterval(() => {
+    if (progress < 85) { // Berhenti di 85% sampai fetch selesai
+      progress += Math.random() * 15;
+      if (progress > 85) progress = 85;
+      progBar.style.width = progress + "%";
+      progPercent.textContent = Math.round(progress) + "%";
+    }
+  }, 300);
+
   const sheetRows = csvRows.map(r => [
-    "",
+    "", // No (biarkan kosong jika ada auto-number di Apps Script)
     r["No Komplain"] || "",
     r["Jenis Komplain"] || "",
     r["Kategori Masalah"] || "",
@@ -431,20 +465,32 @@ async function renderHistoryList(){
   ]);
 
   try {
+    progLabel.textContent = "Mengunggah ke Google Sheets...";
+    
     await fetch(DATA_GAS_URL, {
       method: "POST",
-      mode: "no-cors", // aman untuk GitHub Pages
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8"
-      },
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({ rows: sheetRows })
     });
 
-    document.getElementById("statusText").textContent =
-      "✅ DATA berhasil dikirim ke Google Sheet DATA";
+    // Fetch selesai, set ke 100%
+    clearInterval(interval);
+    progBar.style.width = "100%";
+    progPercent.textContent = "100%";
+    progLabel.textContent = "Selesai!";
+    statusText.textContent = "✅ DATA berhasil dikirim ke Google Sheet DATA";
+
+    // Sembunyikan progress bar setelah 3 detik
+    setTimeout(() => {
+      progContainer.classList.add("d-none");
+    }, 3000);
 
   } catch (err) {
+    clearInterval(interval);
     alert("❌ Error kirim DATA: " + err.message);
+    progLabel.textContent = "Gagal mengirim data.";
+    progBar.classList.replace("bg-success", "bg-danger");
   }
 }
 
@@ -950,6 +996,7 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </script>
 </body>
 </html>
+
 
 
 
