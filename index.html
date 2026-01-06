@@ -391,42 +391,32 @@ async function renderHistoryList(){
 }
 
 /* ====== CSV LOAD ====== */
-  async function kirimCsvKeGoogleSheetDATA(csvRows) {
+  /* ====== CSV LOAD ====== */
+async function kirimCsvKeGoogleSheetDATA(csvRows) {
   if (!csvRows || !csvRows.length) return;
 
   const progContainer = document.getElementById("progressContainer");
-  const progBar = document.getElementById("progressBar");
   const progPercent = document.getElementById("progressPercent");
-  const progLabel = document.getElementById("progressLabel");
   const statusText = document.getElementById("statusText");
 
-  // Munculkan Teks Persentase
+  // Reset tampilan status & munculkan persentase
   progContainer.classList.remove("d-none");
+  progContainer.classList.remove("text-danger");
+  progContainer.classList.add("text-success");
   progPercent.textContent = "0%";
   statusText.textContent = "";
 
-  let progress = 0;
-  const interval = setInterval(() => {
-    if (progress < 85) {
-      progress += Math.random() * 15;
-      if (progress > 85) progress = 85;
-      progPercent.textContent = Math.round(progress) + "%";
-    }
-  }, 300);
-
-  // Simulasi progress awal (saat memproses array)
-  let progress = 0;
-  const interval = setInterval(() => {
-    if (progress < 85) { // Berhenti di 85% sampai fetch selesai
-      progress += Math.random() * 15;
-      if (progress > 85) progress = 85;
-      progBar.style.width = progress + "%";
-      progPercent.textContent = Math.round(progress) + "%";
+  let progressVal = 0; // Ganti nama agar tidak bentrok
+  const progressInterval = setInterval(() => {
+    if (progressVal < 85) {
+      progressVal += Math.random() * 15;
+      if (progressVal > 85) progressVal = 85;
+      progPercent.textContent = Math.round(progressVal) + "%";
     }
   }, 300);
 
   const sheetRows = csvRows.map(r => [
-    "", // No (biarkan kosong jika ada auto-number di Apps Script)
+    "", // No
     r["No Komplain"] || "",
     r["Jenis Komplain"] || "",
     r["Kategori Masalah"] || "",
@@ -477,19 +467,20 @@ async function renderHistoryList(){
       body: JSON.stringify({ rows: sheetRows })
     });
 
-    clearInterval(interval);
+    // Berhasil
+    clearInterval(progressInterval);
     progPercent.textContent = "100%";
     statusText.textContent = " ✅ DATA Terkirim";
-    progContainer.classList.add("text-success");
 
     setTimeout(() => {
       progContainer.classList.add("d-none");
     }, 3000);
 
   } catch (err) {
-    clearInterval(interval);
+    clearInterval(progressInterval);
     progPercent.textContent = "ERR";
     progContainer.classList.replace("text-success", "text-danger");
+    statusText.textContent = " ❌ Gagal Kirim";
     console.error(err);
   }
 }
@@ -996,6 +987,7 @@ document.addEventListener("DOMContentLoaded", ()=> {
 </script>
 </body>
 </html>
+
 
 
 
