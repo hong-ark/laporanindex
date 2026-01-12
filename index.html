@@ -16,6 +16,77 @@
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
   <style>
+  
+    /* --- Tambahan Dark Mode --- */
+:root {
+  --bg-body: #f6f7fb;
+  --bg-card: #ffffff;
+  --text-main: #212529;
+  --border-color: #dee2e6;
+}
+
+[data-bs-theme="dark"] {
+  --bg-body: #121212;
+  --bg-card: #1e1e1e;
+  --text-main: #e0e0e0;
+  --border-color: #333333;
+}
+    /* Menyesuaikan area luar saat export/copy di Dark Mode */
+[data-bs-theme="dark"] body {
+    background-color: #121212 !important;
+}
+
+[data-bs-theme="dark"] .container {
+    background-color: #1e1e1e !important;
+    border: none !important;
+}
+
+/* Pastikan teks "Last update data" di bawah tabel juga jadi putih */
+[data-bs-theme="dark"] .last-update-text, 
+[data-bs-theme="dark"] #copyright {
+    color: #aaaaaa !important;
+}
+
+/* Menghilangkan shadow putih yang mungkin muncul di sekitar container */
+[data-bs-theme="dark"] .container {
+    box-shadow: none !important;
+}
+/* Pastikan judul laporan berubah jadi putih saat dark mode */
+[data-bs-theme="dark"] #judulLaporan {
+    color: #ffffff !important;
+}
+
+/* Tambahan: pastikan teks instruksi di atas select shift juga terbaca */
+[data-bs-theme="dark"] .content-area p {
+    color: #e0e0e0 !important;
+}
+/* Mengubah variabel body agar mengikuti tema */
+body { background: var(--bg-body) !important; color: var(--text-main); transition: 0.3s; }
+.container { background: var(--bg-card) !important; border-color: var(--border-color) !important; }
+
+/* Tombol Floating Kanan Bawah */
+.theme-toggle-float {
+  position: fixed;
+  bottom: 25px;
+  right: 25px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #1976d2;
+  color: white;
+  border: none;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  transition: transform 0.2s;
+}
+.theme-toggle-float:hover { transform: scale(1.1); }
+[data-bs-theme="dark"] .theme-toggle-float { background: #f1c40f; color: #333; }
+[data-bs-theme="dark"] .form-control, [data-bs-theme="dark"] .form-select { background-color: #2b2b2b; border-color: #444; color: #fff; }
+[data-bs-theme="dark"] .table { color: #fff; }
     body { background: #f6f7fb; padding: 20px; font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial; }
     .container { max-width: 1100px; background: white; border-radius: 10px; padding: 0;
                  box-shadow: 0 2px 6px rgba(0,0,0,0.1); overflow: hidden; margin: 0 auto; }
@@ -74,6 +145,11 @@
 </head>
 
 <body>
+  <button class="theme-toggle-float" id="themeToggle" title="Ganti Mode">
+    <svg id="themeIcon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+        <path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708z"/>
+    </svg>
+</button>
 <div class="container">
   <div class="site-top" role="banner" aria-label="Header Pengumuman">
     <h1 class="title"></h1>
@@ -864,65 +940,79 @@ if (downloadBtn) {
 /* ====== SHARE WHATSAPP (TANPA MENGUBAH LAYOUT) ====== */
 document.getElementById("shareBtn").addEventListener("click", async () => {
   const judul = document.getElementById("judulLaporan");
-  const resultArea = document.getElementById("resultArea");
+  const table = document.getElementById("resultTable");
+  const lastUpdate = document.getElementById("lastUpdate");
   const statusText = document.getElementById("statusText");
 
-  statusText.textContent = "Menyiapkan gambar untuk WhatsApp...";
+  const isDark =
+    document.documentElement.getAttribute("data-bs-theme") === "dark";
 
-  /* === CLONE INVISIBLE (TIDAK MENGGANGGU HALAMAN) === */
+  statusText.textContent = "Menyiapkan gambar laporan...";
+
+  /* === WRAPPER FIXED SIZE (WA OPTIMAL) === */
   const cloneWrapper = document.createElement("div");
   cloneWrapper.style.position = "fixed";
-  cloneWrapper.style.left = "-99999px";
+  cloneWrapper.style.left = "-10000px";
   cloneWrapper.style.top = "0";
-  cloneWrapper.style.background = "#ffffff";
-  cloneWrapper.style.display = "inline-block";
+  cloneWrapper.style.background = isDark ? "#121212" : "#ffffff";
+  cloneWrapper.style.color = isDark ? "#e0e0e0" : "#000000";
   cloneWrapper.style.padding = "16px";
+  cloneWrapper.style.margin = "0";
+  cloneWrapper.style.width = "1100px";   // 🔥 SAMA DENGAN CONTAINER
+  cloneWrapper.style.fontFamily = "Segoe UI, Arial, sans-serif";
 
-  cloneWrapper.appendChild(judul.cloneNode(true));
-  cloneWrapper.appendChild(resultArea.cloneNode(true));
+  /* === JUDUL === */
+  const judulClone = judul.cloneNode(true);
+  judulClone.style.margin = "0 0 12px 0";
+  judulClone.style.padding = "0";
+  judulClone.style.textAlign = "center";
+
+  /* === TABLE ONLY (BUKAN resultArea) === */
+  const tableClone = table.cloneNode(true);
+  tableClone.style.margin = "0";
+  tableClone.style.width = "100%";
+
+  /* === LAST UPDATE === */
+  const lastClone = lastUpdate.cloneNode(true);
+  lastClone.style.marginTop = "8px";
+  lastClone.style.fontSize = "13px";
+
+  cloneWrapper.appendChild(judulClone);
+  cloneWrapper.appendChild(tableClone);
+  cloneWrapper.appendChild(lastClone);
 
   document.body.appendChild(cloneWrapper);
 
   try {
     const canvas = await html2canvas(cloneWrapper, {
-      backgroundColor: "#ffffff",
-      scale: 2
+      backgroundColor: isDark ? "#121212" : "#ffffff",
+      scale: 2,
+      useCORS: true
     });
 
     document.body.removeChild(cloneWrapper);
 
-    const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+    await navigator.clipboard.write([
+      new ClipboardItem({ "image/png": await new Promise(r => canvas.toBlob(r)) })
+    ]);
 
-    if (isMobile && navigator.share) {
-      canvas.toBlob(async blob => {
-        const file = new File([blob], "Laporan_Index_CO.jpg", { type: "image/jpeg" });
-        await navigator.share({
-          files: [file],
-          title: "Laporan Index CO"
-        });
-        statusText.textContent = "✅ Berhasil dibagikan ke WhatsApp";
-      }, "image/jpeg", 0.9);
-    } else {
-      canvas.toBlob(async blob => {
-        await navigator.clipboard.write([
-          new ClipboardItem({ "image/png": blob })
-        ]);
-        alert(
-          "Gambar berhasil disalin.\n\n" +
-          "Buka WhatsApp Web / Desktop\n" +
-          "→ pilih chat\n" +
-          "→ tekan CTRL + V"
-        );
-        statusText.textContent = "✅ Gambar siap ditempel ke WhatsApp";
-      });
-    }
+    alert(
+      "Gambar laporan berhasil dicopy.\n\n" +
+      "Paste (Ctrl+V) langsung ke WhatsApp."
+    );
+    statusText.textContent = "✅ Gambar siap dikirim ke WhatsApp";
 
   } catch (err) {
     console.error(err);
-    statusText.textContent = "❌ Gagal share ke WhatsApp";
+    statusText.textContent = "❌ Gagal membuat gambar laporan";
     document.body.removeChild(cloneWrapper);
   }
 });
+
+
+
+    
+   
 /* ====== UI helper for toggle siang and button states ====== */
 function updateToggleSiangAvailability(){
   const mode = document.getElementById("shiftInput").value.trim().toUpperCase();
@@ -984,9 +1074,42 @@ document.addEventListener("DOMContentLoaded", ()=> {
   loadLastUpdate();
   setInterval(loadLastUpdate, 600000); // refresh tiap 10 menit
 });
+  // --- Logic Toggle Dark Mode ---
+const themeToggle = document.getElementById('themeToggle');
+const themeIcon = document.getElementById('themeIcon');
+const htmlElement = document.documentElement;
+
+// Fungsi aktifkan dark mode
+function enableDarkMode() {
+  htmlElement.setAttribute('data-bs-theme', 'dark');
+  localStorage.setItem('theme', 'dark');
+  themeIcon.innerHTML = '<path d="M6 .278a.768.768 0 0 1 .08.858 7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278z"/>';
+}
+
+// Fungsi matikan dark mode
+function disableDarkMode() {
+  htmlElement.setAttribute('data-bs-theme', 'light');
+  localStorage.setItem('theme', 'light');
+  themeIcon.innerHTML = '<path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708z"/>';
+}
+
+// Cek simpanan di browser
+if (localStorage.getItem('theme') === 'dark') enableDarkMode();
+
+// Event click
+themeToggle.addEventListener('click', () => {
+  const currentTheme = htmlElement.getAttribute('data-bs-theme');
+  if (currentTheme === 'dark') disableDarkMode();
+  else enableDarkMode();
+});
 </script>
 </body>
 </html>
+
+
+
+
+
 
 
 
