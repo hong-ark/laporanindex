@@ -160,25 +160,29 @@ async function doSearch() {
   const q = document.getElementById("qInput").value.trim();
   if (!q) return;
 
+  // 1️⃣ tampilkan loading
   document.getElementById("infoText").innerHTML = `
-  <div class="loader">
-    <span></span><span></span><span></span>
-    <span class="ms-2">Mencari data...</span>
-  </div>
-`;
-
+    <div class="d-flex flex-column align-items-center gap-1">
+      <div class="loader">
+        <span></span><span></span><span></span>
+      </div>
+      <small class="text-muted">Mencari data…</small>
+    </div>
+  `;
   document.getElementById("resultArea").innerHTML = "";
-document.getElementById("infoText").innerHTML =
-  `<span class="text-success">✅ Ditemukan ${json.data.length} data</span>`;
+
   try {
+    // 2️⃣ fetch data
     const res = await fetch(`${GAS_URL}?kode=${encodeURIComponent(q)}`);
     const json = await res.json();
 
     if (!json.ok) throw new Error(json.error || "Gagal mengambil data");
 
-    document.getElementById("infoText").textContent =
-      `Ditemukan ${json.data.length} data`;
+    // 3️⃣ update info setelah data ada
+    document.getElementById("infoText").innerHTML =
+      `<span class="text-success">✅ Ditemukan ${json.data.length} data</span>`;
 
+    // 4️⃣ render card
     renderCards(json.data || []);
 
   } catch (err) {
@@ -186,6 +190,7 @@ document.getElementById("infoText").innerHTML =
     alert("❌ Error: " + err.message);
   }
 }
+
 
 /* =========================
    RENDER CARD
@@ -314,6 +319,7 @@ function esc(v) {
 
 </body>
 </html>
+
 
 
 
