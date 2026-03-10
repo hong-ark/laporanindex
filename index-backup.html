@@ -285,9 +285,7 @@ body { background: var(--bg-body) !important; color: var(--text-main); transitio
       Hitung Index
     </button>
 
-    <span id="progressContainer" class="d-none fw-bold text-success" style="font-size: 14px;">
-      Uploading: <span id="progressPercent">0%</span>
-    </span>
+    
 
     <span id="statusText" class="text-muted"></span>
   </div>
@@ -1181,14 +1179,11 @@ document.getElementById("shareBtn").addEventListener("click", async () => {
   tableClone.style.width = "100%";
 
   /* === LAST UPDATE === */
-  const lastClone = lastUpdate.cloneNode(true);
-  lastClone.style.marginTop = "8px";
-  lastClone.style.fontSize = "13px";
+  
 
   cloneWrapper.appendChild(judulClone);
   cloneWrapper.appendChild(tableClone);
-  cloneWrapper.appendChild(lastClone);
-
+ 
   document.body.appendChild(cloneWrapper);
 
   try {
@@ -1313,6 +1308,7 @@ themeToggle.addEventListener('click', () => {
 </script>
 </body>
 </html>
+
 
 
 
